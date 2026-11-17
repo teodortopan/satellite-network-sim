@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Single check command. Builds the CI image and runs scripts/ci.sh in it.
 # Requires only Docker on the host.
-# Usage: scripts/check.sh [format|asan-gcc|asan-clang|valgrind|tidy|all]   (default: all)
+# Usage: scripts/check.sh [format|python-lint|asan-gcc|asan-clang|valgrind|tidy|all]
+# Default: all.
 set -euo pipefail
 
 repo="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"

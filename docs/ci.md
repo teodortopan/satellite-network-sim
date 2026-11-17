@@ -1,9 +1,9 @@
 # CI and local checks
 
 All checks run inside one Docker image (`docker/Dockerfile`, Ubuntu 24.04 with GCC 13,
-Clang 18, CMake, Ninja, Valgrind, clang-format, clang-tidy, and Python 3 with ruff). GitHub Actions and the local
-check run the same `scripts/ci.sh` steps in that image, so a green local run means the same
-commands pass in CI. Local runs on an Apple silicon Mac are linux/arm64; CI is x86_64.
+Clang 18, CMake, Ninja, Valgrind, clang-format, clang-tidy, and Python 3 with ruff). GitHub
+Actions and the local check run the same `scripts/ci.sh` steps in that image, so a green
+local run means the same commands pass in CI. Local runs on an Apple silicon Mac are linux/arm64; CI is x86_64.
 
 ## Running locally
 
@@ -35,6 +35,17 @@ on one of them, and each compiler warns about different things. GoogleTest is bu
 same sanitizer flags as our code but without our warnings.
 
 The disabled clang-tidy checks and the reason for each are listed at the top of `.clang-tidy`.
+
+## The full-snapshot check
+
+Unit tests run under the sanitizers and Valgrind on small fixtures of real records. Loading
+the whole committed Starlink snapshot (about 22,000 records) is a check on the data, not on
+memory safety, so it is a separate executable, `satsim_orbit_snapshot_check`. It is built
+only without sanitizers and runs natively in the `valgrind` step's optimised build, where it
+takes a fraction of a second. Under GCC's AddressSanitizer the same parse takes about five
+minutes per file, because GCC enables stack-use-after-return detection by default and the
+JSON parser makes very many small calls. If a real record ever fails to load, copy it into
+the fixtures so the sanitizers cover that path too.
 
 ## Deliberately deferred
 

@@ -17,11 +17,11 @@ Global rules (workflow, commits, review, self-review) load from
 ## Commands
 
 - **`scripts/check.sh` is the single check command.** It builds the Docker
-  image in `docker/Dockerfile` and runs every CI step inside it: format,
-  ASan + UBSan tests with GCC and with Clang, Valgrind, clang-tidy. Exit 0
-  only if all pass. It needs only Docker on the host.
-- `scripts/check.sh <step>` runs one step (`format`, `asan-gcc`, `asan-clang`,
-  `valgrind`, `tidy`).
+  image in `docker/Dockerfile` and runs every CI step inside it: C++ format,
+  Python lint, ASan + UBSan tests with GCC and with Clang, Valgrind,
+  clang-tidy. Exit 0 only if all pass. It needs only Docker on the host.
+- `scripts/check.sh <step>` runs one step (`format`, `python-lint`,
+  `asan-gcc`, `asan-clang`, `valgrind`, `tidy`).
 - CI (`.github/workflows/ci.yml`) runs the same steps through the same
   `scripts/ci.sh`, so a green local check means a green CI. Prefer adding a
   step to `scripts/ci.sh` over putting logic in the workflow file, because
