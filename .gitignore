@@ -24,3 +24,7 @@ target/
 
 # Claude Code local settings
 .claude/settings.local.json
+
+# CMake / CTest local files
+CMakeUserPresets.json
+Testing/

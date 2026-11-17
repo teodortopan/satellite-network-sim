@@ -1,0 +1,89 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+# Every job builds the same image (layer-cached) and runs one scripts/ci.sh step,
+# so CI runs exactly what scripts/check.sh runs locally.
+
+jobs:
+  format:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+      - uses: docker/setup-buildx-action@v4
+      - uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: docker/Dockerfile
+          tags: satsim-ci
+          load: true
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      - run: docker run --rm --cap-add=SYS_PTRACE -v "$PWD":/work -w /work satsim-ci scripts/ci.sh format
+
+  asan:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        compiler: [gcc, clang]
+    steps:
+      - uses: actions/checkout@v7
+      - uses: docker/setup-buildx-action@v4
+      - uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: docker/Dockerfile
+          tags: satsim-ci
+          load: true
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      # Sanitizer runtimes from LLVM 18 / GCC 13 can fail to map shadow memory with the
+      # high ASLR entropy (vm.mmap_rnd_bits=32) of recent runner kernels. Containers share
+      # the host kernel, so lower it on the runner.
+      - run: sudo sysctl -w vm.mmap_rnd_bits=28
+      - run: docker run --rm --cap-add=SYS_PTRACE -v "$PWD":/work -w /work satsim-ci scripts/ci.sh asan-${{ matrix.compiler }}
+
+  valgrind:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+      - uses: docker/setup-buildx-action@v4
+      - uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: docker/Dockerfile
+          tags: satsim-ci
+          load: true
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      - run: docker run --rm --cap-add=SYS_PTRACE -v "$PWD":/work -w /work satsim-ci scripts/ci.sh valgrind
+
+  tidy:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+      - uses: docker/setup-buildx-action@v4
+      - uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: docker/Dockerfile
+          tags: satsim-ci
+          load: true
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      - run: docker run --rm --cap-add=SYS_PTRACE -v "$PWD":/work -w /work satsim-ci scripts/ci.sh tidy

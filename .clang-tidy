@@ -1,0 +1,43 @@
+---
+# Disabled checks and why:
+#   modernize-use-trailing-return-type     style preference, not a defect
+#   bugprone-easily-swappable-parameters   flags every (double, double) signature; too noisy for numeric code
+#   *-avoid-magic-numbers                  numeric constants are the point of physics code and tests
+#   cppcoreguidelines-avoid-non-const-global-variables,
+#   cppcoreguidelines-owning-memory,
+#   cppcoreguidelines-special-member-functions
+#                                          fire inside GoogleTest's TEST() macro expansion
+#   readability-function-cognitive-complexity
+#                                          each EXPECT_* expands to branches; long test bodies trip it
+#   cppcoreguidelines-pro-bounds-*         C arrays and pointer arithmetic are rare here; revisit if needed
+Checks: >
+  -*,
+  bugprone-*,
+  -bugprone-easily-swappable-parameters,
+  performance-*,
+  modernize-*,
+  -modernize-use-trailing-return-type,
+  cppcoreguidelines-*,
+  -cppcoreguidelines-avoid-magic-numbers,
+  -cppcoreguidelines-avoid-non-const-global-variables,
+  -cppcoreguidelines-owning-memory,
+  -cppcoreguidelines-special-member-functions,
+  -cppcoreguidelines-pro-bounds-*,
+  readability-braces-around-statements,
+  readability-const-return-type,
+  readability-container-size-empty,
+  readability-else-after-return,
+  readability-implicit-bool-conversion,
+  readability-inconsistent-declaration-parameter-name,
+  readability-isolate-declaration,
+  readability-make-member-function-const,
+  readability-misleading-indentation,
+  readability-non-const-parameter,
+  readability-qualified-auto,
+  readability-redundant-*,
+  readability-simplify-boolean-expr
+WarningsAsErrors: '*'
+# Only report diagnostics in our own headers, not GoogleTest's or the standard library's.
+HeaderFilterRegex: '(^|/)(include/satsim|src|tests)/'
+FormatStyle: file
+...

@@ -1,0 +1,61 @@
+{
+  "version": 6,
+  "cmakeMinimumRequired": { "major": 3, "minor": 25, "patch": 0 },
+  "configurePresets": [
+    {
+      "name": "base",
+      "hidden": true,
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build/${presetName}",
+      "cacheVariables": {
+        "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
+        "SATSIM_WARNINGS_AS_ERRORS": "ON"
+      }
+    },
+    {
+      "name": "asan",
+      "inherits": "base",
+      "displayName": "Debug + ASan + UBSan",
+      "description": "Compiler comes from CC/CXX.",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "SATSIM_ENABLE_SANITIZERS": "ON"
+      }
+    },
+    {
+      "name": "valgrind",
+      "inherits": "base",
+      "displayName": "RelWithDebInfo, no sanitizers (for Valgrind)",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "RelWithDebInfo",
+        "SATSIM_ENABLE_SANITIZERS": "OFF"
+      }
+    },
+    {
+      "name": "tidy",
+      "inherits": "base",
+      "displayName": "Debug, no sanitizers (compile_commands.json for clang-tidy)",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "SATSIM_ENABLE_SANITIZERS": "OFF"
+      }
+    }
+  ],
+  "buildPresets": [
+    { "name": "asan", "configurePreset": "asan" },
+    { "name": "valgrind", "configurePreset": "valgrind" },
+    { "name": "tidy", "configurePreset": "tidy" }
+  ],
+  "testPresets": [
+    {
+      "name": "asan",
+      "configurePreset": "asan",
+      "output": { "outputOnFailure": true }
+    },
+    {
+      "name": "valgrind",
+      "configurePreset": "valgrind",
+      "output": { "outputOnFailure": true }
+    }
+  ]
+}

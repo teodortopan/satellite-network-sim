@@ -1,0 +1,4 @@
+# The image needs no sources (the repo is bind-mounted at run time), so send only
+# the Dockerfile as build context.
+*
+!docker/Dockerfile
