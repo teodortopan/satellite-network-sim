@@ -89,7 +89,7 @@ silent error in this field.
   between the equinox direction and the Greenwich meridian. Rotating TEME coordinates about
   the z-axis by GMST gives PEF. This single rotation is the core of TEME to ECEF.
 - **Polar motion.** The rotation axis wanders a few metres across the Earth's surface. It
-  shifts a satellite's ECEF position by up to about 17 m.
+  shifts an ECEF position by up to about 17 m at the surface and 20 m at Starlink's height.
 - **Precession and nutation.** Slow wobbles of the Earth's axis against the stars. Needed
   only to convert between TEME and the precise inertial frames.
 - **Geodetic coordinates.** Latitude, longitude and height above the ellipsoid.

@@ -40,7 +40,8 @@ class UtcTime {
 
   /// This instant moved by `seconds` (negative moves back), rounded to the nearest
   /// nanosecond; crosses day, month and year boundaries with 86400 s per day.
-  /// Precondition: `seconds` is finite and |seconds| <= 1e11 (about 3000 years).
+  /// Precondition: `seconds` is finite and |seconds| <= 1e11 (about 3000 years); checked
+  /// by an assertion in debug builds.
   [[nodiscard]] UtcTime plus_seconds(double seconds) const noexcept;
 
   /// Seconds from `earlier` to this instant (negative if `earlier` is actually later).

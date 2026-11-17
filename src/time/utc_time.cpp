@@ -1,5 +1,6 @@
 #include "satsim/time/utc_time.hpp"
 
+#include <cassert>
 #include <cmath>
 #include <cstdint>
 #include <optional>
@@ -15,6 +16,7 @@ constexpr std::int64_t kNanosecondsPerMinute = 60 * kNanosecondsPerSecond;
 constexpr std::int64_t kNanosecondsPerHour = 60 * kNanosecondsPerMinute;
 constexpr std::int64_t kNanosecondsPerDay = 24 * kNanosecondsPerHour;
 constexpr double kSecondsPerDay = 86400.0;
+constexpr double kMaxOffsetSeconds = 1e11;  // plus_seconds precondition, about 3000 years.
 
 // 1970-01-01 is MJD 40587; MJD 0 is JD 2400000.5.
 constexpr std::int64_t kMjdOfUnixEpoch = 40587;
@@ -138,6 +140,8 @@ double UtcTime::jd_fraction() const noexcept {
 }
 
 UtcTime UtcTime::plus_seconds(double seconds) const noexcept {
+  // Outside the precondition the integer conversions below would be undefined behaviour.
+  assert(std::isfinite(seconds) && std::abs(seconds) <= kMaxOffsetSeconds);
   // Split into whole days and a remainder first: fmod is exact, so no precision of the
   // caller's value is lost, and the nanosecond product stays below 8.64e13.
   const double remainder_s = std::fmod(seconds, kSecondsPerDay);
