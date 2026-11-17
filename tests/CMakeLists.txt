@@ -17,9 +17,7 @@ satsim_enable_sanitizers(gtest_main)
 
 include(GoogleTest)
 
-add_executable(satsim_core_tests
-  core/angles_test.cpp)
-target_link_libraries(satsim_core_tests PRIVATE satsim::core GTest::gtest_main)
-satsim_set_warnings(satsim_core_tests)
-satsim_enable_sanitizers(satsim_core_tests)
-gtest_discover_tests(satsim_core_tests)
+add_subdirectory(core)
+add_subdirectory(time)
+add_subdirectory(frames)
+add_subdirectory(orbit)

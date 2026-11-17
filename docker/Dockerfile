@@ -14,8 +14,19 @@ RUN apt-get update \
         cmake \
         git \
         libclang-rt-dev \
+        libeigen3-dev \
         ninja-build \
+        nlohmann-json3-dev \
+        python3 \
+        python3-venv \
         valgrind \
     && rm -rf /var/lib/apt/lists/*
+
+# Python tooling lives in a virtual environment: Ubuntu's system Python refuses pip installs.
+COPY python/requirements.txt /tmp/requirements.txt
+RUN python3 -m venv /opt/venv \
+    && /opt/venv/bin/pip install --no-cache-dir -r /tmp/requirements.txt \
+    && rm /tmp/requirements.txt
+ENV PATH="/opt/venv/bin:${PATH}"
 
 WORKDIR /work

@@ -1,4 +1,5 @@
 # The image needs no sources (the repo is bind-mounted at run time), so send only
-# the Dockerfile as build context.
+# the Dockerfile and the Python requirements as build context.
 *
 !docker/Dockerfile
+!python/requirements.txt

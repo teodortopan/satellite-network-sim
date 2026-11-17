@@ -18,13 +18,13 @@ list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 include(Warnings)
 include(Sanitizers)
 
-add_library(satsim_core
-  src/core/angles.cpp)
-add_library(satsim::core ALIAS satsim_core)
-target_include_directories(satsim_core PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/include")
-target_compile_features(satsim_core PUBLIC cxx_std_20)
-satsim_set_warnings(satsim_core)
-satsim_enable_sanitizers(satsim_core)
+include(SatsimTargets)
+
+# One library per module. Later modules may depend on earlier ones.
+add_subdirectory(src/core)
+add_subdirectory(src/time)
+add_subdirectory(src/frames)
+add_subdirectory(src/orbit)
 
 if(SATSIM_BUILD_TESTS)
   enable_testing()

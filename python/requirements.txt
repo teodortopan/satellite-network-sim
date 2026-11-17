@@ -1,0 +1,2 @@
+# Python tooling installed into the CI image (docker/Dockerfile). Pin exact versions.
+ruff==0.17.5
