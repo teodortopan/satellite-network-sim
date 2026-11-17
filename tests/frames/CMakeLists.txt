@@ -1,1 +1,2 @@
-# Tests for module 'frames': not implemented yet.
+satsim_add_test(satsim_frames_tests SOURCES wgs84_test.cpp teme_ecef_test.cpp geodetic_test.cpp
+  DEPS satsim::frames)
