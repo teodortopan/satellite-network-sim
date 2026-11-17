@@ -1,0 +1,19 @@
+# Ruff settings for the Python tooling in python/ (scripts/ci.sh python-lint).
+# The ruff version is pinned in python/requirements.txt.
+line-length = 100
+target-version = "py312"  # Python of the CI image (Ubuntu 24.04).
+# Inside build/, which is ignored by git, instead of a .ruff_cache in the repo root.
+cache-dir = "build/ruff-cache"
+
+[lint]
+select = [
+  "E",    # pycodestyle errors
+  "W",    # pycodestyle warnings
+  "F",    # pyflakes
+  "I",    # import order
+  "N",    # pep8 naming
+  "UP",   # pyupgrade
+  "B",    # bugbear
+  "SIM",  # simplifications
+  "RUF",  # ruff-specific
+]

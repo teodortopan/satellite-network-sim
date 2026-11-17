@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 # CI steps. Runs inside the satsim-ci Docker image, from the repo root.
-# Usage: scripts/ci.sh <format|asan-gcc|asan-clang|valgrind|tidy|all>
+# Usage: scripts/ci.sh <format|python-lint|asan-gcc|asan-clang|valgrind|tidy|all>
 set -euo pipefail
 
 usage() {
-  echo "usage: $0 <format|asan-gcc|asan-clang|valgrind|tidy|all>" >&2
+  echo "usage: $0 <format|python-lint|asan-gcc|asan-clang|valgrind|tidy|all>" >&2
 }
 
 # Our C++ sources (not third-party code under build/).
@@ -24,6 +24,13 @@ step_format() {
   clang-format --version
   clang-format --dry-run --Werror "${files[@]}"
   echo "format: ${#files[@]} files OK"
+}
+
+# Lint and formatting of the Python tooling. Settings are in ruff.toml.
+step_python_lint() {
+  ruff --version
+  ruff check python
+  ruff format --check python
 }
 
 run_asan() {
@@ -69,6 +76,7 @@ run_step() {
   echo "==> $1"
   case "$1" in
     format) step_format ;;
+    python-lint) step_python_lint ;;
     asan-gcc) run_asan gcc gcc g++ ;;
     asan-clang) run_asan clang clang clang++ ;;
     valgrind) step_valgrind ;;
@@ -91,7 +99,7 @@ main() {
     return
   fi
 
-  local steps=(format asan-gcc asan-clang valgrind tidy)
+  local steps=(format python-lint asan-gcc asan-clang valgrind tidy)
   local failed=() s
   for s in "${steps[@]}"; do
     # Separate process so one failing step does not stop the others. (A subshell in an

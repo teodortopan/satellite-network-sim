@@ -1,0 +1,4 @@
+# Snapshots are stored byte for byte as downloaded so their sha256 in metadata.json stays
+# valid: no line-ending conversion. Each is one long line, so text diffs are useless.
+data/starlink/*/gp.json -text -diff
+data/starlink/*/supgp.json -text -diff
