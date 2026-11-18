@@ -1,6 +1,7 @@
 # Phase 1: Orbits
 
-**Status:** approved 2026-11-18. Units 1 and 2 are implemented; units 3 to 6 are in progress.
+**Status:** implemented 2026-11-18. The results, with every measured number, are in
+[phase-1-results.md](phase-1-results.md).
 
 Sources checked on 2026-11-17 and 2026-11-18:
 [CelesTrak GP data formats](https://celestrak.org/NORAD/documentation/gp-data-formats.php),
@@ -70,8 +71,11 @@ Read this first. Later sections assume it.
   elliptical orbit: the Earth's bulge at the equator (called J2), atmospheric drag, and for
   high orbits the Sun and Moon. GP data is produced by fitting SGP4 to tracking data, so
   SGP4 is the only correct way to read it back.
-- **Its accuracy.** Roughly a kilometre at the epoch, growing by one to a few kilometres per
-  day. That is a property of the method, not a bug to fix.
+- **Its accuracy.** Roughly a kilometre at the epoch, and worse with age. The usual rule of
+  thumb is one to a few kilometres per day. Starlink satellites fly low and thrust often,
+  and for them it is much worse: measured against SpaceX's own trajectories, about 0.4 km
+  for the first 12 hours, 3 km at 12 to 24 hours and tens of kilometres after one to two
+  days (see the results). That is a property of the method, not a bug to fix.
 - **Vallado's implementation.** David Vallado and co-authors published the reference C++
   code for SGP4 in 2006, with a file of test cases and expected outputs. Nearly every SGP4
   library descends from it.
@@ -223,8 +227,9 @@ Changed:
 - A time's scale (UTC, UT1 or TT) is clear from the type or the parameter name, the same
   way a position's frame is.
 - The satellite catalog number lives in this project's own types and is never passed into
-  the vendored SGP4 code, which stores it in a six-character buffer. Current numbers have
-  up to nine digits.
+  the vendored SGP4 code, which stores it in a six-character buffer. Catalogued numbers
+  now have six digits, and CelesTrak gives satellites that are not yet catalogued nine-digit
+  placeholder numbers.
 
 ## 5. Risks
 
@@ -281,12 +286,12 @@ Changed:
 ## 6. Plan
 
 Six implementation units, each one Opus subagent with a narrow brief (the snapshot in unit 3
-excepted), reviewed and verified by Fable before commit. Each lands as its own commit with
-`scripts/check.sh` green.
+excepted), reviewed and verified by Fable before commit. Each landed as its own commit with
+`scripts/check.sh` green. All six are done.
 
-1. **Time and frames (done).** The UTC instant type, calendar to Julian date, GMST, the TEME
+1. **Time and frames.** The UTC instant type, calendar to Julian date, GMST, the TEME
    to Earth-fixed rotation, ECEF to and from geodetic.
-2. **Data (done).** `python/fetch_elements.py`, a committed snapshot, the OMM JSON loader.
+2. **Data.** `python/fetch_elements.py`, a committed snapshot, the OMM JSON loader.
 3. **Matched snapshot.** `fetch_elements.py` also saves the IERS file and a fixed sample of
    SpaceX trajectory files, in the same run as the element sets. One fresh snapshot replaces
    the first one.

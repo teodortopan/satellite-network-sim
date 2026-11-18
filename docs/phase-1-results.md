@@ -12,7 +12,7 @@ commands.
 - **A snapshot.** One download of the standard and supplemental Starlink element sets from
   CelesTrak (OMM JSON), the IERS Earth-orientation file `finals2000A.all`, and SpaceX's
   trajectory files for 150 satellites. The first three are in git. The trajectory files are
-  not (about 200 MB, and the site states no redistribution terms); `metadata.json` records
+  not (about 300 MB, and the site states no redistribution terms); `metadata.json` records
   the sha256 of each one.
 - **A C++ library**, in four modules:
   - `time`: a UTC instant held as whole days plus a fraction, never one floating-point
