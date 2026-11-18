@@ -4,6 +4,8 @@ line-length = 100
 target-version = "py312"  # Python of the CI image (Ubuntu 24.04).
 # Inside build/, which is ignored by git, instead of a .ruff_cache in the repo root.
 cache-dir = "build/ruff-cache"
+# The scripts import each other (snapshot_tools): first-party, sorted after third-party.
+src = ["python"]
 
 [lint]
 select = [

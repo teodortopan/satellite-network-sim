@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 # CI steps. Runs inside the satsim-ci Docker image, from the repo root.
-# Usage: scripts/ci.sh <format|python-lint|asan-gcc|asan-clang|valgrind|tidy|all>
+# Usage: scripts/ci.sh <format|python-lint|asan-gcc|asan-clang|valgrind|tidy|validate|all>
 set -euo pipefail
 
 usage() {
-  echo "usage: $0 <format|python-lint|asan-gcc|asan-clang|valgrind|tidy|all>" >&2
+  echo "usage: $0 <format|python-lint|asan-gcc|asan-clang|valgrind|tidy|validate|all>" >&2
 }
 
 # Our C++ sources (not third-party code under build/).
@@ -75,6 +75,16 @@ step_tidy() {
   echo "tidy: ${#files[@]} files OK"
 }
 
+# The propagate program, optimised and without sanitizers, checked against Skyfield on a
+# fixed sample of the committed snapshot (python/validate_against_reference.py). Tests are not
+# built (no GoogleTest download), so the step needs no network once the image exists.
+step_validate() {
+  local dir=build/validate
+  CC=gcc CXX=g++ cmake --preset valgrind -B "$dir" -DSATSIM_BUILD_TESTS=OFF
+  cmake --build "$dir" --target propagate
+  python3 python/validate_against_reference.py --propagate "$dir/bin/propagate"
+}
+
 run_step() {
   echo "==> $1"
   case "$1" in
@@ -84,6 +94,7 @@ run_step() {
     asan-clang) run_asan clang clang clang++ ;;
     valgrind) step_valgrind ;;
     tidy) step_tidy ;;
+    validate) step_validate ;;
     *)
       usage
       exit 2
@@ -102,7 +113,7 @@ main() {
     return
   fi
 
-  local steps=(format python-lint asan-gcc asan-clang valgrind tidy)
+  local steps=(format python-lint asan-gcc asan-clang valgrind tidy validate)
   local failed=() s
   for s in "${steps[@]}"; do
     # Separate process so one failing step does not stop the others. (A subshell in an

@@ -2,16 +2,23 @@
 
 [![CI](https://github.com/teodortopan/satellite-network-sim/actions/workflows/ci.yml/badge.svg)](https://github.com/teodortopan/satellite-network-sim/actions/workflows/ci.yml)
 
-A satellite network simulator.
+A simulator of a Starlink-like satellite network on real public orbital data.
 
-**Status:** early. C++20 build, tests and CI are in place; simulator code has not started yet.
+**Status:** Phase 1 (orbits) is implemented. From a saved snapshot of CelesTrak element sets and
+IERS Earth-orientation data, the `propagate` program computes every Starlink satellite's
+position with SGP4, in the Earth-fixed frame (ITRF), as latitude, longitude and height
+(WGS-84), and in J2000. It agrees with Skyfield to under 1 mm in TEME and ITRF and is within
+0.5 km (median) of SpaceX's own trajectories near the element epoch. The numbers, the plots
+and how to reproduce them are in [docs/phase-1-results.md](docs/phase-1-results.md). Links,
+routing and the dashboard come in later phases.
 
 This repository is the source of truth for the project.
 
 ## Build and test
 
 The only host requirement is Docker. The check builds the CI image and runs every step in it
-(formatting, ASan/UBSan builds with GCC and Clang, Valgrind, clang-tidy):
+(formatting, Python lint, ASan/UBSan builds with GCC and Clang, Valgrind, clang-tidy, and the
+comparison of `propagate` against Skyfield):
 
 ```sh
 scripts/check.sh            # all steps

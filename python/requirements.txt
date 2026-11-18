@@ -1,5 +1,23 @@
-# Python tooling installed into the CI image (docker/Dockerfile). Pin exact versions.
+# Python tooling installed into the CI image (docker/Dockerfile). Pin exact versions,
+# including every dependency, so the image is the same on every rebuild.
 ruff==0.17.5
 # ERFA (BSD-licensed IAU SOFA) for python/gen_frame_reference.py; numpy is its dependency.
 pyerfa==2.0.1.5
 numpy==2.5.5
+# Skyfield and Vallado's SGP4 (python-sgp4) for python/validate_against_reference.py.
+# jplephem and certifi are Skyfield dependencies; neither is used for downloads here.
+skyfield==1.55
+sgp4==2.27
+jplephem==2.24
+certifi==2026.10.23
+# matplotlib for python/plot_phase1.py, and its dependencies.
+matplotlib==3.11.2
+contourpy==1.4.0
+cycler==0.12.1
+fonttools==4.68.0
+kiwisolver==1.5.1
+packaging==26.3
+pillow==13.0.0
+pyparsing==3.3.3
+python-dateutil==4.0.0
+tzdata==2026.6
