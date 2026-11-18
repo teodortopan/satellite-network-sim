@@ -15,6 +15,22 @@ function(satsim_add_library name)
   satsim_enable_sanitizers(${target})
 endfunction()
 
+# satsim_add_third_party_library(<name> SOURCES <files...> INCLUDE_DIR <dir>)
+# Creates static library satsim_<name> with alias satsim::<name> from vendored, unmodified
+# third-party sources. It gets the sanitizers (so the whole test binary is instrumented
+# consistently) but not our warning flags, the same treatment GoogleTest gets. INCLUDE_DIR is
+# a SYSTEM include directory, so the compiler and clang-tidy do not report warnings from its
+# headers inside our targets. scripts/ci.sh never formats or tidies third_party/.
+function(satsim_add_third_party_library name)
+  cmake_parse_arguments(ARG "" "INCLUDE_DIR" "SOURCES" ${ARGN})
+  set(target satsim_${name})
+  add_library(${target} STATIC ${ARG_SOURCES})
+  add_library(satsim::${name} ALIAS ${target})
+  target_include_directories(${target} SYSTEM PUBLIC "${ARG_INCLUDE_DIR}")
+  target_compile_features(${target} PUBLIC cxx_std_20)
+  satsim_enable_sanitizers(${target})
+endfunction()
+
 # satsim_add_test(<name> SOURCES <files...> [DEPS <targets...>])
 # Creates GoogleTest executable <name> (must end in _tests) in <build>/tests, where
 # scripts/ci.sh looks for executables to run under Valgrind, and registers its cases

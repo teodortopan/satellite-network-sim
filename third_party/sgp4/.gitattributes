@@ -1,0 +1,5 @@
+# Vendored files are kept byte for byte (their sha256 is in README.md): no line-ending
+# conversion. SGP4.cpp and SGP4.h use CRLF.
+SGP4.cpp -text
+SGP4.h -text
+LICENSE -text

@@ -20,6 +20,11 @@ include(Sanitizers)
 
 include(SatsimTargets)
 
+# Vendored third-party code, built unmodified (see third_party/sgp4/README.md).
+satsim_add_third_party_library(sgp4
+  SOURCES third_party/sgp4/SGP4.cpp
+  INCLUDE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/third_party/sgp4")
+
 # One library per module. Later modules may depend on earlier ones.
 add_subdirectory(src/core)
 add_subdirectory(src/time)

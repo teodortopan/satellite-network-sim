@@ -1,0 +1,4 @@
+# Vallado's verification files are kept byte for byte (their sha256 is in README.md): no
+# line-ending conversion.
+SGP4-VER.TLE -text
+tcppver.out -text
