@@ -16,7 +16,9 @@ constexpr std::int64_t kNanosecondsPerMinute = 60 * kNanosecondsPerSecond;
 constexpr std::int64_t kNanosecondsPerHour = 60 * kNanosecondsPerMinute;
 constexpr std::int64_t kNanosecondsPerDay = 24 * kNanosecondsPerHour;
 constexpr double kSecondsPerDay = 86400.0;
-constexpr double kMaxOffsetSeconds = 1e11;  // plus_seconds precondition, about 3000 years.
+// plus_seconds precondition, about 3000 years. Only read by an assert, so it is unused in
+// release builds (NDEBUG), which Clang reports as an error without the attribute.
+[[maybe_unused]] constexpr double kMaxOffsetSeconds = 1e11;
 
 // 1970-01-01 is MJD 40587; MJD 0 is JD 2400000.5.
 constexpr std::int64_t kMjdOfUnixEpoch = 40587;
