@@ -9,7 +9,7 @@ usage() {
 
 # Our C++ sources (not third-party code under build/).
 our_sources() {
-  find include src tests -type f \( -name '*.hpp' -o -name '*.cpp' \) | sort
+  find include src apps tests -type f \( -name '*.hpp' -o -name '*.cpp' \) | sort
 }
 
 configure_and_build() {
@@ -53,10 +53,13 @@ step_valgrind() {
     echo "valgrind: no test executables found in $dir/tests" >&2
     return 1
   fi
+  # --trace-children=yes: tests that run a built program (the propagate end-to-end test) get
+  # it checked too. Exit code 99 is one no program here uses, so a test that checks a child's
+  # exit status sees a Valgrind error in the child as a failure.
   local t
   for t in "${tests[@]}"; do
     echo "valgrind: $t"
-    valgrind --error-exitcode=1 --leak-check=full \
+    valgrind --error-exitcode=99 --trace-children=yes --leak-check=full \
       --errors-for-leak-kinds=definite,possible --track-origins=yes "$t"
   done
 }

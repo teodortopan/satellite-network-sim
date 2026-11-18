@@ -38,6 +38,6 @@ Checks: >
   readability-simplify-boolean-expr
 WarningsAsErrors: '*'
 # Only report diagnostics in our own headers, not GoogleTest's or the standard library's.
-HeaderFilterRegex: '(^|/)(include/satsim|src|tests)/'
+HeaderFilterRegex: '(^|/)(include/satsim|src|apps|tests)/'
 FormatStyle: file
 ...

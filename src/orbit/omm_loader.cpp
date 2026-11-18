@@ -1,6 +1,5 @@
 #include "satsim/orbit/omm_loader.hpp"
 
-#include <algorithm>
 #include <array>
 #include <charconv>
 #include <cmath>
@@ -14,6 +13,7 @@
 #include <utility>
 
 #include "satsim/core/angles.hpp"
+#include "satsim/time/civil_time.hpp"
 
 namespace satsim::orbit {
 
@@ -60,59 +60,16 @@ std::string describe_type(const json& value) {
   return std::string(vowel ? "an " : "a ") + std::string(name);
 }
 
-bool is_digit(char c) { return c >= '0' && c <= '9'; }
-
-bool all_digits(std::string_view text) {
-  return !text.empty() && std::all_of(text.begin(), text.end(), is_digit);
-}
-
-// Caller guarantees all_digits(text) and at most 4 characters, so this cannot overflow.
-int to_int(std::string_view text) {
-  int value = 0;
-  for (const char c : text) {
-    value = value * 10 + (c - '0');
-  }
-  return value;
-}
-
-// Parses EPOCH strictly as YYYY-MM-DDTHH:MM:SS with an optional fraction of 1 to 9 digits.
-// CelesTrak sends exactly six fraction digits and no zone designator; the time is UTC.
-// Only field ranges are checked here: whether the date exists is the time module's job.
-// Returns an error message, or nothing on success.
+// Parses EPOCH strictly as YYYY-MM-DDTHH:MM:SS with an optional fraction of 1 to 9 digits
+// (time::parse_iso_civil_time). CelesTrak sends exactly six fraction digits and no zone
+// designator; the time is UTC. Only field ranges are checked here: whether the date exists is
+// the time module's job. Returns an error message, or nothing on success.
 std::optional<std::string> parse_epoch(std::string_view text, time::CivilTime& out) {
-  constexpr std::size_t kBaseLength = 19;  // "YYYY-MM-DDTHH:MM:SS"
-  constexpr std::size_t kMaxFractionDigits = 9;
-  std::string bad_format = "EPOCH " + quote(text) + " is not YYYY-MM-DDTHH:MM:SS[.ffffff]";
-
-  if (text.size() < kBaseLength) {
-    return bad_format;
+  const std::optional<time::CivilTime> parsed = time::parse_iso_civil_time(text);
+  if (!parsed) {
+    return "EPOCH " + quote(text) + " is not YYYY-MM-DDTHH:MM:SS[.ffffff]";
   }
-  const auto field = [text](std::size_t pos, std::size_t len) { return text.substr(pos, len); };
-  if (!all_digits(field(0, 4)) || text[4] != '-' || !all_digits(field(5, 2)) || text[7] != '-' ||
-      !all_digits(field(8, 2)) || text[10] != 'T' || !all_digits(field(11, 2)) || text[13] != ':' ||
-      !all_digits(field(14, 2)) || text[16] != ':' || !all_digits(field(17, 2))) {
-    return bad_format;
-  }
-  if (text.size() > kBaseLength) {
-    const std::string_view fraction = text.substr(kBaseLength + 1);
-    if (text[kBaseLength] != '.' || !all_digits(fraction) || fraction.size() > kMaxFractionDigits) {
-      return bad_format;
-    }
-  }
-
-  time::CivilTime epoch;
-  epoch.year = to_int(field(0, 4));
-  epoch.month = to_int(field(5, 2));
-  epoch.day = to_int(field(8, 2));
-  epoch.hour = to_int(field(11, 2));
-  epoch.minute = to_int(field(14, 2));
-  // "SS" or "SS.fff", already checked to be digits and one dot, so from_chars reads all of it.
-  const std::string_view seconds = text.substr(17);
-  const auto [end, ec] = std::from_chars(seconds.data(), seconds.data() + seconds.size(),
-                                         epoch.second, std::chars_format::fixed);
-  if (ec != std::errc{} || end != seconds.data() + seconds.size()) {
-    return bad_format;
-  }
+  const time::CivilTime& epoch = *parsed;
 
   const std::string prefix = "EPOCH " + quote(text) + ": ";
   if (epoch.month < 1 || epoch.month > 12) {

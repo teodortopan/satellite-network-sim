@@ -31,6 +31,9 @@ add_subdirectory(src/time)
 add_subdirectory(src/frames)
 add_subdirectory(src/orbit)
 
+# Programs.
+add_subdirectory(apps/propagate)
+
 if(SATSIM_BUILD_TESTS)
   enable_testing()
   add_subdirectory(tests)
