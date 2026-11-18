@@ -1,12 +1,15 @@
 # Phase 1: Orbits
 
-**Status:** draft.
+**Status:** approved 2026-11-18. Units 1 and 2 are implemented; units 3 to 6 are in progress.
 
-Sources checked on 2026-11-17:
+Sources checked on 2026-11-17 and 2026-11-18:
 [CelesTrak GP data formats](https://celestrak.org/NORAD/documentation/gp-data-formats.php),
 [CelesTrak supplemental GP data](https://celestrak.org/NORAD/elements/supplemental/),
 [CelesTrak astrodynamics code](https://github.com/CelesTrak/fundamentals-of-astrodynamics),
-[python-sgp4](https://github.com/brandon-rhodes/python-sgp4).
+[python-sgp4](https://github.com/brandon-rhodes/python-sgp4),
+[SpaceX trajectory files](https://api.starlink.com/public-files/ephemerides/MANIFEST.txt),
+[IERS Earth-orientation data](https://datacenter.iers.org/data/9/finals2000A.all),
+[Skyfield](https://github.com/skyfielders/python-skyfield).
 
 ## 1. Problem
 
@@ -52,6 +55,11 @@ Read this first. Later sections assume it.
   fitted to the trajectory files SpaceX itself publishes. SpaceX knows where its satellites
   are far better than radar tracking does, so these are more accurate than the standard set.
 - **Ephemeris.** A table of positions over time, as opposed to an element set plus a formula.
+- **SpaceX trajectory files.** SpaceX publishes one ephemeris per Starlink satellite: its own
+  predicted path for the next two days at 60-second steps, in the J2000 frame, with a stated
+  uncertainty at every step. The files are replaced several times a day and there is no
+  archive. They are the operator's best estimate, not a measurement of where the satellite
+  ended up.
 
 ### The propagator
 
@@ -84,7 +92,13 @@ silent error in this field.
   simulator works in, because the question is about cities.
 - **ITRF (International Terrestrial Reference Frame).** The precise, official ECEF frame.
 - **PEF (pseudo Earth-fixed).** ECEF before a tiny correction called polar motion.
-- **GCRF and J2000.** The precise, official inertial frames.
+- **GCRF and J2000.** The precise, official inertial frames. J2000 has its axes set by the
+  Earth's mean equator and equinox on 2000 January 1; it is the frame most orbit data is
+  exchanged in. GCRF is its modern replacement and differs from it by about a metre at
+  Starlink's height.
+- **IAU-76/FK5.** The classical set of models for getting between frames of date and J2000:
+  the IAU 1976 precession model and the IAU 1980 nutation model. The newer IAU 2006/2000A
+  models differ from it by amounts far below SGP4's error.
 - **GMST (Greenwich Mean Sidereal Time).** An angle: how far the Earth has turned, measured
   between the equinox direction and the Greenwich meridian. Rotating TEME coordinates about
   the z-axis by GMST gives PEF. This single rotation is the core of TEME to ECEF.
@@ -113,13 +127,45 @@ minute, and a satellite moves 7.6 km per second.
   calendar arithmetic.
 - **EOP (Earth orientation parameters).** The published daily measurements of UT1 minus UTC
   and of polar motion.
+- **IERS.** The International Earth Rotation and Reference Systems Service, which measures
+  and publishes the EOP. Its file `finals2000A.all` has one row per day, including
+  predictions for the coming months.
+
+### Checking results
+
+- **Verification.** Showing that the code is a correct implementation of the model.
+- **Validation.** Measuring how well the model matches reality.
+- **Skyfield.** An astronomy library for Python. Its SGP4 is the same reference code this
+  project uses, but its time and frame code is independent of ours.
+- **ERFA.** The open-source edition of the IAU's standard astronomy routines (SOFA), with
+  independent implementations of the precession and nutation models.
 
 ## 3. Expected outcome
 
 A command-line program and library that, from a saved snapshot of real Starlink GP data,
-compute every satellite's position in ECEF and as latitude, longitude and altitude, at any
-requested time. Alongside it, a validation report shows how closely the results match
+compute every satellite's position in ECEF and as latitude, longitude and altitude, and in
+J2000, at any requested time. Alongside it, a report shows how closely the results match
 independent references.
+
+The design, in one pass through the chain:
+
+- **Data.** One dated snapshot holds the standard and supplemental element sets, the IERS
+  Earth-orientation file and a sample of SpaceX trajectory files, all downloaded in the same
+  run. Each satellite uses its supplemental element set, or its standard one where no
+  supplemental set exists, and records which. Runs cover one to three days from the
+  snapshot.
+- **Propagation.** Vallado's reference SGP4, vendored unmodified from python-sgp4 2.27 and
+  reached only through this project's own interface. WGS-72 constants, "improved" operation
+  mode (the mode only affects orbits with periods over 225 minutes; Starlink's are 87 to 96).
+- **Earth-fixed positions.** TEME is rotated by GMST (IAU 1982) evaluated at UT1, then
+  corrected for polar motion, giving ITRF. UT1 minus UTC and polar motion come from the
+  saved IERS file, interpolated linearly between daily values.
+- **J2000 positions.** TEME to J2000 through the classical IAU-76/FK5 chain. The result is
+  labelled J2000 (FK5). It is an extra output: nothing in the latency question needs it, but
+  SpaceX's trajectory files are in J2000 and it is the frame other tools exchange.
+- **Proof.** Three layers, each checking a different part: the published SGP4 test cases
+  verify the propagator; Skyfield, ERFA and Vallado's printed examples verify time and
+  frames; SpaceX's trajectory files measure the distance from reality.
 
 What does not exist after Phase 1: links between satellites, ground stations, routing, the
 dashboard, the engine API, Python bindings. Those belong to later phases.
@@ -144,15 +190,15 @@ New, all inside this repo:
 
 | Path | Contents |
 |---|---|
-| `third_party/` | Any third-party source copied in, unmodified, with a README stating origin, version and licence |
-| `include/satsim/time/`, `src/time/` | UTC instant type, Julian date conversion, GMST |
-| `include/satsim/orbit/`, `src/orbit/` | Element-set type, OMM JSON loader, SGP4 wrapper |
-| `include/satsim/frames/`, `src/frames/` | TEME to ECEF, ECEF to and from geodetic (WGS-84) |
+| `third_party/sgp4/` | Vallado's SGP4 source, unmodified, with a README stating origin, version and licence |
+| `include/satsim/time/`, `src/time/` | UTC instant type, Julian date conversion, GMST, Earth-orientation table, UT1 and TT |
+| `include/satsim/orbit/`, `src/orbit/` | Element-set type, OMM JSON loader, SGP4 wrapper, choice of element set per satellite |
+| `include/satsim/frames/`, `src/frames/` | TEME to ECEF with polar motion, TEME to and from J2000, ECEF to and from geodetic (WGS-84) |
 | `apps/propagate/` | Command-line program: snapshot + time range in, positions out as CSV |
 | `tests/` | Unit tests per module, plus the reference test cases |
-| `python/` | `fetch_elements.py`, the validation comparison, plots; pinned `requirements.txt` |
-| `data/` | One dated Starlink snapshot (standard and supplemental), small test fixtures |
-| `docs/phase-1-results.md` | Validation report with numbers and plots |
+| `python/` | `fetch_elements.py`, the comparisons against references, plots; pinned `requirements.txt` |
+| `data/` | One dated Starlink snapshot, small test fixtures. The snapshot's SpaceX trajectory files are not committed (about 300 MB, and no stated redistribution terms); their checksums are |
+| `docs/phase-1-results.md` | Report with numbers and plots |
 
 Changed:
 
@@ -174,6 +220,11 @@ Changed:
 - A failed propagation (decayed satellite, bad elements) is returned as an error value and
   counted. It never becomes a position.
 - The engine does no network access. Only `python/fetch_elements.py` downloads.
+- A time's scale (UTC, UT1 or TT) is clear from the type or the parameter name, the same
+  way a position's frame is.
+- The satellite catalog number lives in this project's own types and is never passed into
+  the vendored SGP4 code, which stores it in a six-character buffer. Current numbers have
+  up to nine digits.
 
 ## 5. Risks
 
@@ -188,20 +239,32 @@ Changed:
     the program reports, and can filter on, element age.
   - Results must be reproducible: all tests and the report run from the saved snapshot,
     never from a live download.
+  - The SpaceX trajectory files cannot be downloaded again later, and they are not in the
+    repository. The comparison against them is therefore reproducible only on a machine that
+    holds the files; its results are committed in the report, with the files' checksums.
+  - The trajectory files are forecasts with a stated uncertainty that grows along their two
+    days. The comparison reports that uncertainty next to the measured error, so the two are
+    not confused.
   - Satellites that are still climbing to their shell or are being deorbited are in the
     data. Phase 1 reports them by altitude; Phase 2 decides which count as part of the
     network.
 - **Time boundaries.**
   - UTC against UT1: GMST needs UT1 but the data is in UTC. Treating them as equal is an
-    error of under 0.9 s of Earth rotation (up to about 450 m at orbit height; tens of
-    metres at today's values). Whatever is done here, the report states it and its size.
+    error of under 0.9 s of Earth rotation (up to about 450 m at orbit height). Measured on
+    the 2026-11-17 data: 34 to 40 m together with polar motion, 10 to 12 m for polar motion
+    alone. Both corrections are applied, so that comparisons against independent references
+    are not carrying a built-in disagreement large enough to hide a bug.
+  - The Earth-orientation values for the snapshot dates are IERS predictions, not final
+    measurements. Their stated uncertainty moves a position by centimetres at most. The
+    reference comparison reads the same file, so it is unaffected.
+  - A time outside the saved Earth-orientation file is an error, never an extrapolation.
   - Leap seconds: simulation time is UTC and a simulated window is assumed not to contain a
     leap second. None has been scheduled since 2016. The assumption is written in the code
     and the report.
   - Epoch parsing across day, month and year boundaries, and leap years: unit-tested.
   - Local time zones never appear. Everything is UTC.
-- **Security.** No secrets are needed: CelesTrak requires no login. Space-Track (which does)
-  is not used in this phase. The repo is public, so nothing credential-like is ever added.
+- **Security.** No secrets are needed: CelesTrak, the IERS and SpaceX's public trajectory
+  files require no login. Space-Track (which does) is not used in this phase. The repo is public, so nothing credential-like is ever added.
   CelesTrak allows one download per data update (about every two hours) and blocks clients
   that retry on errors, so the fetch script downloads once, stops on any HTTP error, and is
   never run by CI or by tests.
@@ -217,28 +280,31 @@ Changed:
 
 ## 6. Plan
 
-Four implementation units, each one Opus subagent with a narrow brief, reviewed and verified
-by Fable before commit. Units 1 and 2 are independent of each other and can run in parallel;
-3 needs both; 4 needs all.
+Six implementation units, each one Opus subagent with a narrow brief (the snapshot in unit 3
+excepted), reviewed and verified by Fable before commit. Each lands as its own commit with
+`scripts/check.sh` green.
 
-1. **Time and frames.** The UTC instant type, calendar to Julian date, GMST, the TEME to
-   ECEF rotation, ECEF to and from geodetic. Tests: published worked examples, known points
-   (equator, poles, Greenwich), round trips, the leap-year and boundary cases.
-2. **Data.** `python/fetch_elements.py` and the committed snapshot (standard and
-   supplemental). The OMM JSON loader, with tests for missing fields and malformed input.
-3. **Propagation and program.** SGP4 behind a small `satsim::orbit` interface: build a
+1. **Time and frames (done).** The UTC instant type, calendar to Julian date, GMST, the TEME
+   to Earth-fixed rotation, ECEF to and from geodetic.
+2. **Data (done).** `python/fetch_elements.py`, a committed snapshot, the OMM JSON loader.
+3. **Matched snapshot.** `fetch_elements.py` also saves the IERS file and a fixed sample of
+   SpaceX trajectory files, in the same run as the element sets. One fresh snapshot replaces
+   the first one.
+4. **Earth orientation and J2000.** The Earth-orientation table and its interpolation, UT1
+   and TT from UTC, polar motion in TEME to ECEF, and the IAU-76/FK5 chain between TEME and
+   J2000. Independent of unit 5.
+5. **Propagation.** The vendored SGP4 behind a small `satsim::orbit` interface: build a
    propagator from an element set, ask for TEME position and velocity at an instant, get a
-   value or an error. The published SGP4 test cases as parameterized GoogleTest cases. The
-   `propagate` program: snapshot, start time, duration and step in; one CSV row per
-   satellite per step out, plus a summary (satellites loaded, failed, altitude spread,
-   element ages).
-4. **Validation and report.** The Python comparison against an independent reference and
-   against the supplemental data, wired in as the `validate` CI step. Plots: one satellite's
-   ground track, the altitude distribution of the constellation, error against each
-   reference, and standard-versus-supplemental difference against element age. Then
-   `docs/phase-1-results.md`, and the CLAUDE.md additions.
-
-Each unit lands as its own commit with `scripts/check.sh` green.
+   value or an error. The choice of element set per satellite. The published SGP4 test cases
+   as parameterized GoogleTest cases.
+6. **Program, validation and report.** The `propagate` program: snapshot, start time,
+   duration and step in; one CSV row per satellite per step out, plus a summary (satellites
+   loaded, failed, altitude spread, element ages, element-set source). The Python comparison
+   against Skyfield, wired in as the `validate` CI step. The comparison against SpaceX's
+   trajectories, run by hand. Plots: one satellite's ground track, the altitude distribution
+   of the constellation, error against each reference, and error against element age for
+   standard and supplemental sets. Then `docs/phase-1-results.md`, and the CLAUDE.md
+   additions.
 
 ## 7. Tests
 
@@ -252,23 +318,39 @@ New:
 | `tests/orbit/omm_loader_test.cpp` | Real records parse; malformed ones are rejected with an error | Fixture records from CelesTrak |
 | `tests/time/utc_time_test.cpp` | Calendar, Julian date and boundary handling | Known dates |
 | `tests/time/gmst_test.cpp` | The Earth-rotation angle | Published worked example; rate of 360.9856° per day |
-| `tests/frames/teme_ecef_test.cpp` | The frame conversion | Vallado's published TEME to Earth-fixed example |
+| `tests/time/earth_orientation_test.cpp` | Earth-orientation values are read and interpolated correctly; out-of-range times are errors | Rows of the IERS file |
+| `tests/frames/teme_ecef_test.cpp` | The frame conversion, including UT1 and polar motion | Vallado's published TEME to Earth-fixed example |
+| `tests/frames/j2000_test.cpp` | Precession, nutation and the TEME to J2000 chain | Vallado's printed examples; values generated with ERFA |
 | `tests/frames/geodetic_test.cpp` | Latitude, longitude, height both ways, including poles | Known points; round trips |
 | `tests/orbit/physical_sanity_test.cpp` | Results are physically plausible: radius, speed, period, maximum latitude near the inclination | The hand-traced example in section 5 |
-| `python/validate_against_reference.py` | Independent agreement on real Starlink data, in TEME and ECEF | An independent astronomy library |
-| `python/compare_supplemental.py` | Measured real-world accuracy (reported, not pass/fail) | CelesTrak supplemental data |
+| `tests/orbit/element_selection_test.cpp` | Each satellite gets its supplemental set, or its standard set when there is none | Synthetic input (no real satellite lacks a supplemental set today) |
+| `python/validate_against_reference.py` | Independent agreement on real Starlink data, in TEME, ECEF and J2000 | Skyfield, reading the same IERS file |
+| `python/compare_spacex.py` | Measured distance from SpaceX's own predicted paths, against element-set age (reported, not pass/fail) | SpaceX trajectory files |
+
+Tolerances, each set just above what its reference can resolve:
+
+| Comparison | Tolerance | Reason |
+|---|---|---|
+| SGP4 against the published test cases | 1 mm | Same model and inputs; only rounding and print precision differ |
+| Frames against Vallado's printed examples | a few cm | His code holds time in one double, which limits his printed values to about 25 mm |
+| Frame models against ERFA | near floating-point level | Two implementations of the same published models |
+| ECEF against Skyfield | 1 cm | The same model reached by a different route; measured agreement 0.6 mm |
+| J2000 against Skyfield | 5 m | Skyfield uses the IAU 2006/2000A models; measured difference 1 to 1.6 m |
+| Positions against SpaceX trajectories | none | A measurement. Alarm above 10 km at the epoch, which would mean a bug, not physics |
 
 Plus the standing proof that the checks bite: before the phase is called done, a deliberate
 frame error (skip the GMST rotation) and a deliberate time error (shift by one second) are
-planted temporarily to confirm the validation fails loudly on each.
+planted temporarily to confirm the validation fails loudly on each. So are: dropping polar
+motion, dropping UT1 minus UTC, flipping a polar-motion sign, and using WGS-84 constants
+inside SGP4.
 
 ### Definition of done
 
 - `scripts/check.sh` is green locally and on GitHub, including the new steps.
 - Every validation tolerance is met on both arm64 and x86-64.
 - `docs/phase-1-results.md` states, with numbers: agreement with each reference, the
-  measured gap between standard and supplemental data, every simplification made, and what
-  each one costs.
+  measured distance from SpaceX's trajectories for standard and for supplemental element
+  sets, every simplification made, and what each one costs.
 - The `propagate` program runs on the full snapshot with one command and prints its summary.
 - You can explain, without notes, why the positions match the references and what would
   break that. The learning list that accompanies this spec covers what that takes.

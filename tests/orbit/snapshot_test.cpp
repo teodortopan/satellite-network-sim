@@ -16,7 +16,7 @@ namespace {
 using satsim::orbit::load_omm_json;
 using satsim::orbit::LoadResult;
 
-const std::filesystem::path kSnapshotDir = "data/starlink/2026-11-17";
+const std::filesystem::path kSnapshotDir = "data/starlink/2026-11-18";
 
 // Every real record must load, and the counts must match what fetch_elements.py recorded.
 TEST(OmmSnapshotTest, FullSnapshotLoadsWithoutErrors) {

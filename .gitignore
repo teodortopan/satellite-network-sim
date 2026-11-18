@@ -29,3 +29,8 @@ target/
 # CMake / CTest local files
 CMakeUserPresets.json
 Testing/
+
+# SpaceX trajectory files of a snapshot: large, and the site states no redistribution
+# terms. metadata.json in the snapshot records their checksums.
+data/starlink/*/ephemerides/
+data/starlink/.*.partial/

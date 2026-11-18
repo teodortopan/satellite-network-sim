@@ -2,3 +2,4 @@
 # valid: no line-ending conversion. Each is one long line, so text diffs are useless.
 data/starlink/*/gp.json -text -diff
 data/starlink/*/supgp.json -text -diff
+data/starlink/*/finals2000A.all -text
