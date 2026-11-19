@@ -11,6 +11,7 @@ cities this project studies. Written by `python/fetch_ground.py`, except where n
 | `<date>/gateways.json` | Gateway sites: name, latitude, longitude, status. | Community dataset (below). |
 | `<date>/pop_locations.json` | PoP sites: city, country, latitude, longitude. | Community dataset (below). |
 | `<date>/pop_codes.json` | One row per PoP code in `starlink_pops.csv`: its routers, city and coordinates. | Hand-made (below). |
+| `<date>/assumed_gateways.json` | Gateways assumed to exist at PoPs with no listed gateway nearby (below). | `python/make_assumed_gateways.py` |
 | `<date>/metadata.json` | Source URL, fetch time, sha256 and size of every download. | `fetch_ground.py` |
 
 ## The community dataset
@@ -33,3 +34,16 @@ at the centre of Brazil). The code `staging2` is left out: it is not a public Po
 
 Coordinates are good to city level (a few tens of kilometres at worst), which is about
 0.1 ms of fibre delay.
+
+## `assumed_gateways.json`
+
+The community gateway list comes from FCC filings, so it holds sites in the United States
+and its territories only. SpaceX has gateways on every continent it serves and builds them
+near its PoPs. Without them, the traffic of a user in London could only come down in the
+United States.
+
+`python/make_assumed_gateways.py` therefore places one assumed gateway at each PoP that has
+no operational listed gateway within 500 km: 45 of them, all outside the United States and
+Canada. They are an assumption, not data. Each row says so in its name, and the simulator
+reports real and assumed gateways separately. The effect is that outside the United States
+the hop from space to the ground is placed at the PoP itself, which is slightly optimistic.
