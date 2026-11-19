@@ -1,0 +1,13 @@
+[
+ {"code": "lhr", "routers": ["lndngbr1"], "city": "London", "country": "GB", "lat": 51.5074, "lon": -0.1278, "coordinates_from": "community dataset (pop_locations.json)"},
+ {"code": "dup", "routers": ["r1"], "city": "A", "country": "AA", "lat": 1, "lon": 1, "coordinates_from": "city centre"},
+ {"code": "", "routers": ["r1"], "city": "A", "country": "AA", "lat": 1, "lon": 1, "coordinates_from": "city centre"},
+ {"code": "nor", "routers": [], "city": "A", "country": "AA", "lat": 1, "lon": 1, "coordinates_from": "city centre"},
+ {"code": "num", "routers": ["r1", 5], "city": "A", "country": "AA", "lat": 1, "lon": 1, "coordinates_from": "city centre"},
+ {"code": "emp", "routers": ["r1", ""], "city": "A", "country": "AA", "lat": 1, "lon": 1, "coordinates_from": "city centre"},
+ {"code": "str", "routers": "r1", "city": "A", "country": "AA", "lat": 1, "lon": 1, "coordinates_from": "city centre"},
+ {"code": "nof", "routers": ["r1"], "city": "A", "country": "AA", "lat": 1, "lon": 1},
+ {"code": "dup", "routers": ["r2"], "city": "B", "country": "BB", "lat": 2, "lon": 2, "coordinates_from": "city centre"},
+ {"code": "lat", "routers": ["r1"], "city": "A", "country": "AA", "lat": 100, "lon": 1, "coordinates_from": "city centre"},
+ {"code": "fra", "routers": ["frntdeu1", "frntdeu2"], "city": "Frankfurt", "country": "DE", "lat": 50.1106, "lon": 8.6821, "coordinates_from": "community dataset (pop_locations.json)"}
+]

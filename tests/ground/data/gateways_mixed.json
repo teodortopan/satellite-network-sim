@@ -1,0 +1,12 @@
+[
+ {"name": "Adelanto, CA", "lat": 34.6024, "lon": -117.4546, "status": "operational"},
+ {"name": "Cape Canaveral, FL", "lat": 28.5434, "lon": -80.6666, "status": "planned"},
+ {"name": "Retired, XX", "lat": 1, "lon": 1, "status": "retired"},
+ {"name": "", "lat": 1, "lon": 1, "status": "operational"},
+ {"name": "No status", "lat": 1, "lon": 1},
+ {"name": "South of the pole", "lat": -91, "lon": 1, "status": "operational"},
+ {"name": "West of the date line", "lat": 1, "lon": -181, "status": "planned"},
+ {"name": "Null longitude", "lat": 1, "lon": null, "status": "operational"},
+ 42,
+ {"name": "Akron, OH", "lat": 41.0575, "lon": -81.5199, "status": "operational"}
+]

@@ -1,0 +1,15 @@
+9.170.0.0/24,lsancax1,lax
+2401:e320::/38,btmmidn1,bth
+9.170.1.0/24,lsancax1
+9.170.2.0/24,lsancax1,lax,extra
+not-a-prefix,r,lax
+9.170.3.1/24,lsancax1,lax
+9.170.4.0/24,,lax
+9.170.5.0/24,lsancax1,
+
+"9.170.6.0/24",lsancax1,lax
+9.170.7.0/24,lsancax1,lax
+9.170.7.0/24,frntdeu1,fra
+9.170.8.0/24,lsancax1,lax
+2401:e320:400::/38,jtnaidn2,jkt
+,,

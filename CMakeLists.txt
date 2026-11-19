@@ -29,6 +29,7 @@ satsim_add_third_party_library(sgp4
 add_subdirectory(src/core)
 add_subdirectory(src/time)
 add_subdirectory(src/frames)
+add_subdirectory(src/ground)
 add_subdirectory(src/orbit)
 
 # Programs.

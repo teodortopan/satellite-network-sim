@@ -1,0 +1,27 @@
+{
+ "note": "Fixture for tests/ground/loaders_test.cpp. Keys other than cities and pairs are ignored.",
+ "cities": [
+  {"name": "New York", "country": "US", "region": "US-NY", "geofeed_city": "New York City", "lat": 40.7128, "lon": -74.006},
+  {"name": "London", "country": "GB", "region": "GB-LND", "geofeed_city": "London", "lat": 51.5074, "lon": -0.1278},
+  {"name": "Twice", "country": "AA", "region": "AA-1", "geofeed_city": "Twice", "lat": 1, "lon": 1},
+  {"country": "AA", "region": "AA-1", "geofeed_city": "X", "lat": 1, "lon": 1},
+  {"name": "Empty country", "country": "", "region": "AA-1", "geofeed_city": "X", "lat": 1, "lon": 1},
+  {"name": "Too far north", "country": "AA", "region": "AA-1", "geofeed_city": "X", "lat": 90.5, "lon": 1},
+  {"name": "Too far east", "country": "AA", "region": "AA-1", "geofeed_city": "X", "lat": 1, "lon": 180.25},
+  {"name": "Text latitude", "country": "AA", "region": "AA-1", "geofeed_city": "X", "lat": "1", "lon": 1},
+  "not an object",
+  {"name": "Twice", "country": "BB", "region": "BB-1", "geofeed_city": "Twice", "lat": 2, "lon": 2},
+  {"name": "Edges", "country": "AA", "region": "AA-1", "geofeed_city": "Edges", "lat": -90, "lon": 180},
+  {"name": 7, "region": 3, "geofeed_city": "X", "lat": 1}
+ ],
+ "pairs": [
+  {"from": "New York", "to": "London", "role": "study", "why": "transatlantic"},
+  {"from": "London", "to": "Edges", "role": "validation"},
+  {"from": "New York", "to": "Nowhere", "role": "study"},
+  {"from": "Twice", "to": "London", "role": "study"},
+  {"from": "London", "to": "London", "role": "study"},
+  {"from": "New York", "to": "London", "role": "guess"},
+  {"from": "New York", "role": "study"},
+  []
+ ]
+}
