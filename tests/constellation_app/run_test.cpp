@@ -251,6 +251,35 @@ TEST(ConstellationMainTest, FailedRunCreatesNoOutputFile) {
   EXPECT_FALSE(std::filesystem::exists(csv_path));
 }
 
+TEST(ConstellationMainTest, ShellsFileReplacesTheBuiltInShells) {
+  const ScratchDir dir;
+  // One shell at 70 degrees that takes the fixture's two 70-degree satellites, each a plane of
+  // its own or together; every other satellite is then in no shell.
+  write_file(dir.path() / "shells.json",
+             R"({"shells": [{"name": "polarish", "inclination_deg": 70.0,
+                 "inclination_tolerance_deg": 0.5, "min_height_km": 400.0,
+                 "max_height_km": 700.0, "plane_gap_threshold_deg": 180.0,
+                 "min_plane_size": 1}]})");
+  const Result r = run_main({"--snapshot", kFixtureSnapshot.string(), "--time", std::string(kTime),
+                             "--out", "-", "--shells-file", (dir.path() / "shells.json").string()});
+  EXPECT_EQ(r.status, 0) << r.err;
+  EXPECT_NE(r.err.find("polarish"), std::string::npos) << r.err;
+  const auto rows = parse_csv(r.out);
+  std::size_t in_shell = 0;
+  for (std::size_t i = 1; i < rows.size(); ++i) {
+    in_shell += rows[i][column("shell")] == "polarish" ? 1U : 0U;
+  }
+  EXPECT_EQ(in_shell, 2U);
+
+  const Result missing =
+      run_main({"--snapshot", kFixtureSnapshot.string(), "--time", std::string(kTime), "--out", "-",
+                "--shells-file", (dir.path() / "missing.json").string()});
+  EXPECT_EQ(missing.status, 1);
+  EXPECT_EQ(missing.err, "constellation: --shells-file cannot open " +
+                             (dir.path() / "missing.json").string() + "\n");
+  EXPECT_EQ(missing.out, "");
+}
+
 TEST(ConstellationMainTest, UnwritableOutputIsAnError) {
   const ScratchDir dir;
   const std::string csv_path = (dir.path() / "no" / "such" / "dir.csv").string();

@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 # CI steps. Runs inside the satsim-ci Docker image, from the repo root.
-# Usage: scripts/ci.sh <format|python-lint|asan-gcc|asan-clang|valgrind|tidy|validate|all>
+# Usage: scripts/ci.sh <format|python-lint|asan-gcc|asan-clang|valgrind|tidy|validate|validate-topology|all>
 set -euo pipefail
 
 usage() {
-  echo "usage: $0 <format|python-lint|asan-gcc|asan-clang|valgrind|tidy|validate|all>" >&2
+  echo "usage: $0 <format|python-lint|asan-gcc|asan-clang|valgrind|tidy|validate|validate-topology|all>" >&2
 }
 
 # Our C++ sources (not third-party code under build/).
@@ -85,6 +85,18 @@ step_validate() {
   python3 python/validate_against_reference.py --propagate "$dir/bin/propagate"
 }
 
+# The topology and constellation programs, optimised and without sanitizers, on Hypatia's first
+# Starlink shell (python/make_ideal_shell.py, written into a temporary directory): plane
+# assignment, link counts and every best-case delay against an independent Python model, and
+# Hypatia's published round-trip times (python/validate_topology.py). No network needed.
+step_validate_topology() {
+  local dir=build/validate
+  CC=gcc CXX=g++ cmake --preset valgrind -B "$dir" -DSATSIM_BUILD_TESTS=OFF
+  cmake --build "$dir" --target topology constellation
+  python3 python/validate_topology.py --topology "$dir/bin/topology" \
+    --constellation "$dir/bin/constellation"
+}
+
 run_step() {
   echo "==> $1"
   case "$1" in
@@ -95,6 +107,7 @@ run_step() {
     valgrind) step_valgrind ;;
     tidy) step_tidy ;;
     validate) step_validate ;;
+    validate-topology) step_validate_topology ;;
     *)
       usage
       exit 2
@@ -113,7 +126,7 @@ main() {
     return
   fi
 
-  local steps=(format python-lint asan-gcc asan-clang valgrind tidy validate)
+  local steps=(format python-lint asan-gcc asan-clang valgrind tidy validate validate-topology)
   local failed=() s
   for s in "${steps[@]}"; do
     # Separate process so one failing step does not stop the others. (A subshell in an

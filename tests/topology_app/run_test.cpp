@@ -512,6 +512,65 @@ TEST(TopologyRunTest, ShellsAndRolesFilter) {
   EXPECT_EQ(prepare(o).directions.size(), 4U);
 }
 
+// --shells-file replaces the built-in shells: the fixture's satellites go to the file's one
+// shell under its own name, --shells names are checked against the file, and a file that
+// cannot be used fails the run before anything else.
+TEST(TopologyRunTest, ShellsFileReplacesTheBuiltInShells) {
+  const Snapshot snapshot;
+  const fs::path dir = subdirectory(snapshot, "shells");
+  {
+    std::ofstream file(dir / "shells.json");
+    file << R"({"shells": [{"name": "fixture", "inclination_deg": 53.16,
+        "inclination_tolerance_deg": 0.3, "min_height_km": 460.0, "max_height_km": 480.0,
+        "plane_gap_threshold_deg": 5.0, "min_plane_size": 10}]})";
+  }
+  app::Options o = fixture::fixture_options(
+      snapshot.dir.path(), 0, 60, topology::LaserPattern::kPlusGrid, app::EndpointModel::kBestCase);
+  o.shells_file = dir / "shells.json";
+  const app::PreparedRun run = prepare(o);
+  ASSERT_EQ(run.options.classification.shells.size(), 1U);
+  EXPECT_EQ(run.options.classification.shells[0].name, "fixture");
+  EXPECT_TRUE(run.options.classification.excluded_groups.empty());
+  // The same planes as with the built-in 53deg shell (fixture_shell: 10 planes of 16).
+  ASSERT_EQ(run.classification.planes.size(), 1U);
+  EXPECT_EQ(run.classification.planes[0].size(), 10U);
+  for (const auto& plane : run.classification.planes[0]) {
+    EXPECT_EQ(plane.members.size(), 16U);
+  }
+  const Written w = write(run);
+  EXPECT_TRUE(w.outcome.statistics.passed());
+  std::ostringstream summary;
+  app::write_summary(run, w.outcome.statistics, summary);
+  EXPECT_NE(summary.str().find("shells file " + (dir / "shells.json").string()), std::string::npos)
+      << summary.str();
+  EXPECT_NE(summary.str().find("shell fixture: 160 satellites in 10 planes"), std::string::npos)
+      << summary.str();
+
+  const auto error_of = [](const app::Options& options) {
+    app::PreparedRunOrError prepared = app::prepare_run(options);
+    EXPECT_TRUE(std::holds_alternative<std::string>(prepared));
+    return std::holds_alternative<std::string>(prepared) ? std::get<std::string>(prepared)
+                                                         : std::string();
+  };
+  app::Options named = o;
+  named.shells = {"53deg"};  // A built-in name, not in the file.
+  EXPECT_EQ(error_of(named), "no shell named 53deg");
+  named.shells = {"fixture"};
+  EXPECT_EQ(prepare(named).shell_used, std::vector<bool>{true});
+
+  app::Options missing = o;
+  missing.shells_file = dir / "missing.json";
+  EXPECT_EQ(error_of(missing), "--shells-file cannot open " + (dir / "missing.json").string());
+  {
+    std::ofstream file(dir / "bad.json");
+    file << R"({"shells": [{"name": "fixture"}]})";
+  }
+  app::Options bad = o;
+  bad.shells_file = dir / "bad.json";
+  const std::string bad_error = error_of(bad);
+  EXPECT_NE(bad_error.find("bad.json: shells[0]: missing"), std::string::npos) << bad_error;
+}
+
 TEST(TopologyRunTest, InputErrorsFailBeforeAnything) {
   const Snapshot snapshot;
   const app::Options good = fixture::fixture_options(

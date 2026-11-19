@@ -1,6 +1,6 @@
 # The constellation module. Ideal Walker shells come from tests/support (satsim::test_support).
 satsim_add_test(satsim_constellation_tests
-  SOURCES geometry_test.cpp classification_test.cpp
+  SOURCES geometry_test.cpp classification_test.cpp config_file_test.cpp
   DEPS satsim::constellation satsim::test_support satsim::orbit satsim::time satsim::core)
 
 # Classifies the full committed snapshot. Kept out of the sanitizer builds and out of Valgrind,

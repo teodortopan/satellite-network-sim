@@ -18,6 +18,7 @@
 #include "common/statistics.hpp"
 #include "constellation/arguments.hpp"
 #include "satsim/constellation/classification.hpp"
+#include "satsim/constellation/config_file.hpp"
 #include "satsim/constellation/geometry.hpp"
 #include "satsim/core/angles.hpp"
 #include "satsim/orbit/element_selection.hpp"
@@ -255,7 +256,17 @@ int run_main(std::span<const std::string_view> args, std::ostream& out, std::ost
     return 2;
   }
   const Options& options = *parsed.options;
-  ClassifiedRunOrError classified = classify_snapshot(options, constellation::default_config());
+  constellation::ClassificationConfig config = constellation::default_config();
+  if (options.shells_file) {
+    constellation::ClassificationConfigOrError loaded =
+        constellation::load_classification_config(*options.shells_file);
+    if (const auto* error = std::get_if<std::string>(&loaded)) {
+      err << "constellation: --shells-file " << *error << '\n';
+      return 1;
+    }
+    config = std::move(std::get<constellation::ClassificationConfig>(loaded));
+  }
+  ClassifiedRunOrError classified = classify_snapshot(options, config);
   if (const auto* error = std::get_if<std::string>(&classified)) {
     err << "constellation: " << *error << '\n';
     return 1;

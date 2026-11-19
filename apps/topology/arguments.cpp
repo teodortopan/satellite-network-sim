@@ -32,7 +32,8 @@ constexpr std::string_view kUsage =
     R"(usage: topology --snapshot <dir> --ground <dir> --cities <file> --start <UTC>
                 --duration-s <s> --step-s <s> --pattern <three|plus-grid|six>
                 --model <realistic|best-case> --out <csv|->
-                [--shells <name,...>] [--roles <study|validation|all>]
+                [--shells <name,...>] [--shells-file <file>]
+                [--roles <study|validation|all>]
                 [--range-cap-km <km>] [--sun-exclusion-deg <deg>] [--lock-on-s <s>]
                 [--fibre-factor <x>] [--high-latitude-mask <on|off>]
                 [--serving <highest-elevation>]
@@ -58,6 +59,9 @@ for physical possibility (spec 6.1).
                               the sender's home PoP) or best-case (any satellites, space only)
   --out <path>                CSV file to write, or - for standard output
   --shells <name,...>         only these shells (default: all; names as 53deg, 43deg, ...)
+  --shells-file <file>        shell definitions and excluded groups to classify with, as
+                              JSON (constellation/config_file.hpp); default: the built-in
+                              shells of the 2026-11-18 snapshot
   --roles <set>               city pairs to compute: study, validation or all (default all)
   --range-cap-km <km>         longest laser link (default: none, line of sight only)
   --sun-exclusion-deg <deg>   a laser link is down while the Sun is within this angle of
@@ -98,6 +102,7 @@ enum Option : std::uint8_t {
   kOut,
   kRequiredCount,
   kShells = kRequiredCount,
+  kShellsFile,
   kRoles,
   kRangeCap,
   kSunExclusion,
@@ -117,6 +122,7 @@ constexpr std::array<std::string_view, kOptionCount> kOptionNames = {"--snapshot
                                                                      "--model",
                                                                      "--out",
                                                                      "--shells",
+                                                                     "--shells-file",
                                                                      "--roles",
                                                                      "--range-cap-km",
                                                                      "--sun-exclusion-deg",
@@ -134,20 +140,27 @@ std::optional<RoleFilter> parse_roles(std::string_view text) noexcept {
   return std::nullopt;
 }
 
-// "53deg,43deg": names of `config`'s shells, each at most once, in the order given.
+// "53deg,43deg": shell names, each at most once, in the order given. With `config`, every
+// name must be one of its shells; without (the shells come from a file read later), the names
+// are checked when the run is prepared.
 std::optional<std::vector<std::string>> parse_shells(
-    std::string_view text, const constellation::ClassificationConfig& config, std::string& error) {
+    std::string_view text, const constellation::ClassificationConfig* config, std::string& error) {
   std::vector<std::string> shells;
   std::size_t begin = 0;
   while (true) {
     const std::size_t comma = text.find(',', begin);
     const std::string_view item = text.substr(
         begin, comma == std::string_view::npos ? std::string_view::npos : comma - begin);
-    const bool known = std::any_of(config.shells.begin(), config.shells.end(),
-                                   [&](const auto& shell) { return shell.name == item; });
+    if (config == nullptr && item.empty()) {
+      error = "--shells: " + quote(item) + " is not a shell";
+      return std::nullopt;
+    }
+    const bool known =
+        config == nullptr || std::any_of(config->shells.begin(), config->shells.end(),
+                                         [&](const auto& shell) { return shell.name == item; });
     if (!known) {
       std::string names;
-      for (const auto& shell : config.shells) {
+      for (const auto& shell : config->shells) {
         names += (names.empty() ? "" : ", ") + shell.name;
       }
       error = "--shells: " + quote(item) + " is not a shell (shells: " + names + ")";
@@ -255,9 +268,16 @@ ParsedArguments parse_arguments(std::span<const std::string_view> args) {
   }
   options.model = *model;
 
+  if (values[kShellsFile]) {
+    if (values[kShellsFile]->empty()) {
+      return failure("--shells-file is empty");
+    }
+    options.shells_file = std::filesystem::path(*values[kShellsFile]);
+  }
   if (values[kShells]) {
     std::string error;
-    auto shells = parse_shells(*values[kShells], options.classification, error);
+    auto shells = parse_shells(*values[kShells],
+                               options.shells_file ? nullptr : &options.classification, error);
     if (!shells) {
       return failure(std::move(error));
     }

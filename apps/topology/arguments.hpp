@@ -57,9 +57,11 @@ struct Options {
   topology::ServingRule serving_rule = topology::ServingRule::kHighestElevation;
   /// Path of the CSV file to write, or "-" for standard output.
   std::string out;
-  /// Shells, planes and exclusions. The program always uses the default; tests use their own
-  /// shells.
+  /// Shells, planes and exclusions: the default, unless shells_file is set (prepare_run then
+  /// replaces it with the file's). Tests may also set their own.
   constellation::ClassificationConfig classification = constellation::default_config();
+  /// --shells-file: shell definitions to read (constellation::load_classification_config).
+  std::optional<std::filesystem::path> shells_file = std::nullopt;
 };
 
 /// The outcome of parse_arguments: exactly one of options, help or error.
@@ -74,7 +76,9 @@ struct ParsedArguments {
 /// options, a missing value, a missing required option, an empty path, a start time that is
 /// not YYYY-MM-DDTHH:MM:SS[.fffffffff] or does not exist, a duration or step that is not a
 /// plain decimal number of seconds (at most 9 decimals, step > 0, at most 1e9 s), an unknown
-/// pattern, model, role set, serving rule or shell name (or a shell named twice), a range cap
+/// pattern, model, role set, serving rule or shell name (or a shell named twice; without
+/// --shells-file, the names must be default shells, otherwise they are checked by prepare_run
+/// against the file), an empty --shells-file, a range cap
 /// that is not a finite number > 0 km, a Sun exclusion angle not in (0, 180] degrees, a
 /// lock-on time that is not a plain decimal number of seconds, a fibre factor that is not a
 /// finite number >= 1, and a high-latitude setting other than on or off.

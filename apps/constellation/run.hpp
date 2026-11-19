@@ -82,7 +82,8 @@ using ClassifiedRunOrError = std::variant<ClassifiedRun, std::string>;
 /// smallest, median and largest plane, and exclusions by reason.
 void write_summary(const ClassifiedRun& run, std::ostream& out);
 
-/// The whole program with the default configuration, minus opening the standard streams:
+/// The whole program with the default configuration (or --shells-file's), minus opening the
+/// standard streams:
 /// parses `args` (without the program name), classifies, writes the CSV to the --out file or
 /// to `out` for "-", and the summary to `out` (to `err` when the CSV goes to `out`). Messages
 /// go to `err`. Returns 0 on success, 1 if the run fails, 2 for invalid arguments. A file

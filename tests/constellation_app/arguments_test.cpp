@@ -36,6 +36,25 @@ TEST(ConstellationArgumentsTest, OrderDoesNotMatter) {
   EXPECT_EQ(p.options->out, "a.csv");
 }
 
+TEST(ConstellationArgumentsTest, ShellsFileIsOptional) {
+  const ParsedArguments without =
+      parse({"--snapshot", "d", "--time", "2026-11-18T21:15:00", "--out", "-"});
+  if (!without.options) {
+    FAIL() << without.error.value_or("");
+  }
+  EXPECT_FALSE(without.options->shells_file.has_value());
+  const ParsedArguments with = parse({"--snapshot", "d", "--time", "2026-11-18T21:15:00", "--out",
+                                      "-", "--shells-file", "ideal.json"});
+  if (!with.options) {
+    FAIL() << with.error.value_or("");
+  }
+  EXPECT_EQ(with.options->shells_file.value_or(""), "ideal.json");
+  const ParsedArguments empty = parse(
+      {"--snapshot", "d", "--time", "2026-11-18T21:15:00", "--out", "-", "--shells-file", ""});
+  EXPECT_FALSE(empty.options.has_value());
+  EXPECT_EQ(empty.error.value_or(""), "--shells-file is empty");
+}
+
 TEST(ConstellationArgumentsTest, HelpWinsOverAnyProblem) {
   EXPECT_TRUE(parse({"--bogus", "-h"}).help);
   EXPECT_TRUE(parse({"--help"}).help);

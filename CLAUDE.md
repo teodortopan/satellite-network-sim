@@ -19,13 +19,21 @@ Global rules (workflow, commits, review, self-review) load from
 - **`scripts/check.sh` is the single check command.** It builds the Docker
   image in `docker/Dockerfile` and runs every CI step inside it: C++ format,
   Python lint, ASan + UBSan tests with GCC and with Clang, Valgrind,
-  clang-tidy, and `validate` (the `propagate` program against Skyfield on the
-  committed snapshot). Exit 0 only if all pass. It needs only Docker on the host.
+  clang-tidy, `validate` (the `propagate` program against Skyfield on the
+  committed snapshot) and `validate-topology` (the `topology` program against an
+  independent Python model on Hypatia's ideal shell). Exit 0 only if all pass. It
+  needs only Docker on the host.
 - `scripts/check.sh <step>` runs one step (`format`, `python-lint`,
-  `asan-gcc`, `asan-clang`, `valgrind`, `tidy`, `validate`).
+  `asan-gcc`, `asan-clang`, `valgrind`, `tidy`, `validate`, `validate-topology`).
+  The GCC sanitizer step takes about 8 minutes; `asan-clang` runs the same tests in
+  seconds, so prefer it while iterating.
 - `python/compare_spacex.py` (against SpaceX's trajectory files) and
   `python/plot_phase1.py` (the report's plots) are run by hand; the exact
-  commands are in `docs/phase-1-results.md`.
+  commands are in `docs/phase-1-results.md`. The same goes for Phase 2:
+  `python/run_phase2.py` (the 12-hour runs and their summaries) and
+  `python/plot_phase2.py`, with commands in `docs/phase-2-results.md`.
+- `python/fetch_ground.py` downloads the ground data and
+  `python/make_assumed_gateways.py` derives the assumed gateways; both by hand.
 - CI (`.github/workflows/ci.yml`) runs the same steps through the same
   `scripts/ci.sh`, so a green local check means a green CI. Prefer adding a
   step to `scripts/ci.sh` over putting logic in the workflow file, because
@@ -41,13 +49,22 @@ Global rules (workflow, commits, review, self-review) load from
 | `include/satsim/frames/`, `src/frames/` | TEME to ITRF, TEME to J2000 (IAU-76/FK5), WGS-84 geodetic |
 | `include/satsim/orbit/`, `src/orbit/` | OMM JSON loader, element-set choice, the SGP4 wrapper |
 | `third_party/sgp4/` | Vallado's SGP4, vendored unmodified from python-sgp4 |
+| `include/satsim/constellation/`, `src/constellation/` | Shells, planes, order in a plane, exclusion reasons, shell definitions from a file |
+| `include/satsim/ground/`, `src/ground/` | Cities, gateways, PoPs, the home-PoP rule, great-circle distance, fibre delay |
+| `include/satsim/topology/`, `src/topology/` | Positions per step, line of sight, elevation and masks, laser patterns, link state, ground links, physical checks |
+| `include/satsim/network/`, `src/network/` | A weighted graph and Dijkstra |
 | `apps/propagate/` | The `propagate` program: snapshot and time range in, CSV out |
+| `apps/constellation/` | The `constellation` program: each satellite's shell, plane and position, or why it has none |
+| `apps/topology/` | The `topology` program: delay per city pair, direction and time step, under two endpoint models |
+| `apps/common/` | Helpers the three programs share: CSV, statistics, time steps, arguments |
 | `tests/<module>/` | GoogleTest per module, with small fixtures |
-| `python/` | Snapshot download, reference generation, validation, SpaceX comparison, plots |
+| `python/` | Snapshot and ground-data download, reference generation, validation, SpaceX comparison, the Phase 2 runs, plots |
 | `data/starlink/<date>/` | One dated snapshot: element sets, IERS file, trajectory checksums |
+| `data/ground/` | Cities and pairs; per date: SpaceX's PoP and location files, the community gateway list, assumed gateways |
 
-Later modules may depend on earlier ones (core, time, frames, orbit), never
-the reverse.
+Later modules may depend on earlier ones (core, time, frames, orbit,
+constellation, ground, topology, network), never the reverse. `network` depends
+on nothing else.
 
 ## Conventions
 
@@ -99,6 +116,27 @@ the reverse.
 - Prefer keeping a snapshot's SpaceX trajectory files over assuming they can
   be fetched again, because SpaceX replaces them several times a day and
   keeps no archive. They are not in git; `metadata.json` holds their sha256.
+- Prefer finding shells and planes from positions propagated to one common time
+  over the raw element values, because element sets have different epochs, plane
+  orientations drift by degrees per day, and mean elements mean nothing outside
+  SGP4.
+- Prefer narrow height bands (a few km) for a shell over a wide one, because a
+  satellite 1 km off slides about 1.2 degrees a day along the orbit against its
+  shell, and several populations sit within 10 km of each other at 53 degrees.
+- Prefer computing a laser link's longest length from the two heights over a
+  fixed number, because the constellation was lowered in 2026 (about 4,500 km at
+  today's heights, not the 5,000 km of the old 550 km shell).
+- Prefer checking every gateway and PoP coordinate from the community dataset
+  over trusting it, because it is US-only (45 gateways elsewhere are assumed at
+  PoP sites) and its automatic place lookups put two PoPs in the wrong place.
+- Prefer comparing with Hypatia through the independent Python model built with
+  Hypatia's same-position grid over holding the program's +Grid to Hypatia's
+  numbers, because on Hypatia's half-slot-staggered shell the nearest-distance
+  +Grid is a different, shorter link set (about half the delay on Paris to
+  Luanda). Hypatia's 15.19 revolutions per day is about 510 km, not 550.
+- Prefer a non-sanitizer check executable for tests that read the full snapshot
+  or the real ground files over a sanitizer test, because GCC's sanitizers make
+  them take over a minute each.
 - Prefer exact IEEE arithmetic over `-ffast-math`, because it breaks the
   bit-level agreement with the published SGP4 cases and differs between
   arm64 (local) and x86-64 (CI).

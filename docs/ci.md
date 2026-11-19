@@ -12,8 +12,8 @@ Only Docker is needed on the host.
 
 ```sh
 scripts/check.sh            # every step; exit 0 only if all pass
-scripts/check.sh valgrind   # one step: format, python-lint, asan-gcc, asan-clang, valgrind, tidy
-                            # or validate
+scripts/check.sh valgrind   # one step: format, python-lint, asan-gcc, asan-clang, valgrind, tidy,
+                            # validate or validate-topology
 ```
 
 Build trees go to `build/<step>` (for example `build/asan-clang`), including the GoogleTest
@@ -28,6 +28,7 @@ download.
 | `asan` (gcc, clang) | AddressSanitizer: heap/stack/global overflows, use-after-free, double free. LeakSanitizer: leaks at exit. UBSan: signed overflow, bad shifts, null or misaligned access, invalid casts, float-to-int overflow | The fast memory and UB check (~2x slowdown), so it runs every test. `-fno-sanitize-recover=all` makes the first report fail the test |
 | `valgrind` | Memcheck: reads of uninitialised memory, which ASan does not detect, plus invalid accesses and leaks. `--trace-children=yes` also checks the `propagate` program that the end-to-end test starts; `--error-exitcode=99` (a status the program never uses) makes a Valgrind error in it fail that test | Runs on a separate unsanitized `RelWithDebInfo` (`-O2`) build, so tests also run on optimised code where some bugs only appear |
 | `tidy` | clang-tidy `bugprone-*`, `performance-*`, most of `modernize-*` and `cppcoreguidelines-*`, and a set of `readability-*` checks on every `.cpp` in `src/`, `apps/` and `tests/`; any finding is an error | Catches suspicious code patterns the compiler accepts |
+| `validate-topology` | `topology` and `constellation` output on an ideal shell that disagrees with an independent Python model: a satellite in the wrong plane or slot, an element set from the wrong file, a wrong count of satellites, planes or laser links, a laser left without a partner, a different laser grid, elevation mask, ground link or shortest path (any row's status, laser hops, first or last satellite, or a one-way delay more than 1e-6 ms off). Builds both programs optimised without sanitizers and runs `python/validate_topology.py` | The unit tests check each piece of the topology on small hand-made cases; this checks the whole program on a full 1,584-satellite shell against code written separately (positions from python-sgp4 and Skyfield, the +Grid built from plane and slot indices, its own Dijkstra), and checks that model against the round-trip times the Hypatia paper published. Tolerances and measured values: `docs/phase-2-results.md` |
 | `validate` | `propagate` output that disagrees with Skyfield on real data: wrong time since epoch, GMST, UT1, polar motion, geodetic conversion or J2000 chain, a wrong element set chosen, a row missing or extra. Builds `propagate` optimised without sanitizers (tests off, so nothing is downloaded) and runs `python/validate_against_reference.py` on a fixed sample of the committed snapshot | The unit tests check each piece against printed references; this checks the whole program against an independent implementation, row by row, on the data it is meant for. Tolerances and measured values: `docs/phase-1-results.md` |
 
 Every build also compiles our code with
@@ -58,6 +59,25 @@ sets and the same `finals2000A.all`. It takes about 5 seconds after the build. I
 local files: the script makes any network connection raise, and the GitHub job runs the
 container with `--network none`. The SpaceX comparison (`python/compare_spacex.py`) is not
 a CI step: it needs trajectory files that are not in git.
+
+## The validate-topology step
+
+`python/make_ideal_shell.py` writes Hypatia's first Starlink shell (72 planes of 22
+satellites, 53 degrees, Hypatia's own element values and phasing, epoch 2000-01-01) into a
+temporary directory: the three snapshot files and a shell definition read with
+`--shells-file`. `python/validate_topology.py` then runs `constellation` and `topology`
+(`plus-grid`, `best-case`, every pair of `data/ground/cities.json`, one hour every minute and
+200 s every second) and recomputes everything independently. It takes about 10 seconds after
+the build, reads only local files (any network connection raises) and runs with
+`--network none` in the GitHub job. Which file each satellite's element set comes from is
+arranged so that a program that picked the wrong one would fail (the script's docstring says
+how).
+
+The step fails if the program and the model differ, and also if the model, built with
+Hypatia's own laser grid, is more than 20% from Hypatia's published Paris to Luanda round-trip
+times. The program's own values on that shell are printed but not held to Hypatia's: its
+nearest-distance laser matching gives a different grid from Hypatia's on this shell
+(`docs/phase-2-results.md` explains why and by how much).
 
 ## Deliberately deferred
 

@@ -19,6 +19,9 @@ struct Options {
   time::UtcTime reference;
   /// Path of the CSV file to write, or "-" for standard output.
   std::string out;
+  /// --shells-file: shells and excluded groups to classify with instead of the default
+  /// (constellation::load_classification_config).
+  std::optional<std::filesystem::path> shells_file = std::nullopt;
 };
 
 /// The outcome of parse_arguments: exactly one of options, help or error.
@@ -30,8 +33,9 @@ struct ParsedArguments {
 
 /// Parses the command line, without the program name. Options take their value as the next
 /// argument. --help or -h anywhere wins over any other problem. Rejected: unknown or repeated
-/// options, a missing value, a missing option, an empty --snapshot or --out, and a --time that
-/// is not YYYY-MM-DDTHH:MM:SS[.fffffffff] or does not exist.
+/// options, a missing value, a missing required option, an empty --snapshot, --out or
+/// --shells-file, and a --time that is not YYYY-MM-DDTHH:MM:SS[.fffffffff] or does not exist.
+/// The shells file is read by run_main, not here.
 [[nodiscard]] ParsedArguments parse_arguments(std::span<const std::string_view> args);
 
 /// The --help text.

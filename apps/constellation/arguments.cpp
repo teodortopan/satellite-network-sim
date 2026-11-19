@@ -20,7 +20,7 @@ namespace satsim::constellation_app {
 namespace {
 
 constexpr std::string_view kUsage =
-    R"(usage: constellation --snapshot <dir> --time <UTC> --out <csv|->
+    R"(usage: constellation --snapshot <dir> --time <UTC> --out <csv|-> [--shells-file <file>]
 
 Classifies every satellite of a saved snapshot into a shell, an orbital plane and a position
 in the plane, or gives the reason it has none. Every satellite is propagated with SGP4 to the
@@ -32,6 +32,9 @@ output, or to standard error when the CSV does.
   --snapshot <dir>     directory holding gp.json and supgp.json
   --time <UTC>         reference time, YYYY-MM-DDTHH:MM:SS[.fffffffff], UTC
   --out <path>         CSV file to write, or - for standard output
+  --shells-file <file> shell definitions and excluded groups to classify with, as JSON
+                       (constellation/config_file.hpp); default: the built-in shells of the
+                       2026-11-18 snapshot
   --help, -h           print this text
 
 Each satellite uses its supplemental element set if there is one, else its standard one.
@@ -47,9 +50,16 @@ ParsedArguments failure(std::string message) {
   return result;
 }
 
-enum Option : std::uint8_t { kSnapshot, kTime, kOut, kOptionCount };
+enum Option : std::uint8_t {
+  kSnapshot,
+  kTime,
+  kOut,
+  kRequiredCount,
+  kShellsFile = kRequiredCount,
+  kOptionCount
+};
 constexpr std::array<std::string_view, kOptionCount> kOptionNames = {"--snapshot", "--time",
-                                                                     "--out"};
+                                                                     "--out", "--shells-file"};
 
 }  // namespace
 
@@ -82,7 +92,7 @@ ParsedArguments parse_arguments(std::span<const std::string_view> args) {
   }
 
   std::string missing;
-  for (std::size_t option = 0; option < kOptionCount; ++option) {
+  for (std::size_t option = 0; option < kRequiredCount; ++option) {
     if (!values.at(option)) {
       missing += (missing.empty() ? "" : ", ") + std::string(kOptionNames.at(option));
     }
@@ -109,11 +119,20 @@ ParsedArguments parse_arguments(std::span<const std::string_view> args) {
     return failure("--time " + quote(time_text) + " is not an existing date and time");
   }
 
+  std::optional<std::filesystem::path> shells_file;
+  if (const std::optional<std::string_view> file = values[kShellsFile]) {
+    if (file->empty()) {
+      return failure("--shells-file is empty");
+    }
+    shells_file = std::filesystem::path(*file);
+  }
+
   ParsedArguments result;
   result.options = Options{
       .snapshot_dir = std::filesystem::path(snapshot),
       .reference = *reference,
       .out = std::string(out),
+      .shells_file = std::move(shells_file),
   };
   return result;
 }

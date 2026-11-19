@@ -199,14 +199,16 @@ struct RunHooks {
   std::function<void(PathResult&)> before_lower_bound;
 };
 
-/// Loads and checks everything a run needs, writing nothing. Fails, with a message naming the
-/// file, time or value at fault, if: an option is out of range (step, duration, limits,
-/// fibre factor, a shell name), the snapshot directory or one of its files is missing, a
+/// Loads and checks everything a run needs, writing nothing. With options.shells_file, the
+/// shells and excluded groups are read from that file first (PreparedRun::options then holds
+/// them). Fails, with a message naming the file, time or value at fault, if: the shells file
+/// cannot be read or is not a usable configuration, an option is out of range (step, duration,
+/// limits, fibre factor, a shell name), the snapshot directory or one of its files is missing, a
 /// step has no Earth-orientation values, a ground file is missing or has any bad record
 /// (a skipped gateway or city would change the results silently), no pair has the selected
 /// role, or an element file cannot be loaded as a whole. Then classifies the snapshot at the
 /// start, propagates every plane member there and plans the laser links.
-[[nodiscard]] PreparedRunOrError prepare_run(const Options& options);
+[[nodiscard]] PreparedRunOrError prepare_run(const Options& requested);
 
 /// Steps through the run: positions, laser link states, ground links, the physical checks
 /// (topology::run_physical_checks, every step) and the endpoint model's paths; writes the

@@ -1,0 +1,481 @@
+pattern,model,from,to,series,step_s,steps,ok,serving_changes,exit_changes,path_changes,path_hold_median_s,path_hold_max_s,largest_jump_ms,one_way_min_ms,one_way_median_ms,one_way_p95_ms,one_way_max_ms
+three,realistic,New York,London,1s-first-hour,1,3601,3601,184,0,184,19,48,0.166,39.899,40.075,40.218,40.488
+three,realistic,New York,London,15s-first-hour,15,241,241,158,0,158,15,45,0.260,39.899,40.074,40.217,40.458
+three,realistic,New York,London,15s-12h,15,2881,2881,1879,0,1879,15,60,0.406,39.899,40.061,40.182,40.458
+three,realistic,New York,London,60s-12h,60,721,721,720,0,720,60,60,0.472,39.899,40.059,40.186,40.413
+three,realistic,New York,London,15s-12h-at-60s-instants,60,721,721,720,0,720,60,60,0.472,39.899,40.059,40.186,40.413
+three,realistic,London,New York,1s-first-hour,1,3601,3601,186,0,186,19,43,0.121,39.911,39.971,40.105,40.305
+three,realistic,London,New York,15s-first-hour,15,241,241,166,0,166,15,45,0.213,39.911,39.971,40.105,40.282
+three,realistic,London,New York,15s-12h,15,2881,2881,1872,0,1872,15,45,0.213,39.911,39.978,40.109,40.285
+three,realistic,London,New York,60s-12h,60,721,721,720,0,720,60,60,0.332,39.911,39.977,40.099,40.285
+three,realistic,London,New York,15s-12h-at-60s-instants,60,721,721,720,0,720,60,60,0.332,39.911,39.977,40.099,40.285
+three,realistic,San Francisco,Tokyo,1s-first-hour,1,3601,3601,146,4,147,25,55,0.275,58.264,58.427,58.637,58.932
+three,realistic,San Francisco,Tokyo,15s-first-hour,15,241,241,134,2,134,30,60,0.344,58.266,58.432,58.639,58.809
+three,realistic,San Francisco,Tokyo,15s-12h,15,2881,2881,1639,10,1641,30,60,0.568,58.257,58.432,58.636,59.161
+three,realistic,San Francisco,Tokyo,60s-12h,60,721,721,720,2,720,60,60,0.619,58.263,58.432,58.633,58.902
+three,realistic,San Francisco,Tokyo,15s-12h-at-60s-instants,60,721,721,720,2,720,60,60,0.619,58.263,58.432,58.633,58.902
+three,realistic,Tokyo,San Francisco,1s-first-hour,1,3601,3601,156,0,156,22,50,0.177,57.697,57.856,58.006,58.197
+three,realistic,Tokyo,San Francisco,15s-first-hour,15,241,241,143,0,143,30,45,0.299,57.697,57.856,58.007,58.174
+three,realistic,Tokyo,San Francisco,15s-12h,15,2881,2881,1532,0,1532,30,60,0.406,57.693,57.869,58.083,58.479
+three,realistic,Tokyo,San Francisco,60s-12h,60,721,721,720,0,720,60,60,0.650,57.697,57.868,58.092,58.364
+three,realistic,Tokyo,San Francisco,15s-12h-at-60s-instants,60,721,721,720,0,720,60,60,0.650,57.697,57.868,58.092,58.364
+three,realistic,Frankfurt,Singapore,1s-first-hour,1,3601,3601,138,0,138,29,48,0.121,70.870,70.950,71.124,71.305
+three,realistic,Frankfurt,Singapore,15s-first-hour,15,241,241,124,0,124,30,45,0.232,70.871,70.947,71.125,71.265
+three,realistic,Frankfurt,Singapore,15s-12h,15,2881,2881,1586,0,1586,30,60,0.358,70.869,70.950,71.152,71.434
+three,realistic,Frankfurt,Singapore,60s-12h,60,721,721,720,0,720,60,60,0.443,70.869,70.950,71.149,71.353
+three,realistic,Frankfurt,Singapore,15s-12h-at-60s-instants,60,721,721,720,0,720,60,60,0.443,70.869,70.950,71.149,71.353
+three,realistic,Singapore,Frankfurt,1s-first-hour,1,3601,3601,94,0,94,39,101,0.182,70.838,71.096,71.663,72.390
+three,realistic,Singapore,Frankfurt,15s-first-hour,15,241,241,89,0,89,45,105,0.470,70.839,71.089,71.629,72.347
+three,realistic,Singapore,Frankfurt,15s-12h,15,2881,2881,1235,0,1235,30,105,0.470,70.838,71.044,71.430,72.347
+three,realistic,Singapore,Frankfurt,60s-12h,60,721,721,708,0,708,60,120,1.166,70.838,71.048,71.404,72.074
+three,realistic,Singapore,Frankfurt,15s-12h-at-60s-instants,60,721,721,708,0,708,60,120,1.166,70.838,71.048,71.404,72.074
+three,realistic,Detroit,Buenos Aires,1s-first-hour,1,3601,3601,214,0,214,16,39,0.697,62.966,63.286,63.510,63.768
+three,realistic,Detroit,Buenos Aires,15s-first-hour,15,241,241,180,0,180,15,45,0.550,62.966,63.285,63.497,63.718
+three,realistic,Detroit,Buenos Aires,15s-12h,15,2881,2881,2284,0,2284,15,45,0.686,62.966,63.282,63.496,63.815
+three,realistic,Detroit,Buenos Aires,60s-12h,60,721,721,720,0,720,60,60,0.545,62.982,63.276,63.493,63.718
+three,realistic,Detroit,Buenos Aires,15s-12h-at-60s-instants,60,721,721,720,0,720,60,60,0.545,62.982,63.276,63.493,63.718
+three,realistic,Buenos Aires,Detroit,1s-first-hour,1,3601,3601,128,0,128,28,61,0.153,62.051,62.214,62.473,62.687
+three,realistic,Buenos Aires,Detroit,15s-first-hour,15,241,241,118,0,118,30,60,0.357,62.052,62.213,62.461,62.609
+three,realistic,Buenos Aires,Detroit,15s-12h,15,2881,2881,1474,0,1474,30,75,0.393,62.049,62.207,62.418,62.753
+three,realistic,Buenos Aires,Detroit,60s-12h,60,721,721,719,0,719,60,120,0.623,62.051,62.209,62.418,62.753
+three,realistic,Buenos Aires,Detroit,15s-12h-at-60s-instants,60,721,721,719,0,719,60,120,0.623,62.051,62.209,62.418,62.753
+three,realistic,New York,Chicago,1s-first-hour,1,3601,3601,184,0,184,19,48,0.166,10.668,10.844,10.986,11.257
+three,realistic,New York,Chicago,15s-first-hour,15,241,241,158,0,158,15,45,0.260,10.668,10.843,10.985,11.226
+three,realistic,New York,Chicago,15s-12h,15,2881,2881,1879,0,1879,15,60,0.406,10.667,10.830,10.951,11.226
+three,realistic,New York,Chicago,60s-12h,60,721,721,720,0,720,60,60,0.472,10.668,10.828,10.955,11.181
+three,realistic,New York,Chicago,15s-12h-at-60s-instants,60,721,721,720,0,720,60,60,0.472,10.668,10.828,10.955,11.181
+three,realistic,Chicago,New York,1s-first-hour,1,3601,3601,211,0,211,17,40,0.157,10.699,10.863,10.949,11.030
+three,realistic,Chicago,New York,15s-first-hour,15,241,241,165,0,165,15,45,0.217,10.700,10.863,10.962,11.017
+three,realistic,Chicago,New York,15s-12h,15,2881,2881,2049,0,2049,15,45,0.279,10.696,10.863,10.950,11.075
+three,realistic,Chicago,New York,60s-12h,60,721,721,720,0,720,60,60,0.361,10.699,10.862,10.950,11.075
+three,realistic,Chicago,New York,15s-12h-at-60s-instants,60,721,721,720,0,720,60,60,0.361,10.699,10.862,10.950,11.075
+three,realistic,Reykjavik,Vladivostok,1s-first-hour,1,3601,3601,104,102,174,17,58,71.926,65.626,82.820,134.256,140.674
+three,realistic,Reykjavik,Vladivostok,15s-first-hour,15,241,241,97,81,136,30,60,66.812,65.638,82.674,133.993,138.675
+three,realistic,Reykjavik,Vladivostok,15s-12h,15,2881,2875,951,636,1253,30,120,87.000,64.205,78.313,134.085,154.127
+three,realistic,Reykjavik,Vladivostok,60s-12h,60,721,719,655,393,692,60,120,87.978,64.316,78.337,132.680,153.742
+three,realistic,Reykjavik,Vladivostok,15s-12h-at-60s-instants,60,721,719,655,393,692,60,120,87.978,64.316,78.337,132.680,153.742
+three,realistic,Vladivostok,Reykjavik,1s-first-hour,1,3601,0,0,0,0,3601,3601,,,,,
+three,realistic,Vladivostok,Reykjavik,15s-first-hour,15,241,0,0,0,0,3615,3615,,,,,
+three,realistic,Vladivostok,Reykjavik,15s-12h,15,2881,0,0,0,0,43215,43215,,,,,
+three,realistic,Vladivostok,Reykjavik,60s-12h,60,721,0,0,0,0,43260,43260,,,,,
+three,realistic,Vladivostok,Reykjavik,15s-12h-at-60s-instants,60,721,0,0,0,0,43260,43260,,,,,
+three,realistic,Paris,Luanda,1s-first-hour,1,3601,3601,135,96,214,16,46,7.030,42.979,47.563,49.931,50.075
+three,realistic,Paris,Luanda,15s-first-hour,15,241,241,121,78,165,15,45,6.844,43.003,47.513,49.936,49.988
+three,realistic,Paris,Luanda,15s-12h,15,2881,2881,1493,982,1985,15,60,7.043,42.957,47.768,49.934,50.170
+three,realistic,Paris,Luanda,60s-12h,60,721,721,720,440,720,60,60,6.970,43.000,47.768,49.917,49.994
+three,realistic,Paris,Luanda,15s-12h-at-60s-instants,60,721,721,720,440,720,60,60,6.970,43.000,47.768,49.917,49.994
+three,realistic,Luanda,Paris,1s-first-hour,1,3601,3601,115,69,157,22,68,50.957,68.187,87.656,114.168,124.520
+three,realistic,Luanda,Paris,15s-first-hour,15,241,241,104,64,126,30,75,50.971,68.244,87.688,114.174,124.443
+three,realistic,Luanda,Paris,15s-12h,15,2881,2881,1290,729,1621,30,75,82.343,67.632,85.801,109.529,152.249
+three,realistic,Luanda,Paris,60s-12h,60,721,721,717,427,720,60,60,67.923,67.692,83.300,108.743,151.967
+three,realistic,Luanda,Paris,15s-12h-at-60s-instants,60,721,721,717,427,720,60,60,67.923,67.692,83.300,108.743,151.967
+three,realistic,Oulu,New York,1s-first-hour,1,3601,3601,66,14,81,41,107,48.520,45.883,46.592,53.355,95.268
+three,realistic,Oulu,New York,15s-first-hour,15,241,241,64,10,75,45,105,48.517,45.889,46.611,53.399,95.167
+three,realistic,Oulu,New York,15s-12h,15,2881,2881,992,33,1066,45,105,48.517,45.846,46.570,47.722,95.351
+three,realistic,Oulu,New York,60s-12h,60,721,721,667,22,676,60,120,49.130,45.873,46.584,49.823,95.216
+three,realistic,Oulu,New York,15s-12h-at-60s-instants,60,721,721,667,22,676,60,120,49.130,45.873,46.584,49.823,95.216
+three,realistic,New York,Oulu,1s-first-hour,1,3601,3601,184,0,184,19,48,0.166,45.277,45.453,45.595,45.866
+three,realistic,New York,Oulu,15s-first-hour,15,241,241,158,0,158,15,45,0.260,45.277,45.452,45.594,45.835
+three,realistic,New York,Oulu,15s-12h,15,2881,2881,1879,0,1879,15,60,0.406,45.276,45.439,45.560,45.835
+three,realistic,New York,Oulu,60s-12h,60,721,721,720,0,720,60,60,0.472,45.277,45.437,45.564,45.790
+three,realistic,New York,Oulu,15s-12h-at-60s-instants,60,721,721,720,0,720,60,60,0.472,45.277,45.437,45.564,45.790
+three,best-case,New York,London,1s-first-hour,1,3601,3601,141,148,191,21,70,1.969,20.417,20.688,21.684,22.650
+three,best-case,New York,London,15s-first-hour,15,241,241,121,123,140,30,75,2.022,20.417,20.687,21.698,22.605
+three,best-case,New York,London,15s-12h,15,2881,2881,1491,1575,1768,30,75,2.376,20.346,20.676,21.855,22.926
+three,best-case,New York,London,60s-12h,60,721,721,681,688,714,60,120,2.099,20.346,20.675,21.800,22.635
+three,best-case,New York,London,15s-12h-at-60s-instants,60,721,721,681,688,714,60,120,2.099,20.346,20.675,21.800,22.635
+three,best-case,London,New York,1s-first-hour,1,3601,3601,148,141,191,21,70,1.969,20.417,20.688,21.684,22.650
+three,best-case,London,New York,15s-first-hour,15,241,241,123,121,140,30,75,2.022,20.417,20.687,21.698,22.605
+three,best-case,London,New York,15s-12h,15,2881,2881,1575,1491,1768,30,75,2.376,20.346,20.676,21.855,22.926
+three,best-case,London,New York,60s-12h,60,721,721,688,681,714,60,120,2.099,20.346,20.675,21.800,22.635
+three,best-case,London,New York,15s-12h-at-60s-instants,60,721,721,688,681,714,60,120,2.099,20.346,20.675,21.800,22.635
+three,best-case,San Francisco,Tokyo,1s-first-hour,1,3601,3601,154,148,178,17,91,2.145,30.538,31.676,32.524,33.113
+three,best-case,San Francisco,Tokyo,15s-first-hour,15,241,241,108,104,124,30,105,2.102,30.540,31.676,32.488,33.086
+three,best-case,San Francisco,Tokyo,15s-12h,15,2881,2881,1341,1349,1619,30,105,2.139,30.540,31.404,32.316,33.086
+three,best-case,San Francisco,Tokyo,60s-12h,60,721,721,671,656,704,60,120,2.020,30.578,31.404,32.257,33.006
+three,best-case,San Francisco,Tokyo,15s-12h-at-60s-instants,60,721,721,671,656,704,60,120,2.020,30.578,31.404,32.257,33.006
+three,best-case,Tokyo,San Francisco,1s-first-hour,1,3601,3601,148,154,178,17,91,2.145,30.538,31.676,32.524,33.113
+three,best-case,Tokyo,San Francisco,15s-first-hour,15,241,241,104,108,124,30,105,2.102,30.540,31.676,32.488,33.086
+three,best-case,Tokyo,San Francisco,15s-12h,15,2881,2881,1349,1341,1619,30,105,2.139,30.540,31.404,32.316,33.086
+three,best-case,Tokyo,San Francisco,60s-12h,60,721,721,656,671,704,60,120,2.020,30.578,31.404,32.257,33.006
+three,best-case,Tokyo,San Francisco,15s-12h-at-60s-instants,60,721,721,656,671,704,60,120,2.020,30.578,31.404,32.257,33.006
+three,best-case,Frankfurt,Singapore,1s-first-hour,1,3601,3601,104,84,125,28,103,1.259,37.473,37.862,38.701,39.199
+three,best-case,Frankfurt,Singapore,15s-first-hour,15,241,241,88,75,101,30,90,1.243,37.476,37.865,38.715,39.199
+three,best-case,Frankfurt,Singapore,15s-12h,15,2881,2881,1074,943,1273,30,105,2.323,37.313,37.911,39.014,40.513
+three,best-case,Frankfurt,Singapore,60s-12h,60,721,721,640,592,678,60,120,2.693,37.392,37.909,39.052,40.513
+three,best-case,Frankfurt,Singapore,15s-12h-at-60s-instants,60,721,721,640,592,678,60,120,2.693,37.392,37.909,39.052,40.513
+three,best-case,Singapore,Frankfurt,1s-first-hour,1,3601,3601,84,104,125,28,103,1.259,37.473,37.862,38.701,39.199
+three,best-case,Singapore,Frankfurt,15s-first-hour,15,241,241,75,88,101,30,90,1.243,37.476,37.865,38.715,39.199
+three,best-case,Singapore,Frankfurt,15s-12h,15,2881,2881,943,1074,1273,30,105,2.323,37.313,37.911,39.014,40.513
+three,best-case,Singapore,Frankfurt,60s-12h,60,721,721,592,640,678,60,120,2.693,37.392,37.909,39.052,40.513
+three,best-case,Singapore,Frankfurt,15s-12h-at-60s-instants,60,721,721,592,640,678,60,120,2.693,37.392,37.909,39.052,40.513
+three,best-case,Detroit,Buenos Aires,1s-first-hour,1,3601,3601,55,56,68,40,194,16.538,33.130,36.804,48.244,52.255
+three,best-case,Detroit,Buenos Aires,15s-first-hour,15,241,241,46,50,59,45,195,16.677,33.131,37.028,48.087,52.117
+three,best-case,Detroit,Buenos Aires,15s-12h,15,2881,2881,555,544,739,45,285,44.143,32.543,35.182,60.987,95.083
+three,best-case,Detroit,Buenos Aires,60s-12h,60,721,721,393,398,516,60,240,43.262,32.564,35.174,60.887,94.996
+three,best-case,Detroit,Buenos Aires,15s-12h-at-60s-instants,60,721,721,393,398,516,60,240,43.262,32.564,35.174,60.887,94.996
+three,best-case,Buenos Aires,Detroit,1s-first-hour,1,3601,3601,56,55,68,40,194,16.538,33.130,36.804,48.244,52.255
+three,best-case,Buenos Aires,Detroit,15s-first-hour,15,241,241,50,46,59,45,195,16.677,33.131,37.028,48.087,52.117
+three,best-case,Buenos Aires,Detroit,15s-12h,15,2881,2881,544,555,739,45,285,44.143,32.543,35.182,60.987,95.083
+three,best-case,Buenos Aires,Detroit,60s-12h,60,721,721,398,393,516,60,240,43.262,32.564,35.174,60.887,94.996
+three,best-case,Buenos Aires,Detroit,15s-12h-at-60s-instants,60,721,721,398,393,516,60,240,43.262,32.564,35.174,60.887,94.996
+three,best-case,New York,Chicago,1s-first-hour,1,3601,3601,133,133,133,27,62,0.010,5.036,5.087,5.166,5.211
+three,best-case,New York,Chicago,15s-first-hour,15,241,241,111,111,111,30,60,0.100,5.037,5.089,5.167,5.208
+three,best-case,New York,Chicago,15s-12h,15,2881,2881,1429,1429,1429,30,75,0.113,5.035,5.084,5.158,5.254
+three,best-case,New York,Chicago,60s-12h,60,721,721,720,720,720,60,60,0.154,5.036,5.084,5.159,5.200
+three,best-case,New York,Chicago,15s-12h-at-60s-instants,60,721,721,720,720,720,60,60,0.154,5.036,5.084,5.159,5.200
+three,best-case,Chicago,New York,1s-first-hour,1,3601,3601,133,133,133,27,62,0.010,5.036,5.087,5.166,5.211
+three,best-case,Chicago,New York,15s-first-hour,15,241,241,111,111,111,30,60,0.100,5.037,5.089,5.167,5.208
+three,best-case,Chicago,New York,15s-12h,15,2881,2881,1429,1429,1429,30,75,0.113,5.035,5.084,5.158,5.254
+three,best-case,Chicago,New York,60s-12h,60,721,721,720,720,720,60,60,0.154,5.036,5.084,5.159,5.200
+three,best-case,Chicago,New York,15s-12h-at-60s-instants,60,721,721,720,720,720,60,60,0.154,5.036,5.084,5.159,5.200
+three,best-case,Reykjavik,Vladivostok,1s-first-hour,1,3601,3601,62,61,87,32,105,0.755,28.741,29.260,29.474,29.676
+three,best-case,Reykjavik,Vladivostok,15s-first-hour,15,241,241,54,52,71,38,105,0.618,28.743,29.255,29.469,29.601
+three,best-case,Reykjavik,Vladivostok,15s-12h,15,2881,2881,624,556,755,45,225,48.437,28.685,30.544,41.939,86.175
+three,best-case,Reykjavik,Vladivostok,60s-12h,60,721,721,428,411,528,60,240,49.401,28.760,30.463,41.991,86.175
+three,best-case,Reykjavik,Vladivostok,15s-12h-at-60s-instants,60,721,721,428,411,528,60,240,49.401,28.760,30.463,41.991,86.175
+three,best-case,Vladivostok,Reykjavik,1s-first-hour,1,3601,3601,61,62,87,32,105,0.755,28.741,29.260,29.474,29.676
+three,best-case,Vladivostok,Reykjavik,15s-first-hour,15,241,241,52,54,71,38,105,0.618,28.743,29.255,29.469,29.601
+three,best-case,Vladivostok,Reykjavik,15s-12h,15,2881,2881,556,624,755,45,225,48.437,28.685,30.544,41.939,86.175
+three,best-case,Vladivostok,Reykjavik,60s-12h,60,721,721,411,428,528,60,240,49.401,28.760,30.463,41.991,86.175
+three,best-case,Vladivostok,Reykjavik,15s-12h-at-60s-instants,60,721,721,411,428,528,60,240,49.401,28.760,30.463,41.991,86.175
+three,best-case,Paris,Luanda,1s-first-hour,1,3601,3601,69,56,81,38,157,93.910,23.881,29.602,92.445,119.187
+three,best-case,Paris,Luanda,15s-first-hour,15,241,241,60,50,68,45,165,92.837,23.881,29.651,99.731,119.130
+three,best-case,Paris,Luanda,15s-12h,15,2881,2881,678,631,844,45,210,92.837,23.783,27.184,38.969,119.130
+three,best-case,Paris,Luanda,60s-12h,60,721,721,452,425,552,60,240,76.606,23.784,27.198,39.321,111.066
+three,best-case,Paris,Luanda,15s-12h-at-60s-instants,60,721,721,452,425,552,60,240,76.606,23.784,27.198,39.321,111.066
+three,best-case,Luanda,Paris,1s-first-hour,1,3601,3601,56,69,81,38,157,93.910,23.881,29.602,92.445,119.187
+three,best-case,Luanda,Paris,15s-first-hour,15,241,241,50,60,68,45,165,92.837,23.881,29.651,99.731,119.130
+three,best-case,Luanda,Paris,15s-12h,15,2881,2881,631,678,844,45,210,92.837,23.783,27.184,38.969,119.130
+three,best-case,Luanda,Paris,60s-12h,60,721,721,425,452,552,60,240,76.606,23.784,27.198,39.321,111.066
+three,best-case,Luanda,Paris,15s-12h-at-60s-instants,60,721,721,425,452,552,60,240,76.606,23.784,27.198,39.321,111.066
+three,best-case,Oulu,New York,1s-first-hour,1,3601,3598,77,41,93,29,158,92.415,24.072,26.858,98.795,123.435
+three,best-case,Oulu,New York,15s-first-hour,15,241,241,63,33,76,45,150,92.587,24.073,26.847,94.126,122.713
+three,best-case,Oulu,New York,15s-12h,15,2881,2881,624,410,808,45,180,121.183,23.555,25.316,62.459,154.736
+three,best-case,Oulu,New York,60s-12h,60,721,721,446,334,556,60,180,117.323,23.570,25.262,60.294,152.936
+three,best-case,Oulu,New York,15s-12h-at-60s-instants,60,721,721,446,334,556,60,180,117.323,23.570,25.262,60.294,152.936
+three,best-case,New York,Oulu,1s-first-hour,1,3601,3598,41,77,93,29,158,92.415,24.072,26.858,98.795,123.435
+three,best-case,New York,Oulu,15s-first-hour,15,241,241,33,63,76,45,150,92.587,24.073,26.847,94.126,122.713
+three,best-case,New York,Oulu,15s-12h,15,2881,2881,410,624,808,45,180,121.183,23.555,25.316,62.459,154.736
+three,best-case,New York,Oulu,60s-12h,60,721,721,334,446,556,60,180,117.323,23.570,25.262,60.294,152.936
+three,best-case,New York,Oulu,15s-12h-at-60s-instants,60,721,721,334,446,556,60,180,117.323,23.570,25.262,60.294,152.936
+plus-grid,realistic,New York,London,1s-first-hour,1,3601,3601,184,0,184,19,48,0.166,39.899,40.075,40.218,40.488
+plus-grid,realistic,New York,London,15s-first-hour,15,241,241,158,0,158,15,45,0.260,39.899,40.074,40.217,40.458
+plus-grid,realistic,New York,London,15s-12h,15,2881,2881,1879,0,1879,15,60,0.406,39.899,40.061,40.182,40.458
+plus-grid,realistic,New York,London,60s-12h,60,721,721,720,0,720,60,60,0.472,39.899,40.059,40.186,40.413
+plus-grid,realistic,New York,London,15s-12h-at-60s-instants,60,721,721,720,0,720,60,60,0.472,39.899,40.059,40.186,40.413
+plus-grid,realistic,London,New York,1s-first-hour,1,3601,3601,186,0,186,19,43,0.121,39.911,39.971,40.105,40.305
+plus-grid,realistic,London,New York,15s-first-hour,15,241,241,166,0,166,15,45,0.213,39.911,39.971,40.105,40.282
+plus-grid,realistic,London,New York,15s-12h,15,2881,2881,1872,0,1872,15,45,0.213,39.911,39.978,40.109,40.285
+plus-grid,realistic,London,New York,60s-12h,60,721,721,720,0,720,60,60,0.332,39.911,39.977,40.099,40.285
+plus-grid,realistic,London,New York,15s-12h-at-60s-instants,60,721,721,720,0,720,60,60,0.332,39.911,39.977,40.099,40.285
+plus-grid,realistic,San Francisco,Tokyo,1s-first-hour,1,3601,3601,146,4,147,25,55,0.275,58.264,58.427,58.637,58.932
+plus-grid,realistic,San Francisco,Tokyo,15s-first-hour,15,241,241,134,2,134,30,60,0.344,58.266,58.432,58.639,58.809
+plus-grid,realistic,San Francisco,Tokyo,15s-12h,15,2881,2881,1639,10,1641,30,60,0.568,58.257,58.432,58.636,59.161
+plus-grid,realistic,San Francisco,Tokyo,60s-12h,60,721,721,720,2,720,60,60,0.619,58.263,58.432,58.633,58.902
+plus-grid,realistic,San Francisco,Tokyo,15s-12h-at-60s-instants,60,721,721,720,2,720,60,60,0.619,58.263,58.432,58.633,58.902
+plus-grid,realistic,Tokyo,San Francisco,1s-first-hour,1,3601,3601,156,0,156,22,50,0.177,57.697,57.856,58.006,58.197
+plus-grid,realistic,Tokyo,San Francisco,15s-first-hour,15,241,241,143,0,143,30,45,0.299,57.697,57.856,58.007,58.174
+plus-grid,realistic,Tokyo,San Francisco,15s-12h,15,2881,2881,1532,0,1532,30,60,0.406,57.693,57.869,58.083,58.479
+plus-grid,realistic,Tokyo,San Francisco,60s-12h,60,721,721,720,0,720,60,60,0.650,57.697,57.868,58.092,58.364
+plus-grid,realistic,Tokyo,San Francisco,15s-12h-at-60s-instants,60,721,721,720,0,720,60,60,0.650,57.697,57.868,58.092,58.364
+plus-grid,realistic,Frankfurt,Singapore,1s-first-hour,1,3601,3601,138,0,138,29,48,0.121,70.870,70.950,71.124,71.305
+plus-grid,realistic,Frankfurt,Singapore,15s-first-hour,15,241,241,124,0,124,30,45,0.232,70.871,70.947,71.125,71.265
+plus-grid,realistic,Frankfurt,Singapore,15s-12h,15,2881,2881,1586,0,1586,30,60,0.358,70.869,70.950,71.152,71.434
+plus-grid,realistic,Frankfurt,Singapore,60s-12h,60,721,721,720,0,720,60,60,0.443,70.869,70.950,71.149,71.353
+plus-grid,realistic,Frankfurt,Singapore,15s-12h-at-60s-instants,60,721,721,720,0,720,60,60,0.443,70.869,70.950,71.149,71.353
+plus-grid,realistic,Singapore,Frankfurt,1s-first-hour,1,3601,3601,94,0,94,39,101,0.182,70.838,71.096,71.663,72.390
+plus-grid,realistic,Singapore,Frankfurt,15s-first-hour,15,241,241,89,0,89,45,105,0.470,70.839,71.089,71.629,72.347
+plus-grid,realistic,Singapore,Frankfurt,15s-12h,15,2881,2881,1235,0,1235,30,105,0.470,70.838,71.044,71.430,72.347
+plus-grid,realistic,Singapore,Frankfurt,60s-12h,60,721,721,708,0,708,60,120,1.166,70.838,71.048,71.404,72.074
+plus-grid,realistic,Singapore,Frankfurt,15s-12h-at-60s-instants,60,721,721,708,0,708,60,120,1.166,70.838,71.048,71.404,72.074
+plus-grid,realistic,Detroit,Buenos Aires,1s-first-hour,1,3601,3601,214,0,214,16,39,0.697,62.966,63.286,63.510,63.768
+plus-grid,realistic,Detroit,Buenos Aires,15s-first-hour,15,241,241,180,0,180,15,45,0.550,62.966,63.285,63.497,63.718
+plus-grid,realistic,Detroit,Buenos Aires,15s-12h,15,2881,2881,2284,0,2284,15,45,0.686,62.966,63.282,63.496,63.815
+plus-grid,realistic,Detroit,Buenos Aires,60s-12h,60,721,721,720,0,720,60,60,0.545,62.982,63.276,63.493,63.718
+plus-grid,realistic,Detroit,Buenos Aires,15s-12h-at-60s-instants,60,721,721,720,0,720,60,60,0.545,62.982,63.276,63.493,63.718
+plus-grid,realistic,Buenos Aires,Detroit,1s-first-hour,1,3601,3601,128,0,128,28,61,0.153,62.051,62.214,62.473,62.687
+plus-grid,realistic,Buenos Aires,Detroit,15s-first-hour,15,241,241,118,0,118,30,60,0.357,62.052,62.213,62.461,62.609
+plus-grid,realistic,Buenos Aires,Detroit,15s-12h,15,2881,2881,1474,0,1474,30,75,0.393,62.049,62.207,62.418,62.753
+plus-grid,realistic,Buenos Aires,Detroit,60s-12h,60,721,721,719,0,719,60,120,0.623,62.051,62.209,62.418,62.753
+plus-grid,realistic,Buenos Aires,Detroit,15s-12h-at-60s-instants,60,721,721,719,0,719,60,120,0.623,62.051,62.209,62.418,62.753
+plus-grid,realistic,New York,Chicago,1s-first-hour,1,3601,3601,184,0,184,19,48,0.166,10.668,10.844,10.986,11.257
+plus-grid,realistic,New York,Chicago,15s-first-hour,15,241,241,158,0,158,15,45,0.260,10.668,10.843,10.985,11.226
+plus-grid,realistic,New York,Chicago,15s-12h,15,2881,2881,1879,0,1879,15,60,0.406,10.667,10.830,10.951,11.226
+plus-grid,realistic,New York,Chicago,60s-12h,60,721,721,720,0,720,60,60,0.472,10.668,10.828,10.955,11.181
+plus-grid,realistic,New York,Chicago,15s-12h-at-60s-instants,60,721,721,720,0,720,60,60,0.472,10.668,10.828,10.955,11.181
+plus-grid,realistic,Chicago,New York,1s-first-hour,1,3601,3601,211,0,211,17,40,0.157,10.699,10.863,10.949,11.030
+plus-grid,realistic,Chicago,New York,15s-first-hour,15,241,241,165,0,165,15,45,0.217,10.700,10.863,10.962,11.017
+plus-grid,realistic,Chicago,New York,15s-12h,15,2881,2881,2049,0,2049,15,45,0.279,10.696,10.863,10.950,11.075
+plus-grid,realistic,Chicago,New York,60s-12h,60,721,721,720,0,720,60,60,0.361,10.699,10.862,10.950,11.075
+plus-grid,realistic,Chicago,New York,15s-12h-at-60s-instants,60,721,721,720,0,720,60,60,0.361,10.699,10.862,10.950,11.075
+plus-grid,realistic,Reykjavik,Vladivostok,1s-first-hour,1,3601,3601,104,14,157,22,58,29.622,64.438,78.130,88.199,100.137
+plus-grid,realistic,Reykjavik,Vladivostok,15s-first-hour,15,241,241,97,8,124,30,60,27.619,64.464,78.080,88.050,100.075
+plus-grid,realistic,Reykjavik,Vladivostok,15s-12h,15,2881,2881,951,308,1235,30,120,88.800,64.188,68.512,126.654,154.014
+plus-grid,realistic,Reykjavik,Vladivostok,60s-12h,60,721,721,655,193,692,60,120,73.688,64.316,68.475,126.058,139.804
+plus-grid,realistic,Reykjavik,Vladivostok,15s-12h-at-60s-instants,60,721,721,655,193,692,60,120,73.688,64.316,68.475,126.058,139.804
+plus-grid,realistic,Vladivostok,Reykjavik,1s-first-hour,1,3601,0,0,0,0,3601,3601,,,,,
+plus-grid,realistic,Vladivostok,Reykjavik,15s-first-hour,15,241,0,0,0,0,3615,3615,,,,,
+plus-grid,realistic,Vladivostok,Reykjavik,15s-12h,15,2881,0,0,0,0,43215,43215,,,,,
+plus-grid,realistic,Vladivostok,Reykjavik,60s-12h,60,721,0,0,0,0,43260,43260,,,,,
+plus-grid,realistic,Vladivostok,Reykjavik,15s-12h-at-60s-instants,60,721,0,0,0,0,43260,43260,,,,,
+plus-grid,realistic,Paris,Luanda,1s-first-hour,1,3601,3601,135,57,220,15,60,6.761,42.979,43.975,49.888,50.075
+plus-grid,realistic,Paris,Luanda,15s-first-hour,15,241,241,121,42,160,15,60,6.717,43.003,43.960,49.877,49.988
+plus-grid,realistic,Paris,Luanda,15s-12h,15,2881,2881,1493,592,1974,15,60,7.043,42.957,44.135,49.907,50.170
+plus-grid,realistic,Paris,Luanda,60s-12h,60,721,721,720,267,720,60,60,6.970,43.000,44.118,49.894,49.989
+plus-grid,realistic,Paris,Luanda,15s-12h-at-60s-instants,60,721,721,720,267,720,60,60,6.970,43.000,44.118,49.894,49.989
+plus-grid,realistic,Luanda,Paris,1s-first-hour,1,3601,3601,115,24,180,20,68,36.776,68.045,72.385,96.534,106.310
+plus-grid,realistic,Luanda,Paris,15s-first-hour,15,241,241,104,17,144,15,75,36.683,68.078,72.356,96.588,104.982
+plus-grid,realistic,Luanda,Paris,15s-12h,15,2881,2881,1290,276,1707,15,75,76.001,67.632,71.184,96.126,145.501
+plus-grid,realistic,Luanda,Paris,60s-12h,60,721,721,717,177,720,60,60,71.670,67.692,71.023,96.562,145.219
+plus-grid,realistic,Luanda,Paris,15s-12h-at-60s-instants,60,721,721,717,177,720,60,60,71.670,67.692,71.023,96.562,145.219
+plus-grid,realistic,Oulu,New York,1s-first-hour,1,3601,3601,66,8,81,41,107,48.520,45.883,46.592,49.360,95.268
+plus-grid,realistic,Oulu,New York,15s-first-hour,15,241,241,64,6,75,45,105,48.517,45.889,46.611,49.797,95.167
+plus-grid,realistic,Oulu,New York,15s-12h,15,2881,2881,992,27,1063,45,105,48.832,45.846,46.570,47.722,95.351
+plus-grid,realistic,Oulu,New York,60s-12h,60,721,721,667,18,676,60,120,49.130,45.873,46.584,49.266,95.216
+plus-grid,realistic,Oulu,New York,15s-12h-at-60s-instants,60,721,721,667,18,676,60,120,49.130,45.873,46.584,49.266,95.216
+plus-grid,realistic,New York,Oulu,1s-first-hour,1,3601,3601,184,0,184,19,48,0.166,45.277,45.453,45.595,45.866
+plus-grid,realistic,New York,Oulu,15s-first-hour,15,241,241,158,0,158,15,45,0.260,45.277,45.452,45.594,45.835
+plus-grid,realistic,New York,Oulu,15s-12h,15,2881,2881,1879,0,1879,15,60,0.406,45.276,45.439,45.560,45.835
+plus-grid,realistic,New York,Oulu,60s-12h,60,721,721,720,0,720,60,60,0.472,45.277,45.437,45.564,45.790
+plus-grid,realistic,New York,Oulu,15s-12h-at-60s-instants,60,721,721,720,0,720,60,60,0.472,45.277,45.437,45.564,45.790
+plus-grid,best-case,New York,London,1s-first-hour,1,3601,3601,116,138,170,25,40,1.915,20.436,20.690,21.218,22.562
+plus-grid,best-case,New York,London,15s-first-hour,15,241,241,104,122,132,30,45,1.738,20.496,20.690,21.238,22.467
+plus-grid,best-case,New York,London,15s-12h,15,2881,2881,1283,1449,1611,30,75,2.187,20.312,20.673,21.289,22.734
+plus-grid,best-case,New York,London,60s-12h,60,721,721,703,716,719,60,120,2.063,20.346,20.668,21.302,22.610
+plus-grid,best-case,New York,London,15s-12h-at-60s-instants,60,721,721,703,716,719,60,120,2.063,20.346,20.668,21.302,22.610
+plus-grid,best-case,London,New York,1s-first-hour,1,3601,3601,138,116,170,25,40,1.915,20.436,20.690,21.218,22.562
+plus-grid,best-case,London,New York,15s-first-hour,15,241,241,122,104,132,30,45,1.738,20.496,20.690,21.238,22.467
+plus-grid,best-case,London,New York,15s-12h,15,2881,2881,1449,1283,1611,30,75,2.187,20.312,20.673,21.289,22.734
+plus-grid,best-case,London,New York,60s-12h,60,721,721,716,703,719,60,120,2.063,20.346,20.668,21.302,22.610
+plus-grid,best-case,London,New York,15s-12h-at-60s-instants,60,721,721,716,703,719,60,120,2.063,20.346,20.668,21.302,22.610
+plus-grid,best-case,San Francisco,Tokyo,1s-first-hour,1,3601,3601,98,101,182,15,88,1.088,30.571,30.870,31.395,32.252
+plus-grid,best-case,San Francisco,Tokyo,15s-first-hour,15,241,241,84,87,140,15,90,1.158,30.573,30.875,31.389,32.250
+plus-grid,best-case,San Francisco,Tokyo,15s-12h,15,2881,2881,1148,1141,1695,15,90,1.856,30.401,30.843,31.836,33.144
+plus-grid,best-case,San Francisco,Tokyo,60s-12h,60,721,721,655,648,712,60,120,2.168,30.451,30.842,31.838,33.006
+plus-grid,best-case,San Francisco,Tokyo,15s-12h-at-60s-instants,60,721,721,655,648,712,60,120,2.168,30.451,30.842,31.838,33.006
+plus-grid,best-case,Tokyo,San Francisco,1s-first-hour,1,3601,3601,101,98,182,15,88,1.088,30.571,30.870,31.395,32.252
+plus-grid,best-case,Tokyo,San Francisco,15s-first-hour,15,241,241,87,84,140,15,90,1.158,30.573,30.875,31.389,32.250
+plus-grid,best-case,Tokyo,San Francisco,15s-12h,15,2881,2881,1141,1148,1695,15,90,1.856,30.401,30.843,31.836,33.144
+plus-grid,best-case,Tokyo,San Francisco,60s-12h,60,721,721,648,655,712,60,120,2.168,30.451,30.842,31.838,33.006
+plus-grid,best-case,Tokyo,San Francisco,15s-12h-at-60s-instants,60,721,721,648,655,712,60,120,2.168,30.451,30.842,31.838,33.006
+plus-grid,best-case,Frankfurt,Singapore,1s-first-hour,1,3601,3601,150,96,201,14,82,1.168,37.316,37.829,38.449,38.756
+plus-grid,best-case,Frankfurt,Singapore,15s-first-hour,15,241,241,129,86,155,15,75,1.196,37.326,37.824,38.454,38.682
+plus-grid,best-case,Frankfurt,Singapore,15s-12h,15,2881,2881,1330,929,1566,15,105,2.664,37.272,37.902,38.821,40.651
+plus-grid,best-case,Frankfurt,Singapore,60s-12h,60,721,721,683,537,687,60,120,2.840,37.272,37.899,38.845,40.651
+plus-grid,best-case,Frankfurt,Singapore,15s-12h-at-60s-instants,60,721,721,683,537,687,60,120,2.840,37.272,37.899,38.845,40.651
+plus-grid,best-case,Singapore,Frankfurt,1s-first-hour,1,3601,3601,96,150,201,14,82,1.168,37.316,37.829,38.449,38.756
+plus-grid,best-case,Singapore,Frankfurt,15s-first-hour,15,241,241,86,129,155,15,75,1.196,37.326,37.824,38.454,38.682
+plus-grid,best-case,Singapore,Frankfurt,15s-12h,15,2881,2881,929,1330,1566,15,105,2.664,37.272,37.902,38.821,40.651
+plus-grid,best-case,Singapore,Frankfurt,60s-12h,60,721,721,537,683,687,60,120,2.840,37.272,37.899,38.845,40.651
+plus-grid,best-case,Singapore,Frankfurt,15s-12h-at-60s-instants,60,721,721,537,683,687,60,120,2.840,37.272,37.899,38.845,40.651
+plus-grid,best-case,Detroit,Buenos Aires,1s-first-hour,1,3601,3601,97,78,120,14,172,5.091,33.130,35.609,38.621,42.293
+plus-grid,best-case,Detroit,Buenos Aires,15s-first-hour,15,241,241,74,61,84,30,180,5.876,33.131,35.622,38.637,41.649
+plus-grid,best-case,Detroit,Buenos Aires,15s-12h,15,2881,2881,850,823,1035,30,225,14.334,32.550,35.312,40.242,51.013
+plus-grid,best-case,Detroit,Buenos Aires,60s-12h,60,721,721,527,528,574,60,240,13.774,32.992,35.321,40.541,50.987
+plus-grid,best-case,Detroit,Buenos Aires,15s-12h-at-60s-instants,60,721,721,527,528,574,60,240,13.774,32.992,35.321,40.541,50.987
+plus-grid,best-case,Buenos Aires,Detroit,1s-first-hour,1,3601,3601,78,97,120,14,172,5.091,33.130,35.609,38.621,42.293
+plus-grid,best-case,Buenos Aires,Detroit,15s-first-hour,15,241,241,61,74,84,30,180,5.876,33.131,35.622,38.637,41.649
+plus-grid,best-case,Buenos Aires,Detroit,15s-12h,15,2881,2881,823,850,1035,30,225,14.334,32.550,35.312,40.242,51.013
+plus-grid,best-case,Buenos Aires,Detroit,60s-12h,60,721,721,528,527,574,60,240,13.774,32.992,35.321,40.541,50.987
+plus-grid,best-case,Buenos Aires,Detroit,15s-12h-at-60s-instants,60,721,721,528,527,574,60,240,13.774,32.992,35.321,40.541,50.987
+plus-grid,best-case,New York,Chicago,1s-first-hour,1,3601,3601,133,133,133,27,62,0.010,5.036,5.087,5.166,5.211
+plus-grid,best-case,New York,Chicago,15s-first-hour,15,241,241,111,111,111,30,60,0.100,5.037,5.089,5.167,5.208
+plus-grid,best-case,New York,Chicago,15s-12h,15,2881,2881,1429,1429,1429,30,75,0.113,5.035,5.084,5.158,5.254
+plus-grid,best-case,New York,Chicago,60s-12h,60,721,721,720,720,720,60,60,0.154,5.036,5.084,5.159,5.200
+plus-grid,best-case,New York,Chicago,15s-12h-at-60s-instants,60,721,721,720,720,720,60,60,0.154,5.036,5.084,5.159,5.200
+plus-grid,best-case,Chicago,New York,1s-first-hour,1,3601,3601,133,133,133,27,62,0.010,5.036,5.087,5.166,5.211
+plus-grid,best-case,Chicago,New York,15s-first-hour,15,241,241,111,111,111,30,60,0.100,5.037,5.089,5.167,5.208
+plus-grid,best-case,Chicago,New York,15s-12h,15,2881,2881,1429,1429,1429,30,75,0.113,5.035,5.084,5.158,5.254
+plus-grid,best-case,Chicago,New York,60s-12h,60,721,721,720,720,720,60,60,0.154,5.036,5.084,5.159,5.200
+plus-grid,best-case,Chicago,New York,15s-12h-at-60s-instants,60,721,721,720,720,720,60,60,0.154,5.036,5.084,5.159,5.200
+plus-grid,best-case,Reykjavik,Vladivostok,1s-first-hour,1,3601,3601,120,99,175,12,89,0.820,28.723,29.196,29.364,29.545
+plus-grid,best-case,Reykjavik,Vladivostok,15s-first-hour,15,241,241,93,81,131,15,90,0.745,28.724,29.195,29.360,29.479
+plus-grid,best-case,Reykjavik,Vladivostok,15s-12h,15,2881,2881,734,645,939,30,150,16.944,28.713,30.541,36.782,47.902
+plus-grid,best-case,Reykjavik,Vladivostok,60s-12h,60,721,721,483,430,572,60,180,13.417,28.722,30.462,36.792,45.398
+plus-grid,best-case,Reykjavik,Vladivostok,15s-12h-at-60s-instants,60,721,721,483,430,572,60,180,13.417,28.722,30.462,36.792,45.398
+plus-grid,best-case,Vladivostok,Reykjavik,1s-first-hour,1,3601,3601,99,120,175,12,89,0.820,28.723,29.196,29.364,29.545
+plus-grid,best-case,Vladivostok,Reykjavik,15s-first-hour,15,241,241,81,93,131,15,90,0.745,28.724,29.195,29.360,29.479
+plus-grid,best-case,Vladivostok,Reykjavik,15s-12h,15,2881,2881,645,734,939,30,150,16.944,28.713,30.541,36.782,47.902
+plus-grid,best-case,Vladivostok,Reykjavik,60s-12h,60,721,721,430,483,572,60,180,13.417,28.722,30.462,36.792,45.398
+plus-grid,best-case,Vladivostok,Reykjavik,15s-12h-at-60s-instants,60,721,721,430,483,572,60,180,13.417,28.722,30.462,36.792,45.398
+plus-grid,best-case,Paris,Luanda,1s-first-hour,1,3601,3601,70,62,83,28,163,20.938,23.881,29.795,40.139,46.301
+plus-grid,best-case,Paris,Luanda,15s-first-hour,15,241,241,60,51,68,45,165,19.875,23.881,29.831,40.145,46.167
+plus-grid,best-case,Paris,Luanda,15s-12h,15,2881,2881,924,835,1148,30,180,19.875,23.783,26.215,33.033,46.167
+plus-grid,best-case,Paris,Luanda,60s-12h,60,721,721,564,543,634,60,180,12.616,23.784,26.191,32.977,42.646
+plus-grid,best-case,Paris,Luanda,15s-12h-at-60s-instants,60,721,721,564,543,634,60,180,12.616,23.784,26.191,32.977,42.646
+plus-grid,best-case,Luanda,Paris,1s-first-hour,1,3601,3601,62,70,83,28,163,20.938,23.881,29.795,40.139,46.301
+plus-grid,best-case,Luanda,Paris,15s-first-hour,15,241,241,51,60,68,45,165,19.875,23.881,29.831,40.145,46.167
+plus-grid,best-case,Luanda,Paris,15s-12h,15,2881,2881,835,924,1148,30,180,19.875,23.783,26.215,33.033,46.167
+plus-grid,best-case,Luanda,Paris,60s-12h,60,721,721,543,564,634,60,180,12.616,23.784,26.191,32.977,42.646
+plus-grid,best-case,Luanda,Paris,15s-12h-at-60s-instants,60,721,721,543,564,634,60,180,12.616,23.784,26.191,32.977,42.646
+plus-grid,best-case,Oulu,New York,1s-first-hour,1,3601,3598,64,37,88,33,122,30.885,24.072,26.706,35.253,56.571
+plus-grid,best-case,Oulu,New York,15s-first-hour,15,241,241,56,34,75,45,120,30.947,24.073,26.695,35.227,56.286
+plus-grid,best-case,Oulu,New York,15s-12h,15,2881,2881,677,405,876,45,135,33.261,23.576,25.185,32.008,60.817
+plus-grid,best-case,Oulu,New York,60s-12h,60,721,721,484,341,592,60,180,33.691,23.580,25.146,32.005,60.817
+plus-grid,best-case,Oulu,New York,15s-12h-at-60s-instants,60,721,721,484,341,592,60,180,33.691,23.580,25.146,32.005,60.817
+plus-grid,best-case,New York,Oulu,1s-first-hour,1,3601,3598,37,64,88,33,122,30.885,24.072,26.706,35.253,56.571
+plus-grid,best-case,New York,Oulu,15s-first-hour,15,241,241,34,56,75,45,120,30.947,24.073,26.695,35.227,56.286
+plus-grid,best-case,New York,Oulu,15s-12h,15,2881,2881,405,677,876,45,135,33.261,23.576,25.185,32.008,60.817
+plus-grid,best-case,New York,Oulu,60s-12h,60,721,721,341,484,592,60,180,33.691,23.580,25.146,32.005,60.817
+plus-grid,best-case,New York,Oulu,15s-12h-at-60s-instants,60,721,721,341,484,592,60,180,33.691,23.580,25.146,32.005,60.817
+six,realistic,New York,London,1s-first-hour,1,3601,3601,184,0,184,19,48,0.166,39.899,40.075,40.218,40.488
+six,realistic,New York,London,15s-first-hour,15,241,241,158,0,158,15,45,0.260,39.899,40.074,40.217,40.458
+six,realistic,New York,London,15s-12h,15,2881,2881,1879,0,1879,15,60,0.406,39.899,40.061,40.182,40.458
+six,realistic,New York,London,60s-12h,60,721,721,720,0,720,60,60,0.472,39.899,40.059,40.186,40.413
+six,realistic,New York,London,15s-12h-at-60s-instants,60,721,721,720,0,720,60,60,0.472,39.899,40.059,40.186,40.413
+six,realistic,London,New York,1s-first-hour,1,3601,3601,186,0,186,19,43,0.121,39.911,39.971,40.105,40.305
+six,realistic,London,New York,15s-first-hour,15,241,241,166,0,166,15,45,0.213,39.911,39.971,40.105,40.282
+six,realistic,London,New York,15s-12h,15,2881,2881,1872,0,1872,15,45,0.213,39.911,39.978,40.109,40.285
+six,realistic,London,New York,60s-12h,60,721,721,720,0,720,60,60,0.332,39.911,39.977,40.099,40.285
+six,realistic,London,New York,15s-12h-at-60s-instants,60,721,721,720,0,720,60,60,0.332,39.911,39.977,40.099,40.285
+six,realistic,San Francisco,Tokyo,1s-first-hour,1,3601,3601,146,4,147,25,55,0.275,58.264,58.427,58.637,58.932
+six,realistic,San Francisco,Tokyo,15s-first-hour,15,241,241,134,2,134,30,60,0.344,58.266,58.432,58.639,58.809
+six,realistic,San Francisco,Tokyo,15s-12h,15,2881,2881,1639,10,1641,30,60,0.568,58.257,58.432,58.636,59.161
+six,realistic,San Francisco,Tokyo,60s-12h,60,721,721,720,2,720,60,60,0.619,58.263,58.432,58.633,58.902
+six,realistic,San Francisco,Tokyo,15s-12h-at-60s-instants,60,721,721,720,2,720,60,60,0.619,58.263,58.432,58.633,58.902
+six,realistic,Tokyo,San Francisco,1s-first-hour,1,3601,3601,156,0,156,22,50,0.177,57.697,57.856,58.006,58.197
+six,realistic,Tokyo,San Francisco,15s-first-hour,15,241,241,143,0,143,30,45,0.299,57.697,57.856,58.007,58.174
+six,realistic,Tokyo,San Francisco,15s-12h,15,2881,2881,1532,0,1532,30,60,0.406,57.693,57.869,58.083,58.479
+six,realistic,Tokyo,San Francisco,60s-12h,60,721,721,720,0,720,60,60,0.650,57.697,57.868,58.092,58.364
+six,realistic,Tokyo,San Francisco,15s-12h-at-60s-instants,60,721,721,720,0,720,60,60,0.650,57.697,57.868,58.092,58.364
+six,realistic,Frankfurt,Singapore,1s-first-hour,1,3601,3601,138,0,138,29,48,0.121,70.870,70.950,71.124,71.305
+six,realistic,Frankfurt,Singapore,15s-first-hour,15,241,241,124,0,124,30,45,0.232,70.871,70.947,71.125,71.265
+six,realistic,Frankfurt,Singapore,15s-12h,15,2881,2881,1586,0,1586,30,60,0.358,70.869,70.950,71.152,71.434
+six,realistic,Frankfurt,Singapore,60s-12h,60,721,721,720,0,720,60,60,0.443,70.869,70.950,71.149,71.353
+six,realistic,Frankfurt,Singapore,15s-12h-at-60s-instants,60,721,721,720,0,720,60,60,0.443,70.869,70.950,71.149,71.353
+six,realistic,Singapore,Frankfurt,1s-first-hour,1,3601,3601,94,0,94,39,101,0.182,70.838,71.096,71.663,72.390
+six,realistic,Singapore,Frankfurt,15s-first-hour,15,241,241,89,0,89,45,105,0.470,70.839,71.089,71.629,72.347
+six,realistic,Singapore,Frankfurt,15s-12h,15,2881,2881,1235,0,1235,30,105,0.470,70.838,71.044,71.430,72.347
+six,realistic,Singapore,Frankfurt,60s-12h,60,721,721,708,0,708,60,120,1.166,70.838,71.048,71.404,72.074
+six,realistic,Singapore,Frankfurt,15s-12h-at-60s-instants,60,721,721,708,0,708,60,120,1.166,70.838,71.048,71.404,72.074
+six,realistic,Detroit,Buenos Aires,1s-first-hour,1,3601,3601,214,0,214,16,39,0.697,62.966,63.286,63.510,63.768
+six,realistic,Detroit,Buenos Aires,15s-first-hour,15,241,241,180,0,180,15,45,0.550,62.966,63.285,63.497,63.718
+six,realistic,Detroit,Buenos Aires,15s-12h,15,2881,2881,2284,0,2284,15,45,0.686,62.966,63.282,63.496,63.815
+six,realistic,Detroit,Buenos Aires,60s-12h,60,721,721,720,0,720,60,60,0.545,62.982,63.276,63.493,63.718
+six,realistic,Detroit,Buenos Aires,15s-12h-at-60s-instants,60,721,721,720,0,720,60,60,0.545,62.982,63.276,63.493,63.718
+six,realistic,Buenos Aires,Detroit,1s-first-hour,1,3601,3601,128,0,128,28,61,0.153,62.051,62.214,62.473,62.687
+six,realistic,Buenos Aires,Detroit,15s-first-hour,15,241,241,118,0,118,30,60,0.357,62.052,62.213,62.461,62.609
+six,realistic,Buenos Aires,Detroit,15s-12h,15,2881,2881,1474,0,1474,30,75,0.393,62.049,62.207,62.418,62.753
+six,realistic,Buenos Aires,Detroit,60s-12h,60,721,721,719,0,719,60,120,0.623,62.051,62.209,62.418,62.753
+six,realistic,Buenos Aires,Detroit,15s-12h-at-60s-instants,60,721,721,719,0,719,60,120,0.623,62.051,62.209,62.418,62.753
+six,realistic,New York,Chicago,1s-first-hour,1,3601,3601,184,0,184,19,48,0.166,10.668,10.844,10.986,11.257
+six,realistic,New York,Chicago,15s-first-hour,15,241,241,158,0,158,15,45,0.260,10.668,10.843,10.985,11.226
+six,realistic,New York,Chicago,15s-12h,15,2881,2881,1879,0,1879,15,60,0.406,10.667,10.830,10.951,11.226
+six,realistic,New York,Chicago,60s-12h,60,721,721,720,0,720,60,60,0.472,10.668,10.828,10.955,11.181
+six,realistic,New York,Chicago,15s-12h-at-60s-instants,60,721,721,720,0,720,60,60,0.472,10.668,10.828,10.955,11.181
+six,realistic,Chicago,New York,1s-first-hour,1,3601,3601,211,0,211,17,40,0.157,10.699,10.863,10.949,11.030
+six,realistic,Chicago,New York,15s-first-hour,15,241,241,165,0,165,15,45,0.217,10.700,10.863,10.962,11.017
+six,realistic,Chicago,New York,15s-12h,15,2881,2881,2049,0,2049,15,45,0.279,10.696,10.863,10.950,11.075
+six,realistic,Chicago,New York,60s-12h,60,721,721,720,0,720,60,60,0.361,10.699,10.862,10.950,11.075
+six,realistic,Chicago,New York,15s-12h-at-60s-instants,60,721,721,720,0,720,60,60,0.361,10.699,10.862,10.950,11.075
+six,realistic,Reykjavik,Vladivostok,1s-first-hour,1,3601,3601,104,6,149,23,61,12.916,64.393,68.595,74.812,79.481
+six,realistic,Reykjavik,Vladivostok,15s-first-hour,15,241,241,97,4,123,30,60,13.185,64.400,67.971,74.806,79.401
+six,realistic,Reykjavik,Vladivostok,15s-12h,15,2881,2881,951,277,1218,30,120,88.993,64.162,66.763,109.833,154.014
+six,realistic,Reykjavik,Vladivostok,60s-12h,60,721,721,655,172,691,60,120,73.390,64.205,66.795,110.434,139.609
+six,realistic,Reykjavik,Vladivostok,15s-12h-at-60s-instants,60,721,721,655,172,691,60,120,73.390,64.205,66.795,110.434,139.609
+six,realistic,Vladivostok,Reykjavik,1s-first-hour,1,3601,0,0,0,0,3601,3601,,,,,
+six,realistic,Vladivostok,Reykjavik,15s-first-hour,15,241,0,0,0,0,3615,3615,,,,,
+six,realistic,Vladivostok,Reykjavik,15s-12h,15,2881,0,0,0,0,43215,43215,,,,,
+six,realistic,Vladivostok,Reykjavik,60s-12h,60,721,0,0,0,0,43260,43260,,,,,
+six,realistic,Vladivostok,Reykjavik,15s-12h-at-60s-instants,60,721,0,0,0,0,43260,43260,,,,,
+six,realistic,Paris,Luanda,1s-first-hour,1,3601,3601,135,47,219,15,60,6.761,42.979,43.924,49.861,50.075
+six,realistic,Paris,Luanda,15s-first-hour,15,241,241,121,34,156,15,60,6.717,43.003,43.923,49.834,49.988
+six,realistic,Paris,Luanda,15s-12h,15,2881,2881,1493,512,1973,15,60,7.043,42.957,44.029,49.889,50.170
+six,realistic,Paris,Luanda,60s-12h,60,721,721,720,206,720,60,60,6.970,43.000,44.012,49.866,49.989
+six,realistic,Paris,Luanda,15s-12h-at-60s-instants,60,721,721,720,206,720,60,60,6.970,43.000,44.012,49.866,49.989
+six,realistic,Luanda,Paris,1s-first-hour,1,3601,3601,115,12,176,19,71,29.888,68.045,70.141,76.258,98.345
+six,realistic,Luanda,Paris,15s-first-hour,15,241,241,104,6,140,15,75,28.031,68.078,70.136,75.952,98.329
+six,realistic,Luanda,Paris,15s-12h,15,2881,2881,1290,185,1724,15,75,76.593,67.632,70.036,93.229,145.501
+six,realistic,Luanda,Paris,60s-12h,60,721,721,717,127,720,60,60,73.016,67.692,70.049,93.391,145.219
+six,realistic,Luanda,Paris,15s-12h-at-60s-instants,60,721,721,717,127,720,60,60,73.016,67.692,70.049,93.391,145.219
+six,realistic,Oulu,New York,1s-first-hour,1,3601,3601,66,8,82,41,107,48.520,45.883,46.592,49.360,95.268
+six,realistic,Oulu,New York,15s-first-hour,15,241,241,64,6,75,45,105,48.517,45.889,46.611,49.797,95.167
+six,realistic,Oulu,New York,15s-12h,15,2881,2881,992,27,1063,45,105,48.517,45.846,46.570,47.722,95.351
+six,realistic,Oulu,New York,60s-12h,60,721,721,667,18,676,60,120,49.130,45.873,46.584,49.179,95.216
+six,realistic,Oulu,New York,15s-12h-at-60s-instants,60,721,721,667,18,676,60,120,49.130,45.873,46.584,49.179,95.216
+six,realistic,New York,Oulu,1s-first-hour,1,3601,3601,184,0,184,19,48,0.166,45.277,45.453,45.595,45.866
+six,realistic,New York,Oulu,15s-first-hour,15,241,241,158,0,158,15,45,0.260,45.277,45.452,45.594,45.835
+six,realistic,New York,Oulu,15s-12h,15,2881,2881,1879,0,1879,15,60,0.406,45.276,45.439,45.560,45.835
+six,realistic,New York,Oulu,60s-12h,60,721,721,720,0,720,60,60,0.472,45.277,45.437,45.564,45.790
+six,realistic,New York,Oulu,15s-12h-at-60s-instants,60,721,721,720,0,720,60,60,0.472,45.277,45.437,45.564,45.790
+six,best-case,New York,London,1s-first-hour,1,3601,3601,111,134,168,25,60,1.091,20.436,20.671,21.108,21.886
+six,best-case,New York,London,15s-first-hour,15,241,241,102,118,128,30,60,1.091,20.496,20.672,21.104,21.760
+six,best-case,New York,London,15s-12h,15,2881,2881,1218,1422,1586,30,75,1.756,20.312,20.669,21.168,22.364
+six,best-case,New York,London,60s-12h,60,721,721,695,716,719,60,120,1.714,20.346,20.662,21.185,22.364
+six,best-case,New York,London,15s-12h-at-60s-instants,60,721,721,695,716,719,60,120,1.714,20.346,20.662,21.185,22.364
+six,best-case,London,New York,1s-first-hour,1,3601,3601,134,111,168,25,60,1.091,20.436,20.671,21.108,21.886
+six,best-case,London,New York,15s-first-hour,15,241,241,118,102,128,30,60,1.091,20.496,20.672,21.104,21.760
+six,best-case,London,New York,15s-12h,15,2881,2881,1422,1218,1586,30,75,1.756,20.312,20.669,21.168,22.364
+six,best-case,London,New York,60s-12h,60,721,721,716,695,719,60,120,1.714,20.346,20.662,21.185,22.364
+six,best-case,London,New York,15s-12h-at-60s-instants,60,721,721,716,695,719,60,120,1.714,20.346,20.662,21.185,22.364
+six,best-case,San Francisco,Tokyo,1s-first-hour,1,3601,3601,183,168,269,9,84,0.682,30.366,30.712,30.930,31.481
+six,best-case,San Francisco,Tokyo,15s-first-hour,15,241,241,130,123,161,15,90,0.752,30.368,30.712,30.943,31.454
+six,best-case,San Francisco,Tokyo,15s-12h,15,2881,2881,1680,1562,2058,15,90,0.752,30.368,30.691,30.891,31.454
+six,best-case,San Francisco,Tokyo,60s-12h,60,721,721,697,690,717,60,120,0.592,30.368,30.689,30.890,31.245
+six,best-case,San Francisco,Tokyo,15s-12h-at-60s-instants,60,721,721,697,690,717,60,120,0.592,30.368,30.689,30.890,31.245
+six,best-case,Tokyo,San Francisco,1s-first-hour,1,3601,3601,168,183,269,9,84,0.682,30.366,30.712,30.930,31.481
+six,best-case,Tokyo,San Francisco,15s-first-hour,15,241,241,123,130,161,15,90,0.752,30.368,30.712,30.943,31.454
+six,best-case,Tokyo,San Francisco,15s-12h,15,2881,2881,1562,1680,2058,15,90,0.752,30.368,30.691,30.891,31.454
+six,best-case,Tokyo,San Francisco,60s-12h,60,721,721,690,697,717,60,120,0.592,30.368,30.689,30.890,31.245
+six,best-case,Tokyo,San Francisco,15s-12h-at-60s-instants,60,721,721,690,697,717,60,120,0.592,30.368,30.689,30.890,31.245
+six,best-case,Frankfurt,Singapore,1s-first-hour,1,3601,3601,170,90,230,13,61,1.170,37.169,37.686,38.367,38.666
+six,best-case,Frankfurt,Singapore,15s-first-hour,15,241,241,141,73,174,15,60,1.033,37.169,37.702,38.406,38.547
+six,best-case,Frankfurt,Singapore,15s-12h,15,2881,2881,1485,870,1813,15,105,2.337,37.169,37.827,38.726,40.488
+six,best-case,Frankfurt,Singapore,60s-12h,60,721,721,704,523,710,60,120,2.513,37.169,37.817,38.766,40.324
+six,best-case,Frankfurt,Singapore,15s-12h-at-60s-instants,60,721,721,704,523,710,60,120,2.513,37.169,37.817,38.766,40.324
+six,best-case,Singapore,Frankfurt,1s-first-hour,1,3601,3601,90,170,230,13,61,1.170,37.169,37.686,38.367,38.666
+six,best-case,Singapore,Frankfurt,15s-first-hour,15,241,241,73,141,174,15,60,1.033,37.169,37.702,38.406,38.547
+six,best-case,Singapore,Frankfurt,15s-12h,15,2881,2881,870,1485,1813,15,105,2.337,37.169,37.827,38.726,40.488
+six,best-case,Singapore,Frankfurt,60s-12h,60,721,721,523,704,710,60,120,2.513,37.169,37.817,38.766,40.324
+six,best-case,Singapore,Frankfurt,15s-12h-at-60s-instants,60,721,721,523,704,710,60,120,2.513,37.169,37.817,38.766,40.324
+six,best-case,Detroit,Buenos Aires,1s-first-hour,1,3601,3601,79,71,123,23,109,1.230,32.573,33.431,35.434,36.098
+six,best-case,Detroit,Buenos Aires,15s-first-hour,15,241,241,62,61,99,30,120,1.400,32.582,33.450,35.406,35.797
+six,best-case,Detroit,Buenos Aires,15s-12h,15,2881,2881,895,882,1255,30,180,2.749,32.550,34.360,35.803,37.155
+six,best-case,Detroit,Buenos Aires,60s-12h,60,721,721,574,585,663,60,180,3.111,32.555,34.382,35.789,37.101
+six,best-case,Detroit,Buenos Aires,15s-12h-at-60s-instants,60,721,721,574,585,663,60,180,3.111,32.555,34.382,35.789,37.101
+six,best-case,Buenos Aires,Detroit,1s-first-hour,1,3601,3601,71,79,123,23,109,1.230,32.573,33.431,35.434,36.098
+six,best-case,Buenos Aires,Detroit,15s-first-hour,15,241,241,61,62,99,30,120,1.400,32.582,33.450,35.406,35.797
+six,best-case,Buenos Aires,Detroit,15s-12h,15,2881,2881,882,895,1255,30,180,2.749,32.550,34.360,35.803,37.155
+six,best-case,Buenos Aires,Detroit,60s-12h,60,721,721,585,574,663,60,180,3.111,32.555,34.382,35.789,37.101
+six,best-case,Buenos Aires,Detroit,15s-12h-at-60s-instants,60,721,721,585,574,663,60,180,3.111,32.555,34.382,35.789,37.101
+six,best-case,New York,Chicago,1s-first-hour,1,3601,3601,133,133,133,27,62,0.010,5.036,5.087,5.166,5.211
+six,best-case,New York,Chicago,15s-first-hour,15,241,241,111,111,111,30,60,0.100,5.037,5.089,5.167,5.208
+six,best-case,New York,Chicago,15s-12h,15,2881,2881,1429,1429,1429,30,75,0.113,5.035,5.084,5.158,5.254
+six,best-case,New York,Chicago,60s-12h,60,721,721,720,720,720,60,60,0.154,5.036,5.084,5.159,5.200
+six,best-case,New York,Chicago,15s-12h-at-60s-instants,60,721,721,720,720,720,60,60,0.154,5.036,5.084,5.159,5.200
+six,best-case,Chicago,New York,1s-first-hour,1,3601,3601,133,133,133,27,62,0.010,5.036,5.087,5.166,5.211
+six,best-case,Chicago,New York,15s-first-hour,15,241,241,111,111,111,30,60,0.100,5.037,5.089,5.167,5.208
+six,best-case,Chicago,New York,15s-12h,15,2881,2881,1429,1429,1429,30,75,0.113,5.035,5.084,5.158,5.254
+six,best-case,Chicago,New York,60s-12h,60,721,721,720,720,720,60,60,0.154,5.036,5.084,5.159,5.200
+six,best-case,Chicago,New York,15s-12h-at-60s-instants,60,721,721,720,720,720,60,60,0.154,5.036,5.084,5.159,5.200
+six,best-case,Reykjavik,Vladivostok,1s-first-hour,1,3601,3601,117,84,188,12,66,0.820,28.723,29.135,29.356,29.545
+six,best-case,Reykjavik,Vladivostok,15s-first-hour,15,241,241,99,75,138,15,75,0.745,28.724,29.135,29.351,29.479
+six,best-case,Reykjavik,Vladivostok,15s-12h,15,2881,2881,852,681,1102,30,150,11.414,28.713,30.462,35.052,42.711
+six,best-case,Reykjavik,Vladivostok,60s-12h,60,721,721,556,474,610,60,180,8.753,28.722,30.407,35.001,41.270
+six,best-case,Reykjavik,Vladivostok,15s-12h-at-60s-instants,60,721,721,556,474,610,60,180,8.753,28.722,30.407,35.001,41.270
+six,best-case,Vladivostok,Reykjavik,1s-first-hour,1,3601,3601,84,117,188,12,66,0.820,28.723,29.135,29.356,29.545
+six,best-case,Vladivostok,Reykjavik,15s-first-hour,15,241,241,75,99,138,15,75,0.745,28.724,29.135,29.351,29.479
+six,best-case,Vladivostok,Reykjavik,15s-12h,15,2881,2881,681,852,1102,30,150,11.414,28.713,30.462,35.052,42.711
+six,best-case,Vladivostok,Reykjavik,60s-12h,60,721,721,474,556,610,60,180,8.753,28.722,30.407,35.001,41.270
+six,best-case,Vladivostok,Reykjavik,15s-12h-at-60s-instants,60,721,721,474,556,610,60,180,8.753,28.722,30.407,35.001,41.270
+six,best-case,Paris,Luanda,1s-first-hour,1,3601,3601,94,89,146,21,108,1.902,23.881,25.243,27.011,28.448
+six,best-case,Paris,Luanda,15s-first-hour,15,241,241,82,79,114,30,105,1.818,23.881,25.271,26.945,28.416
+six,best-case,Paris,Luanda,15s-12h,15,2881,2881,1040,998,1392,30,135,3.317,23.783,25.183,26.393,28.553
+six,best-case,Paris,Luanda,60s-12h,60,721,721,638,622,695,60,120,2.872,23.784,25.184,26.383,28.416
+six,best-case,Paris,Luanda,15s-12h-at-60s-instants,60,721,721,638,622,695,60,120,2.872,23.784,25.184,26.383,28.416
+six,best-case,Luanda,Paris,1s-first-hour,1,3601,3601,89,94,146,21,108,1.902,23.881,25.243,27.011,28.448
+six,best-case,Luanda,Paris,15s-first-hour,15,241,241,79,82,114,30,105,1.818,23.881,25.271,26.945,28.416
+six,best-case,Luanda,Paris,15s-12h,15,2881,2881,998,1040,1392,30,135,3.317,23.783,25.183,26.393,28.553
+six,best-case,Luanda,Paris,60s-12h,60,721,721,622,638,695,60,120,2.872,23.784,25.184,26.383,28.416
+six,best-case,Luanda,Paris,15s-12h-at-60s-instants,60,721,721,622,638,695,60,120,2.872,23.784,25.184,26.383,28.416
+six,best-case,Oulu,New York,1s-first-hour,1,3601,3598,67,40,90,37,122,10.978,24.072,25.867,28.856,36.656
+six,best-case,Oulu,New York,15s-first-hour,15,241,241,56,35,76,45,120,6.796,24.073,25.843,28.788,36.054
+six,best-case,Oulu,New York,15s-12h,15,2881,2881,778,456,995,30,120,11.461,23.560,24.952,29.224,37.000
+six,best-case,Oulu,New York,60s-12h,60,721,721,547,377,631,60,120,10.567,23.580,24.917,29.428,36.473
+six,best-case,Oulu,New York,15s-12h-at-60s-instants,60,721,721,547,377,631,60,120,10.567,23.580,24.917,29.428,36.473
+six,best-case,New York,Oulu,1s-first-hour,1,3601,3598,40,67,90,37,122,10.978,24.072,25.867,28.856,36.656
+six,best-case,New York,Oulu,15s-first-hour,15,241,241,35,56,76,45,120,6.796,24.073,25.843,28.788,36.054
+six,best-case,New York,Oulu,15s-12h,15,2881,2881,456,778,995,30,120,11.461,23.560,24.952,29.224,37.000
+six,best-case,New York,Oulu,60s-12h,60,721,721,377,547,631,60,120,10.567,23.580,24.917,29.428,36.473
+six,best-case,New York,Oulu,15s-12h-at-60s-instants,60,721,721,377,547,631,60,120,10.567,23.580,24.917,29.428,36.473

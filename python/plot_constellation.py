@@ -422,7 +422,7 @@ def shell53_variants(
 
 
 def plot_shell53(sats: list[Sat], shell: Shell, variants: dict[str, list[dict]], out: Path) -> None:
-    fig, (left, right) = plt.subplots(1, 2, figsize=(11, 4.0))
+    fig, (left, right) = plt.subplots(1, 2, figsize=(11, 4.8))
     near = [
         s
         for s in sats
@@ -452,7 +452,8 @@ def plot_shell53(sats: list[Sat], shell: Shell, variants: dict[str, list[dict]],
     left.set_xlabel("mean geodetic height (km)")
     left.set_ylabel("RAAN drift (deg/day)")
     left.set_title(f"{shell.name} inclination band, 440-500 km")
-    left.legend(loc="lower left", markerscale=4)
+    # Legends below the axes: inside, they covered points and lines.
+    left.legend(loc="upper center", bbox_to_anchor=(0.5, -0.17), ncol=3, markerscale=4)
     colours = [GRAY, ORANGE, BLUE, AQUA]
     for (label, stats), colour in zip(variants.items(), colours, strict=True):
         right.plot(THRESHOLDS_DEG, [x["planes"] for x in stats], color=colour, label=label)
@@ -461,7 +462,7 @@ def plot_shell53(sats: list[Sat], shell: Shell, variants: dict[str, list[dict]],
     right.set_xlabel("plane gap threshold (deg)")
     right.set_ylabel(f"planes of {shell.min_plane_size} or more")
     right.set_title(f"{shell.name}: how the satellites are chosen")
-    right.legend(loc="upper left", fontsize=8)
+    right.legend(loc="upper center", bbox_to_anchor=(0.5, -0.17), ncol=2, fontsize=8)
     save(fig, out, "shell53.png")
 
 

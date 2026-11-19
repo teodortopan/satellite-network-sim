@@ -1,6 +1,7 @@
 # Phase 2: Network topology
 
-**Status:** in progress.
+**Status:** implemented 2026-11-19. The results, with every measured number, are in
+[phase-2-results.md](phase-2-results.md).
 
 Sources checked on 2026-11-19:
 [FCC order DA 26-36](https://docs.fcc.gov/public/attachments/DA-26-36A1.pdf),
@@ -217,7 +218,7 @@ and the report shows how much each one moves the results.
 | Atmosphere layer | 80 km, fixed | The height a laser beam must clear |
 | Range cap | none | A maximum link length below the line-of-sight limit |
 | Sun exclusion | off | A link is down while the Sun is within a set angle of the beam, as seen from either end |
-| Lock-on time | 0 s | A link that comes back up carries nothing for this long |
+| Lock-on time | 0 s | A link that comes up carries nothing for this long. Every link counts as just come up at the first step |
 | Fibre factor | 1.98 | Fibre delay relative to light in a vacuum over the great-circle distance |
 | Serving-satellite rule | highest elevation | How a city's one satellite is chosen in the realistic model |
 
@@ -248,7 +249,8 @@ and the report shows how much each one moves the results.
 ### 4.8 The `topology` program
 
 Input: snapshot directory, ground-data directory, city file, start, duration, step, link
-pattern, endpoint model, the shells to use, and the limits of 4.5.
+pattern, endpoint model, the shells to use, the limits of 4.5, and optionally a file of
+shell definitions that replaces the built-in ones of section 5.
 
 Output, one CSV row per city pair, direction and time step: time, the two cities, pattern,
 model, status (a path, or the reason there is none), one-way delay, hops, path length,
@@ -314,23 +316,39 @@ No ground truth exists for the real link map. Three layers, none of them proof a
 
 Any failure is counted and makes the program exit with status 1.
 
-### 6.2 Agrees with Hypatia on an ideal shell (CI, no network)
+### 6.2 Agrees with an independent model, which agrees with Hypatia (CI, no network)
 
-Hypatia's first Starlink shell: 72 planes of 22 satellites, 550 km, 53°, +Grid, 25° mask,
-ground stations free to use any visible satellite, shortest path. This project builds the
-same shell as element sets and runs the `plus-grid` pattern with the best-case model.
+Hypatia's first Starlink shell, built from Hypatia's own orbital elements: 72 planes of 22
+satellites, 53°, 15.19 revolutions per day (about 510 km, although Hypatia labels it
+550 km), +Grid, 25° mask, ground stations free to use any visible satellite, shortest path.
+
+The comparison is a chain of two links, because the two +Grids differ. Hypatia links each
+satellite to the one with the same position number in the next plane. Its planes are
+staggered by half a slot, so half of those links are the longer diagonal. This project links
+each satellite to the nearest one in the next plane (4.3), which is a different and shorter
+set of links. A same-position grid has no meaning on the real constellation, where planes
+hold different numbers of satellites, so the program does not have one.
+
+An independent model in Python (`python/validate_topology.py`) sits between the two. It
+shares no code with the program: its positions come from python-sgp4 and Skyfield, its grid
+is built from plane and slot numbers, and it has its own line-of-sight test, mask and
+shortest path. It can build either grid.
 
 | Comparison | Tolerance | Why |
 |---|---|---|
-| Satellites and laser links | exact: 1,584 and 3,168 | The pattern is fully determined |
-| Round-trip time, per pair | within 20% of Hypatia's | Hypatia's ground-link limit and Earth model differ slightly from this project's |
+| Program: satellites and laser links | exact: 1,584 and 3,168, 4 per satellite | The pattern is fully determined |
+| Program against the model with the nearest grid: status, hops, first and last satellite of every path | exact | Both follow the same rules from independent code |
+| Program against the model with the nearest grid: one-way delay | 1e-6 ms | Ten times what Phase 1's position agreement allows over the longest path |
+| Model with Hypatia's grid against Hypatia's published round-trip times | within 20% | Hypatia's ground-link limit and Earth model differ slightly from this project's |
+
+Hypatia publishes one pair on this shell: Paris to Luanda, 85 to 117 ms.
 
 ### 6.3 Plausible against real Starlink (reported, no pass or fail)
 
 - Paths that papers measured (Oulu to New York: 143 ms median round trip) run in the
   realistic model.
-- Published general figures as range checks: about 40 ms median round trip to the nearest
-  PoP.
+- Published general figures as range checks: about 40 ms median round trip from the dish
+  to the ground station, and about 5 ms more to the PoP.
 - Any pair whose delay is more than 3 times its lower bound is flagged and explained.
 
 ### 6.4 Tests

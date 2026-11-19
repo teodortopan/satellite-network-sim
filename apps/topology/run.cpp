@@ -22,6 +22,7 @@
 #include "common/statistics.hpp"
 #include "common/steps.hpp"
 #include "satsim/constellation/classification.hpp"
+#include "satsim/constellation/config_file.hpp"
 #include "satsim/core/physical_constants.hpp"
 #include "satsim/ground/distance.hpp"
 #include "satsim/ground/home_pop.hpp"
@@ -315,7 +316,16 @@ std::string_view name_of(ground::HomePopLevel level) noexcept {
   return "unknown";
 }
 
-PreparedRunOrError prepare_run(const Options& options) {
+PreparedRunOrError prepare_run(const Options& requested) {
+  Options options = requested;
+  if (options.shells_file) {
+    constellation::ClassificationConfigOrError config =
+        constellation::load_classification_config(*options.shells_file);
+    if (auto* error = std::get_if<std::string>(&config)) {
+      return "--shells-file " + *error;
+    }
+    options.classification = std::move(std::get<constellation::ClassificationConfig>(config));
+  }
   if (auto error = check_options(options)) {
     return std::move(*error);
   }
@@ -605,7 +615,8 @@ void write_summary(const PreparedRun& run, const RunStatistics& stats, std::ostr
   const auto& config = o.classification;
   out << "topology summary\n";
   out << "  inputs: snapshot " << o.snapshot_dir.string() << ", ground " << o.ground_dir.string()
-      << ", cities " << o.cities_file.string() << '\n';
+      << ", cities " << o.cities_file.string() << ", shells "
+      << (o.shells_file ? "file " + o.shells_file->string() : std::string("built-in")) << '\n';
   out << "  times: " << run.time_count << ", from " << run.first_time << " to " << run.last_time
       << " UTC every " << app::seconds_text(o.step_ns) << " s (steps done: " << stats.steps
       << ")\n";

@@ -144,6 +144,20 @@ TEST(TopologyArgumentsTest, EveryOption) {
   EXPECT_TRUE(parse(reversed).options.has_value());
 }
 
+TEST(TopologyArgumentsTest, ShellsFileDefersTheShellNamesToTheFile) {
+  EXPECT_FALSE(options_of(parse(kRequired)).shells_file.has_value());
+  const ParsedArguments p = parse_with({"--shells-file", "ideal.json", "--shells", "ideal,x"});
+  const auto& o = options_of(p);
+  EXPECT_EQ(o.shells_file.value_or(""), "ideal.json");
+  // Not checked against the built-in shells: the file is read when the run is prepared.
+  EXPECT_EQ(o.shells, (std::vector<std::string>{"ideal", "x"}));
+  EXPECT_EQ(error_of(parse_with({"--shells-file", ""})), "--shells-file is empty");
+  EXPECT_EQ(error_of(parse_with({"--shells-file", "f.json", "--shells", "a,a"})),
+            "--shells: \"a\" is named twice");
+  EXPECT_EQ(error_of(parse_with({"--shells-file", "f.json", "--shells", "a,"})),
+            "--shells: \"\" is not a shell");
+}
+
 TEST(TopologyArgumentsTest, HelpWinsOverAnyProblem) {
   EXPECT_TRUE(parse({"--bogus", "-h"}).help);
   EXPECT_TRUE(parse({"--help"}).help);

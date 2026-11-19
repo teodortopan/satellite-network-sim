@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Single check command. Builds the CI image and runs scripts/ci.sh in it.
 # Requires only Docker on the host.
-# Usage: scripts/check.sh [format|python-lint|asan-gcc|asan-clang|valgrind|tidy|validate|all]
+# Usage: scripts/check.sh [format|python-lint|asan-gcc|asan-clang|valgrind|tidy|validate|
+#                          validate-topology|all]
 # Default: all.
 set -euo pipefail
 

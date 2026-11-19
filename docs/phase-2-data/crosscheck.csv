@@ -1,0 +1,31 @@
+kind,from,to,rows,worst_abs_difference_ms,min_ms,median_ms,max_ms
+program_minus_model_one_way,Buenos Aires,Detroit,61,6.544e-12,,,
+program_minus_model_one_way,Chicago,New York,61,2.249e-12,,,
+program_minus_model_one_way,Detroit,Buenos Aires,61,6.551e-12,,,
+program_minus_model_one_way,Frankfurt,Singapore,61,8.086e-12,,,
+program_minus_model_one_way,London,New York,61,2.771e-12,,,
+program_minus_model_one_way,Luanda,Paris,61,8.551e-12,,,
+program_minus_model_one_way,New York,Chicago,61,2.249e-12,,,
+program_minus_model_one_way,New York,London,61,2.771e-12,,,
+program_minus_model_one_way,Paris,Luanda,61,8.555e-12,,,
+program_minus_model_one_way,San Francisco,Tokyo,61,5.155e-12,,,
+program_minus_model_one_way,Singapore,Frankfurt,61,8.086e-12,,,
+program_minus_model_one_way,Tokyo,San Francisco,61,5.155e-12,,,
+hypatia_grid_minus_nearest_grid_one_way,Buenos Aires,Detroit,61,,20.7286,25.7470,35.2527
+hypatia_grid_minus_nearest_grid_one_way,Chicago,New York,61,,0.0000,0.0000,0.0000
+hypatia_grid_minus_nearest_grid_one_way,Detroit,Buenos Aires,61,,20.7286,25.7470,35.2527
+hypatia_grid_minus_nearest_grid_one_way,Frankfurt,Singapore,61,,0.0000,0.0861,3.0802
+hypatia_grid_minus_nearest_grid_one_way,London,New York,61,,-0.3389,0.0455,1.5782
+hypatia_grid_minus_nearest_grid_one_way,Luanda,Paris,61,,25.7166,27.3912,35.0218
+hypatia_grid_minus_nearest_grid_one_way,New York,Chicago,61,,0.0000,0.0000,0.0000
+hypatia_grid_minus_nearest_grid_one_way,New York,London,61,,-0.3389,0.0455,1.5782
+hypatia_grid_minus_nearest_grid_one_way,Paris,Luanda,61,,25.7166,27.3912,35.0218
+hypatia_grid_minus_nearest_grid_one_way,San Francisco,Tokyo,61,,0.0000,0.7093,8.9494
+hypatia_grid_minus_nearest_grid_one_way,Singapore,Frankfurt,61,,0.0000,0.0861,3.0802
+hypatia_grid_minus_nearest_grid_one_way,Tokyo,San Francisco,61,,0.0000,0.7093,8.9494
+program_round_trip_200s,Paris,Luanda,201,,48.4430,50.2205,52.3670
+model_round_trip_200s (this model with Hypatia's same-index grid),Paris,Luanda,201,,85.3919,105.0282,117.4792
+model_round_trip_200s (Hypatia's grid and ground-link rule),Paris,Luanda,201,,85.2734,104.7604,117.2239
+program_round_trip_200s,Luanda,Paris,201,,48.4430,50.2205,52.3670
+model_round_trip_200s (this model with Hypatia's same-index grid),Luanda,Paris,201,,85.3919,105.0282,117.4792
+model_round_trip_200s (Hypatia's grid and ground-link rule),Luanda,Paris,201,,85.2734,104.7604,117.2239
