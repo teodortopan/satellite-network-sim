@@ -1,13 +1,13 @@
 # The constellation program. Its logic is a library, so tests call it directly and it gets our
-# warnings and sanitizers; the executable is only main(). It reuses the propagate program's CSV
-# and statistics helpers (satsim::propagate_app), so both programs write numbers and fields the
+# warnings and sanitizers; the executable is only main(). Number and field formatting come
+# from the programs' shared helpers (satsim::app_common), so every program writes them the
 # same way.
 satsim_add_library(constellation_app
   SOURCES arguments.cpp run.cpp
-  DEPS satsim::constellation satsim::orbit satsim::time)
+  DEPS satsim::app_common satsim::constellation satsim::orbit satsim::time)
 # Headers are included as "constellation/run.hpp".
 target_include_directories(satsim_constellation_app PUBLIC "${PROJECT_SOURCE_DIR}/apps")
-target_link_libraries(satsim_constellation_app PRIVATE satsim::propagate_app satsim::core)
+target_link_libraries(satsim_constellation_app PRIVATE satsim::core)
 
 # Output in <build>/bin.
 add_executable(constellation main.cpp)

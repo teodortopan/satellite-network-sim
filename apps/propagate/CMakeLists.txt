@@ -1,8 +1,8 @@
 # The propagate program. Its logic is a library, so tests call it directly and it gets our
 # warnings and sanitizers; the executable is only main().
 satsim_add_library(propagate_app
-  SOURCES arguments.cpp csv.cpp statistics.cpp run.cpp
-  DEPS satsim::orbit satsim::frames satsim::time)
+  SOURCES arguments.cpp run.cpp
+  DEPS satsim::app_common satsim::orbit satsim::frames satsim::time)
 # Headers are included as "propagate/run.hpp".
 target_include_directories(satsim_propagate_app PUBLIC "${PROJECT_SOURCE_DIR}/apps")
 target_link_libraries(satsim_propagate_app PRIVATE satsim::core)

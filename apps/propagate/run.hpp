@@ -94,14 +94,6 @@ struct RunOutcome {
   RunSummary summary;
 };
 
-/// Output time number `index` (from 0): start + index * step_ns. The offset is computed in
-/// integer nanoseconds and handed to UtcTime::plus_seconds as whole seconds then the
-/// remaining nanoseconds, two doubles that are each exact, so every time is exact to the
-/// nanosecond however long the run (no drift, unlike repeated addition of a double step).
-/// Precondition: 0 <= index * step_ns <= kMaxDurationNs.
-[[nodiscard]] time::UtcTime time_of_step(const time::UtcTime& start, std::int64_t step_ns,
-                                         std::int64_t index) noexcept;
-
 /// Loads and checks everything a run needs, writing nothing. Fails (with a message naming
 /// the file or time at fault) if the snapshot directory or one of its three files is
 /// missing, a file cannot be loaded as a whole (record-level errors are only counted), or

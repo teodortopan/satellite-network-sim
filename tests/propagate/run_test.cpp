@@ -21,6 +21,8 @@
 #include <variant>
 #include <vector>
 
+#include "common/csv.hpp"
+#include "common/steps.hpp"
 #include "propagate/csv.hpp"
 #include "satsim/core/angles.hpp"
 #include "satsim/frames/geodetic.hpp"
@@ -283,9 +285,8 @@ TEST(PropagateRunTest, DecimalStepsAreExact) {
 TEST(PropagateRunTest, TimeOfStepIsExactOverLongRuns) {
   const UtcTime start = utc("2026-11-17T18:00:00.123456789");
   // 1e5 steps of 0.1 s plus a large index: no drift, unlike repeated addition.
-  EXPECT_EQ(satsim::propagate::time_of_step(start, 100'000'000, 100'000),
-            start.plus_seconds(10'000.0));
-  EXPECT_EQ(satsim::propagate::time_of_step(start, 1, 999'999'999'999'999'999),
+  EXPECT_EQ(satsim::app::time_of_step(start, 100'000'000, 100'000), start.plus_seconds(10'000.0));
+  EXPECT_EQ(satsim::app::time_of_step(start, 1, 999'999'999'999'999'999),
             utc("2058-07-26T19:46:40.123456788"));
 }
 
@@ -368,9 +369,9 @@ TEST(PropagateRunTest, SatelliteThatDecaysHasNoRowsAfterwardsAndIsCounted) {
   std::vector<std::string> expected_times;
   std::size_t expected_failures = 0;
   for (std::int64_t i = 0; i < 7; ++i) {
-    const UtcTime t = satsim::propagate::time_of_step(o.start, o.step_ns, i);
+    const UtcTime t = satsim::app::time_of_step(o.start, o.step_ns, i);
     if (std::holds_alternative<TemeState>(std::get<Propagator>(built).propagate(t))) {
-      expected_times.push_back(satsim::propagate::format_utc_iso(t, 0));
+      expected_times.push_back(satsim::app::format_utc_iso(t, 0));
     } else {
       ++expected_failures;
     }

@@ -1,0 +1,14 @@
+{
+ "note": "Fixture for tests/topology_app. Invented cities; Gamma has no Starlink service (no geofeed row for FR).",
+ "cities": [
+  {"name": "Alpha", "country": "US", "region": "US-NY", "geofeed_city": "Alpha", "lat": 40.0, "lon": -75.0},
+  {"name": "Beta", "country": "US", "region": "US-IL", "geofeed_city": "Beta", "lat": 42.0, "lon": -88.0},
+  {"name": "Gamma", "country": "FR", "region": "FR-IDF", "geofeed_city": "Gamma", "lat": 48.8, "lon": 2.3},
+  {"name": "Delta", "country": "JP", "region": "JP-13", "geofeed_city": "Delta", "lat": 35.7, "lon": 139.7}
+ ],
+ "pairs": [
+  {"from": "Alpha", "to": "Beta", "role": "study", "why": "short, both served"},
+  {"from": "Alpha", "to": "Gamma", "role": "study", "why": "Gamma has no service"},
+  {"from": "Delta", "to": "Alpha", "role": "validation", "why": "across the Pacific"}
+ ]
+}

@@ -8,14 +8,13 @@
 #include <string_view>
 #include <vector>
 
+#include "common/steps.hpp"
 #include "satsim/time/utc_time.hpp"
 
 namespace satsim::propagate {
 
-/// Longest accepted --duration-s: about 31.7 years, far beyond any Earth-orientation file. It
-/// keeps every offset in nanoseconds (step index times step) well inside int64_t and
-/// UtcTime::plus_seconds's precondition.
-inline constexpr std::int64_t kMaxDurationNs = 1'000'000'000LL * 1'000'000'000LL;
+/// Longest accepted --duration-s (app::kMaxDurationNs, about 31.7 years).
+using app::kMaxDurationNs;
 
 /// What one run of the program computes and where it writes it. Built by parse_arguments,
 /// which has checked every value; tests may also fill one in directly.

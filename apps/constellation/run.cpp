@@ -2,7 +2,6 @@
 
 #include <algorithm>
 #include <array>
-#include <charconv>
 #include <cstddef>
 #include <fstream>
 #include <map>
@@ -11,14 +10,13 @@
 #include <span>
 #include <string>
 #include <string_view>
-#include <system_error>
 #include <utility>
 #include <variant>
 #include <vector>
 
+#include "common/csv.hpp"
+#include "common/statistics.hpp"
 #include "constellation/arguments.hpp"
-#include "propagate/csv.hpp"
-#include "propagate/statistics.hpp"
 #include "satsim/constellation/classification.hpp"
 #include "satsim/constellation/geometry.hpp"
 #include "satsim/core/angles.hpp"
@@ -31,26 +29,19 @@ namespace satsim::constellation_app {
 
 namespace {
 
+using app::append_csv_field;
+using app::append_double;
+using app::append_integer;
+using app::fixed;
 using constellation::ClassifiedSatellite;
 using constellation::ExclusionReason;
 using constellation::PlaneAssignment;
-using propagate::append_csv_field;
-using propagate::append_double;
-using propagate::append_integer;
 
 constexpr int kTimeFractionDigits = 9;
 
-// `value` with `decimals` digits after the point, locale-independent.
-std::string fixed(double value, int decimals) {
-  std::array<char, 64> buffer{};
-  const auto [end, ec] = std::to_chars(buffer.data(), buffer.data() + buffer.size(), value,
-                                       std::chars_format::fixed, decimals);
-  return ec == std::errc{} ? std::string(buffer.data(), end) : std::string("?");
-}
-
 // The reference time as text, without trailing zero fraction digits.
 std::string time_text(const time::UtcTime& utc) {
-  std::string text = propagate::format_utc_iso(utc, kTimeFractionDigits);
+  std::string text = app::format_utc_iso(utc, kTimeFractionDigits);
   text.erase(text.find_last_not_of('0') + 1);
   if (text.back() == '.') {
     text.pop_back();
@@ -230,7 +221,7 @@ void write_summary(const ClassifiedRun& run, std::ostream& out) {
     for (const constellation::Plane& plane : planes) {
       sizes.push_back(static_cast<double>(plane.members.size()));
     }
-    if (const std::optional<propagate::Quantiles> q = propagate::quantiles(sizes)) {
+    if (const std::optional<app::Quantiles> q = app::quantiles(sizes)) {
       out << ", plane size min " << fixed(q->min, 0) << " median " << fixed(q->median, 1) << " max "
           << fixed(q->max, 0);
     }

@@ -6,9 +6,9 @@
 #include <optional>
 #include <vector>
 
-namespace satsim::propagate {
+namespace satsim::app {
 
-/// Order statistics of a sample, for the run summary.
+/// Order statistics of a sample, for the programs' summaries.
 struct Quantiles {
   std::size_t count = 0;
   double min = 0.0;
@@ -32,4 +32,4 @@ struct Quantiles {
 [[nodiscard]] std::map<std::int64_t, std::size_t> band_counts(const std::vector<double>& values,
                                                               double band_width);
 
-}  // namespace satsim::propagate
+}  // namespace satsim::app

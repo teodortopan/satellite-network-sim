@@ -1,0 +1,5 @@
+[
+ {"code": "pa", "routers": ["alphaus1"], "city": "Alpha", "country": "US", "lat": 40.1, "lon": -75.1, "coordinates_from": "invented"},
+ {"code": "pb", "routers": ["betaus1"], "city": "Beta", "country": "US", "lat": 42.1, "lon": -88.1, "coordinates_from": "invented"},
+ {"code": "pd", "routers": ["deltajp1"], "city": "Delta", "country": "JP", "lat": 35.6, "lon": 139.6, "coordinates_from": "invented"}
+]

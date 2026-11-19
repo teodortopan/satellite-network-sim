@@ -1,4 +1,4 @@
-#include "propagate/csv.hpp"
+#include "common/csv.hpp"
 
 #include <array>
 #include <cassert>
@@ -13,7 +13,7 @@
 #include "satsim/time/civil_time.hpp"
 #include "satsim/time/utc_time.hpp"
 
-namespace satsim::propagate {
+namespace satsim::app {
 
 namespace {
 
@@ -109,4 +109,25 @@ std::string format_utc_iso(const time::UtcTime& utc, int fraction_digits) {
   return text;
 }
 
-}  // namespace satsim::propagate
+std::string fixed(double value, int decimals) {
+  std::array<char, 64> buffer{};
+  const auto [end, ec] = std::to_chars(buffer.data(), buffer.data() + buffer.size(), value,
+                                       std::chars_format::fixed, decimals);
+  return ec == std::errc{} ? std::string(buffer.data(), end) : std::string("?");
+}
+
+std::string seconds_text(std::int64_t ns) {
+  std::string text;
+  append_integer(text, ns / kNanosecondsPerSecond);
+  const std::int64_t fraction = ns % kNanosecondsPerSecond;
+  if (fraction != 0) {
+    // Nine digits, then trailing zeros dropped.
+    std::string digits = std::to_string(fraction);
+    digits.insert(0, 9 - digits.size(), '0');
+    digits.erase(digits.find_last_not_of('0') + 1);
+    text += "." + digits;
+  }
+  return text;
+}
+
+}  // namespace satsim::app

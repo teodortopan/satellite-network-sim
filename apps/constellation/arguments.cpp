@@ -11,14 +11,13 @@
 #include <string_view>
 #include <utility>
 
+#include "common/arguments.hpp"
 #include "satsim/time/civil_time.hpp"
 #include "satsim/time/utc_time.hpp"
 
 namespace satsim::constellation_app {
 
 namespace {
-
-constexpr std::size_t kMaxQuotedLength = 40;  // Keeps messages short on junk input.
 
 constexpr std::string_view kUsage =
     R"(usage: constellation --snapshot <dir> --time <UTC> --out <csv|->
@@ -40,12 +39,7 @@ Exit status: 0 on success (excluded satellites are counted, not fatal), 1 if the
 2 if the arguments are invalid.
 )";
 
-std::string quote(std::string_view text) {
-  if (text.size() > kMaxQuotedLength) {
-    return "\"" + std::string(text.substr(0, kMaxQuotedLength)) + "...\"";
-  }
-  return "\"" + std::string(text) + "\"";
-}
+using app::quote;
 
 ParsedArguments failure(std::string message) {
   ParsedArguments result;

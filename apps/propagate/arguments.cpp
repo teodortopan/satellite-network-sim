@@ -11,6 +11,7 @@
 #include <utility>
 #include <vector>
 
+#include "common/arguments.hpp"
 #include "satsim/time/civil_time.hpp"
 #include "satsim/time/utc_time.hpp"
 
@@ -18,9 +19,7 @@ namespace satsim::propagate {
 
 namespace {
 
-constexpr std::int64_t kNanosecondsPerSecond = 1'000'000'000;
 constexpr std::int64_t kMaxCatalogNumber = 999'999'999;  // OMM allows nine digits.
-constexpr std::size_t kMaxQuotedLength = 40;             // Keeps messages short on junk input.
 
 constexpr std::string_view kUsage =
     R"(usage: propagate --snapshot <dir> --start <UTC> --duration-s <s> --step-s <s> --out <csv|->
@@ -46,12 +45,8 @@ Exit status: 0 on success (satellites that fail to propagate are counted, not fa
 1 if the run fails, 2 if the arguments are invalid.
 )";
 
-std::string quote(std::string_view text) {
-  if (text.size() > kMaxQuotedLength) {
-    return "\"" + std::string(text.substr(0, kMaxQuotedLength)) + "...\"";
-  }
-  return "\"" + std::string(text) + "\"";
-}
+using app::parse_seconds_as_ns;
+using app::quote;
 
 bool is_digit(char c) noexcept { return c >= '0' && c <= '9'; }
 
@@ -70,46 +65,6 @@ std::optional<std::int64_t> parse_small_unsigned(std::string_view digits) noexce
     value = value * 10 + (c - '0');
   }
   return value;
-}
-
-// A plain decimal number of seconds, "12" or "12.345", with at most 9 fraction digits, read
-// exactly as integer nanoseconds. Nullopt for anything else or above kMaxDurationNs.
-std::optional<std::int64_t> parse_seconds_as_ns(std::string_view text) noexcept {
-  constexpr std::size_t kMaxFractionDigits = 9;
-  const std::size_t dot = text.find('.');
-  const std::string_view whole = text.substr(0, dot);
-  std::string_view fraction;
-  if (dot != std::string_view::npos) {
-    fraction = text.substr(dot + 1);
-    if (fraction.empty() || fraction.size() > kMaxFractionDigits) {
-      return std::nullopt;
-    }
-  }
-  // Whole part limited to 10 digits (kMaxDurationNs is 1e9 s), so the product cannot overflow.
-  constexpr std::size_t kMaxWholeDigits = 10;
-  if (whole.size() > kMaxWholeDigits) {
-    return std::nullopt;
-  }
-  const std::optional<std::int64_t> whole_s = parse_small_unsigned(whole);
-  if (!whole_s) {
-    return std::nullopt;
-  }
-  std::int64_t fraction_ns = 0;
-  if (!fraction.empty()) {
-    const std::optional<std::int64_t> digits = parse_small_unsigned(fraction);
-    if (!digits) {
-      return std::nullopt;
-    }
-    fraction_ns = *digits;
-    for (std::size_t i = fraction.size(); i < kMaxFractionDigits; ++i) {
-      fraction_ns *= 10;
-    }
-  }
-  const std::int64_t total_ns = *whole_s * kNanosecondsPerSecond + fraction_ns;
-  if (total_ns > kMaxDurationNs) {
-    return std::nullopt;
-  }
-  return total_ns;
 }
 
 // "44714,100001": catalogue numbers, returned ascending without repeats.

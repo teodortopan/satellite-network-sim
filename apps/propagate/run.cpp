@@ -3,7 +3,6 @@
 #include <Eigen/Core>
 #include <algorithm>
 #include <array>
-#include <charconv>
 #include <cstddef>
 #include <cstdint>
 #include <filesystem>
@@ -14,14 +13,15 @@
 #include <span>
 #include <string>
 #include <string_view>
-#include <system_error>
 #include <utility>
 #include <variant>
 #include <vector>
 
+#include "common/csv.hpp"
+#include "common/statistics.hpp"
+#include "common/steps.hpp"
 #include "propagate/arguments.hpp"
 #include "propagate/csv.hpp"
-#include "propagate/statistics.hpp"
 #include "satsim/core/angles.hpp"
 #include "satsim/frames/geodetic.hpp"
 #include "satsim/frames/teme_ecef.hpp"
@@ -39,7 +39,18 @@ namespace satsim::propagate {
 
 namespace {
 
-constexpr std::int64_t kNanosecondsPerSecond = 1'000'000'000;
+using app::append_csv_field;
+using app::append_double;
+using app::append_integer;
+using app::band_counts;
+using app::fixed;
+using app::format_utc_iso;
+using app::fraction_digits_for;
+using app::Quantiles;
+using app::quantiles;
+using app::seconds_text;
+using app::time_of_step;
+
 constexpr double kSecondsPerDay = 86400.0;
 constexpr std::size_t kMaxRecordErrorsListed = 10;
 
@@ -56,28 +67,6 @@ std::string date_of_mjd(std::int64_t mjd) {
   }
   return format_utc_iso(mjd_zero->plus_seconds(static_cast<double>(mjd) * kSecondsPerDay), 0)
       .substr(0, 10);
-}
-
-// `value` with `decimals` digits after the point, locale-independent.
-std::string fixed(double value, int decimals) {
-  std::array<char, 64> buffer{};
-  const auto [end, ec] = std::to_chars(buffer.data(), buffer.data() + buffer.size(), value,
-                                       std::chars_format::fixed, decimals);
-  return ec == std::errc{} ? std::string(buffer.data(), end) : std::string("?");
-}
-
-std::string seconds_text(std::int64_t ns) {
-  std::string text;
-  append_integer(text, ns / kNanosecondsPerSecond);
-  std::int64_t fraction = ns % kNanosecondsPerSecond;
-  if (fraction != 0) {
-    // Nine digits, then trailing zeros dropped.
-    std::string digits = std::to_string(fraction);
-    digits.insert(0, 9 - digits.size(), '0');
-    digits.erase(digits.find_last_not_of('0') + 1);
-    text += "." + digits;
-  }
-  return text;
 }
 
 std::string earth_orientation_gap_message(const std::string& time_text,
@@ -146,17 +135,6 @@ void write_ages(std::ostream& out, std::string_view source, const std::vector<do
 
 }  // namespace
 
-time::UtcTime time_of_step(const time::UtcTime& start, std::int64_t step_ns,
-                           std::int64_t index) noexcept {
-  const std::int64_t offset_ns = index * step_ns;
-  // Whole seconds (at most 1e9, exact in a double) then the rest (below 1e9 ns, so the
-  // quotient by 1e9 is within 1e-16 s of it and plus_seconds rounds it back exactly).
-  const std::int64_t whole_s = offset_ns / kNanosecondsPerSecond;
-  const std::int64_t rest_ns = offset_ns % kNanosecondsPerSecond;
-  return start.plus_seconds(static_cast<double>(whole_s))
-      .plus_seconds(static_cast<double>(rest_ns) / static_cast<double>(kNanosecondsPerSecond));
-}
-
 PreparedRunOrError prepare_run(const Options& options) {
   namespace fs = std::filesystem;
   // parse_arguments guarantees these; checked again for Options built by hand.
@@ -181,7 +159,7 @@ PreparedRunOrError prepare_run(const Options& options) {
   PreparedRun run{
       .start = options.start,
       .step_ns = options.step_ns,
-      .time_count = options.duration_ns / options.step_ns + 1,
+      .time_count = app::step_count(options.duration_ns, options.step_ns),
       .fraction_digits = fraction_digits_for(options.start, options.step_ns),
       .earth_orientation = std::move(*eop.table),
       .satellites = {},

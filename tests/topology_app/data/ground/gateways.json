@@ -1,0 +1,5 @@
+[
+ {"name": "Gateway Alpha", "lat": 40.5, "lon": -74.5, "status": "operational"},
+ {"name": "Gateway Beta", "lat": 41.5, "lon": -87.5, "status": "operational"},
+ {"name": "Gateway Planned", "lat": 35.0, "lon": 139.0, "status": "planned"}
+]

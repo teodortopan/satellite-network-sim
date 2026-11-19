@@ -33,10 +33,13 @@ add_subdirectory(src/ground)
 add_subdirectory(src/orbit)
 add_subdirectory(src/constellation)
 add_subdirectory(src/topology)
+add_subdirectory(src/network)
 
-# Programs.
+# Programs, and the helpers they share.
+add_subdirectory(apps/common)
 add_subdirectory(apps/propagate)
 add_subdirectory(apps/constellation)
+add_subdirectory(apps/topology)
 
 if(SATSIM_BUILD_TESTS)
   enable_testing()

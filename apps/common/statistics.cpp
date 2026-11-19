@@ -1,4 +1,4 @@
-#include "propagate/statistics.hpp"
+#include "common/statistics.hpp"
 
 #include <algorithm>
 #include <cassert>
@@ -9,7 +9,7 @@
 #include <optional>
 #include <vector>
 
-namespace satsim::propagate {
+namespace satsim::app {
 
 double percentile_of_sorted(const std::vector<double>& sorted, double p) {
   assert(!sorted.empty() && p >= 0.0 && p <= 100.0);
@@ -44,4 +44,4 @@ std::map<std::int64_t, std::size_t> band_counts(const std::vector<double>& value
   return counts;
 }
 
-}  // namespace satsim::propagate
+}  // namespace satsim::app
