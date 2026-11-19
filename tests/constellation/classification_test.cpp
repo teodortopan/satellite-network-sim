@@ -434,6 +434,28 @@ TEST(ClassificationTest, ShuffledInputGivesTheSameResult) {
   EXPECT_EQ(twin_place.index_in_plane + 1, original_place.index_in_plane);
 }
 
+// A shell's height band has two limits. A plane 20 km above the upper one and a plane 20 km
+// below the lower one are at the shell's inclination but not in the shell.
+TEST(ClassificationTest, SatellitesAboveOrBelowTheHeightBandAreNotInTheShell) {
+  const WalkerShell inside{.planes = 1, .per_plane = 4, .height_km = 550.0, .first_id = 1000};
+  const WalkerShell above{.planes = 1, .per_plane = 4, .height_km = 600.0, .first_id = 2000};
+  const WalkerShell below{.planes = 1, .per_plane = 4, .height_km = 480.0, .first_id = 3000};
+  std::vector<ElementSet> sets = walker_element_sets(inside);
+  for (const WalkerShell& shell : {above, below}) {
+    const std::vector<ElementSet> more = walker_element_sets(shell);
+    sets.insert(sets.end(), more.begin(), more.end());
+  }
+  const Classification c = classify(sets, utc(kEpoch), config_with({shell_a()}));
+  ASSERT_EQ(c.planes.size(), 1U);
+  ASSERT_EQ(c.planes[0].size(), 1U);
+  EXPECT_EQ(c.planes[0][0].members.size(), 4U);
+  for (std::size_t s = 0; s < 4; ++s) {
+    EXPECT_EQ(reason(c, walker_id(inside, 0, s)), std::nullopt);
+    EXPECT_EQ(reason(c, walker_id(above, 0, s)), ExclusionReason::kNotAtShellHeight);
+    EXPECT_EQ(reason(c, walker_id(below, 0, s)), ExclusionReason::kNotAtShellHeight);
+  }
+}
+
 TEST(ClassificationTest, BadConfigurationIsAnError) {
   ClassificationConfig config = config_with({shell_a()});
   config.shells[0].max_height_km = config.shells[0].min_height_km;
