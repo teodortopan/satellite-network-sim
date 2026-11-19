@@ -120,3 +120,107 @@ validated (does the result match reality?).
 - **Why:** A global tolerance wouldn't be able to reliably catch bugs for all comparisons. For some it'd be too large, for others too small. One per comparison ensures all are just right.
 - **Tradeoff:** Every number needs a written reason and has to be revisited
   if a reference or a model changes.
+
+## Phase 2: Topology
+
+### 1. Link Pattern
+
+- **Options:** Standard 4 links per satellite, 3 links per satellite (used by v2 Starlink satellites), or 6 links per satellite (used by new v3 Starlink satellites).
+
+- **Chosen:** 3 links per satellite as the main model (2 in the same plane, 1 cross plane). Also a 6 link version (2 same plane, 4 cross plane) and the 4 link standard (2 same plane, 2 cross plane) for comparison.
+
+- **Why:** 3 links most closely matches the bulk of Starlink satellites in orbit, while 6 link will continue to grow with time. 4 link is the standard used in the past, so it will be interesting to compare all 3 methods.
+
+- **Tradeoff:** Three link methods to build. SpaceX doesn't publish which satellites link across planes, so that rule is our assumption.
+
+### 2. Finding the Planes
+
+- **Options:** Cluster by RAAN + inclination, use launch groups, drop/keep misfits?
+
+- **Chosen:** Cluster by RAAN, inclination and height, using every satellite's position at the same moment. Drop misfits.
+
+- **Why:** Working satellites sit at the same tilt and height, in tight RAAN groups. The ones that don't are usually raising, lowering or retired. Height matters most: satellites a few km off slide out of place within days.
+
+- **Tradeoff:** Have to tune and justify angles, report misfit counts.
+
+### 3. Which Satellites Count?
+
+- **Options:** All satellites, only satellites with lasers, only satellites at operational altitude
+
+- **Chosen:** Only satellites with lasers at operational altitude
+
+- **Why:** The scope of the project relies on operating satellites and comparing laser link latency/reliability. Satellites not operating and without laser links aren't useful. Also, satellites drifting together form easy lattices, and easy connections.
+
+- **Tradeoff:** Have to filter satellites and count what is left out: about 550 first-generation satellites with no lasers, and about 800 direct-to-cell satellites near 360 km, which could be added later. High latitude coverage is missing until the 70deg and 97deg shells are added.
+
+### 4. Laser Link Limits
+
+Max link length, and minimum clearance above Earth
+
+- **Options:** Geometric cap only (80km clearance, which gives about 4500km max length) or tighter practical caps with a rule for links switching off (accounts for sun, more realistic conditions)
+
+- **Chosen:** Geometric cap as the fixed limit. Tighter caps, sun and lock-on time are settings that can be changed, with a test of how much each one matters.
+
+- **Why:** SpaceX doesn't publish its real limits, so picking one "realistic" cap and calling it fact wouldn't be defensible. Testing a range shows which assumptions actually change the result.
+
+- **Tradeoff:** Extra runs for the tests. Defaults must be justified and reasonable.
+
+### 5. Ground Visibility
+
+Minimum elevation angle for a city to see a satellite, and can it use several or just one?
+
+- **Options:** One angle for all satellites, or the FCC rule by height (10deg below 400km, 20deg from 400 to 500km, 25deg above). Only one satellite per city (realistic), or any visible one (best-case)
+
+- **Chosen:** The FCC rule by height, which means 20deg for almost every satellite today. One satellite per city in the realistic model, any visible one in the best case.
+
+- **Why:** Almost all working satellites now fly between 400 and 500km, where the limit is 20deg. One satellite per city is more realistic.
+
+- **Tradeoff:** per shell masks
+
+### 6. Ground Stations
+
+Does traffic stay in space, or come down at a gateway?
+
+- **Options:** Space only: city -> satellite -> city (best case). Via gateways, fibre and PoP (realistic)
+
+- **Chosen:** Both. The realistic model comes down at a gateway, then fibre to the user's home PoP, then fibre to the destination. We compare it with space only. In some cases fibre is faster.
+
+- **Why:** Real Starlink traffic always goes through the user's home PoP, so space only is the "best case", not how the service works.
+
+- **Tradeoff:** Have to build the more complicated path from space to ground station. The public gateway list only covers the US, so outside the US we assume a gateway at each PoP (45 of them), which is slightly optimistic.
+
+### 7. Cities
+
+What city pairs to study?
+
+- **Options:** Any city pairs really
+
+- **Chosen:** The classics, like NYC -> London, but also some edge cases such as long vertical (Detroit -> Buenos Aires), high latitude (Reykjavik -> Vladivostok) and short distance ones like NYC -> Chicago where fibre should win
+
+- **Why:** No objective reasoning, any city pair works. I chose pairs I'm personally interested in seeing tested, like Detroit-Buenos Aires and Reykjavik-Vladivostok
+
+- **Tradeoff:** Need to make sure edge cases are covered, like short distance pairs, long distance pairs, and high latitude.
+
+### 8. Time Step
+
+How often is the network rebuilt as satellites move in orbit?
+
+- **Options:** 1s (finer, high compute), 15s (how often researchers measured Starlink switching dishes between satellites), 60s (cheaper, may risk missing handoffs)
+
+- **Chosen:** 15s as the base, with a comparison against 1s and 60s
+
+- **Why:** Closest to what Starlink really uses, plus it's not on either end of the extreme. Comparing it to 1s and 60s shows what each step size misses: at 60s every sample has a new satellite, and at 15s about 14% to 30% of the changes seen at 1s are missed. Typical delays barely move.
+
+- **Tradeoff:** 2,880 steps for a 12 hour run. The 15s figure comes from outside measurements, not from SpaceX.
+
+### 9. Proof of Correctness
+
+What proves the topology is right, since SpaceX doesn't publish its data for this
+
+- **Options:** Physical sanity checks, reproducing published results, comparing with Starlink latency.
+
+- **Chosen:** A combination of all 3.
+
+- **Why:** Provides best coverage. The physical checks make sure the links are actually possible. A separate model written in Python has to give the same answer as our program, and that model reproduces Hypatia's published result within 0.5%. Comparing with published Starlink measurements shows if results are plausible.
+
+- **Tradeoff:** None of the three is proof on its own, since no real link map exists. Our 4 link grid is not the same as Hypatia's, so we can't compare with Hypatia directly and need the separate model in between.
