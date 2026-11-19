@@ -29,6 +29,7 @@
 #include "satsim/orbit/element_selection.hpp"
 #include "satsim/orbit/omm_loader.hpp"
 #include "satsim/orbit/propagator.hpp"
+#include "satsim/orbit/snapshot.hpp"
 #include "satsim/time/civil_time.hpp"
 #include "satsim/time/earth_orientation.hpp"
 #include "satsim/time/time_scales.hpp"
@@ -77,19 +78,6 @@ std::string seconds_text(std::int64_t ns) {
     text += "." + digits;
   }
   return text;
-}
-
-FileLoadSummary summarise_load(const orbit::LoadResult& load) {
-  return {.records_loaded = load.element_sets.size(), .record_errors = load.record_errors};
-}
-
-// Loads one OMM JSON file of the snapshot; a file-level error is fatal.
-std::variant<orbit::LoadResult, std::string> load_elements(const std::filesystem::path& path) {
-  orbit::LoadResult load = orbit::load_omm_json(path);
-  if (load.file_error) {
-    return *load.file_error;  // Already names the path.
-  }
-  return load;
 }
 
 std::string earth_orientation_gap_message(const std::string& time_text,
@@ -176,22 +164,10 @@ PreparedRunOrError prepare_run(const Options& options) {
     return std::string("step must be positive and duration in [0, 1e9] s");
   }
   const fs::path& dir = options.snapshot_dir;
-  std::error_code ec;
-  if (!fs::exists(dir, ec)) {
-    return "snapshot directory " + dir.string() + " does not exist";
-  }
-  if (!fs::is_directory(dir, ec)) {
-    return "snapshot " + dir.string() + " is not a directory";
-  }
-  std::string missing;
-  for (const std::string_view name :
-       {kStandardFileName, kSupplementalFileName, kEarthOrientationFileName}) {
-    if (!fs::is_regular_file(dir / name, ec)) {
-      missing += (missing.empty() ? "" : ", ") + std::string(name);
-    }
-  }
-  if (!missing.empty()) {
-    return "snapshot directory " + dir.string() + " has no " + missing;
+  constexpr std::array<std::string_view, 3> kSnapshotFiles = {
+      kStandardFileName, kSupplementalFileName, kEarthOrientationFileName};
+  if (std::optional<std::string> error = orbit::check_snapshot_directory(dir, kSnapshotFiles)) {
+    return std::move(*error);
   }
 
   // Earth orientation first: it is quick to load, and the time range can be checked before
@@ -236,21 +212,14 @@ PreparedRunOrError prepare_run(const Options& options) {
     }
   }
 
-  auto standard = load_elements(dir / kStandardFileName);
-  if (const auto* error = std::get_if<std::string>(&standard)) {
-    return *error;
+  orbit::SnapshotElementsOrError loaded = orbit::load_snapshot_elements(dir);
+  if (auto* error = std::get_if<std::string>(&loaded)) {
+    return std::move(*error);
   }
-  auto supplemental = load_elements(dir / kSupplementalFileName);
-  if (const auto* error = std::get_if<std::string>(&supplemental)) {
-    return *error;
-  }
-  const orbit::LoadResult& standard_load = std::get<orbit::LoadResult>(standard);
-  const orbit::LoadResult& supplemental_load = std::get<orbit::LoadResult>(supplemental);
-  summary.standard_file = summarise_load(standard_load);
-  summary.supplemental_file = summarise_load(supplemental_load);
-
-  orbit::ElementSelection selection =
-      orbit::select_element_sets(standard_load.element_sets, supplemental_load.element_sets);
+  auto& elements = std::get<orbit::SnapshotElements>(loaded);
+  summary.standard_file = std::move(elements.standard_file);
+  summary.supplemental_file = std::move(elements.supplemental_file);
+  orbit::ElementSelection& selection = elements.selection;
   summary.superseded = selection.superseded.size();
 
   const auto by_id = [](const orbit::SourcedElementSet& s, std::int64_t id) {
@@ -264,6 +233,7 @@ PreparedRunOrError prepare_run(const Options& options) {
     }
   }
 
+  std::vector<orbit::SourcedElementSet> wanted;
   for (orbit::SourcedElementSet& chosen : selection.selected) {
     if (!options.ids.empty() &&
         !std::binary_search(options.ids.begin(), options.ids.end(), chosen.elements.norad_cat_id)) {
@@ -271,18 +241,21 @@ PreparedRunOrError prepare_run(const Options& options) {
     }
     const bool supplemental_set = chosen.source == orbit::ElementSource::kSupplemental;
     ++(supplemental_set ? summary.selected_supplemental : summary.selected_standard);
-    orbit::PropagatorOrError built = orbit::Propagator::create(chosen.elements);
-    if (const auto* error = std::get_if<orbit::PropagationError>(&built)) {
-      ++summary.build_failures[*error];
-      continue;
-    }
-    auto& propagator = std::get<orbit::Propagator>(built);
-    const double age_s = run.start.seconds_since(propagator.epoch());
-    (supplemental_set ? summary.supplemental_age_at_start_s : summary.standard_age_at_start_s)
-        .push_back(age_s);
-    run.satellites.push_back(
-        {.element_set = std::move(chosen), .propagator = std::move(propagator)});
+    wanted.push_back(std::move(chosen));
   }
+
+  orbit::BuiltPropagators built = orbit::build_propagators(std::move(wanted));
+  for (const orbit::PropagatorBuildFailure& failure : built.failures) {
+    ++summary.build_failures[failure.error];
+  }
+  for (const Satellite& satellite : built.satellites) {
+    const double age_s = run.start.seconds_since(satellite.propagator.epoch());
+    (satellite.element_set.source == orbit::ElementSource::kSupplemental
+         ? summary.supplemental_age_at_start_s
+         : summary.standard_age_at_start_s)
+        .push_back(age_s);
+  }
+  run.satellites = std::move(built.satellites);
   return run;
 }
 

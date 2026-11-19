@@ -15,24 +15,22 @@
 #include "satsim/orbit/element_selection.hpp"
 #include "satsim/orbit/omm_loader.hpp"
 #include "satsim/orbit/propagator.hpp"
+#include "satsim/orbit/snapshot.hpp"
 #include "satsim/time/earth_orientation.hpp"
 #include "satsim/time/utc_time.hpp"
 
 namespace satsim::propagate {
 
 /// The files a snapshot directory must hold (written by python/fetch_elements.py).
-inline constexpr std::string_view kStandardFileName = "gp.json";
-inline constexpr std::string_view kSupplementalFileName = "supgp.json";
-inline constexpr std::string_view kEarthOrientationFileName = "finals2000A.all";
+inline constexpr std::string_view kStandardFileName = orbit::kStandardElementsFileName;
+inline constexpr std::string_view kSupplementalFileName = orbit::kSupplementalElementsFileName;
+inline constexpr std::string_view kEarthOrientationFileName = orbit::kEarthOrientationFileName;
 
 /// Width of the height bands the summary counts satellites in.
 inline constexpr double kHeightBandKm = 50.0;
 
 /// What loading one OMM JSON file gave.
-struct FileLoadSummary {
-  std::size_t records_loaded = 0;
-  std::vector<orbit::RecordError> record_errors;
-};
+using FileLoadSummary = orbit::ElementFileLoad;
 
 /// Everything the summary reports. prepare_run fills the loading part, write_rows the rest.
 struct RunSummary {
@@ -74,10 +72,7 @@ struct RunSummary {
 };
 
 /// One satellite of a run: its chosen element set and the propagator built from it.
-struct Satellite {
-  orbit::SourcedElementSet element_set;
-  orbit::Propagator propagator;
-};
+using Satellite = orbit::SnapshotSatellite;
 
 /// A run whose inputs are loaded and checked: write_rows can no longer fail on them.
 struct PreparedRun {

@@ -1,0 +1,111 @@
+Shells and planes at 2026-11-18T21:15:00 UTC (data/starlink/2026-11-18)
+
+Program summary
+constellation summary
+  reference time: 2026-11-18T21:15:00 UTC
+  gp.json: 11208 records loaded, 0 record errors
+  supgp.json: 11209 records loaded, 0 record errors
+  element sets superseded: 0
+  satellites: 11209
+  shell 53deg (inclination 53.16 +- 0.30 deg, height 467.5 to 471.0 km, plane gap 0.40 deg, planes of 10 or more): 3351 satellites in the bands, 3196 in planes, 121 planes, plane size min 10 median 29.0 max 33
+  shell 43deg (inclination 43.00 +- 0.30 deg, height 485.5 to 489.0 km, plane gap 1.00 deg, planes of 10 or more): 3218 satellites in the bands, 3187 in planes, 93 planes, plane size min 11 median 32.0 max 51
+  shell 97deg (inclination 97.28 +- 0.30 deg, height 476.0 to 479.0 km, plane gap 0.40 deg, planes of 10 or more): 1446 satellites in the bands, 1426 in planes, 63 planes, plane size min 10 median 24.0 max 24
+  shell 70deg (inclination 70.00 +- 0.30 deg, height 483.5 to 489.0 km, plane gap 2.00 deg, planes of 10 or more): 596 satellites in the bands, 586 in planes, 23 planes, plane size min 10 median 26.0 max 44
+  satellites in planes: 8395
+  satellites excluded: 2814
+    propagation_failed: 0
+    no_lasers: 553
+    unknown_launch: 0
+    low_group: 797
+    old_height: 168
+    other_height: 474
+    not_at_shell_height: 575
+    no_shell: 57
+    no_plane: 190
+
+53deg: inclination 53.16 +- 0.3 deg, height 467.5 to 471.0 km, plane gap 0.4 deg, planes of 10 or more
+  candidates 3325, in planes 3196, planes 121; plane size min 10 median 29.0 max 33; most common size 31 (42 planes)
+  gaps along the orbit: most common 11.6 deg, median 11.6, p95 23.3, max 185.6; largest per plane (deg, plane): 185.6 (87), 162.5 (55), 162.5 (79), 151.2 (38), 139.4 (14)
+  plane count against the gap threshold:
+    threshold  planes  in planes  median  max
+         0.10     117       2938    29.0   31
+         0.20     120       3114    29.0   33
+         0.30     121       3155    29.0   33
+         0.40     121       3196    29.0   33
+         0.50     121       3202    29.0   33
+         0.75     126       3289    29.0   33
+         1.00     123       3290    29.0   62
+         1.50      52       3311    71.0   94
+         2.00      46       3325    76.5   94
+         3.00      44       3325    77.5  156
+
+43deg: inclination 43.0 +- 0.3 deg, height 485.5 to 489.0 km, plane gap 1.0 deg, planes of 10 or more
+  candidates 3218, in planes 3187, planes 93; plane size min 11 median 32.0 max 51; most common size 51 (8 planes)
+  gaps along the orbit: most common 7.1 deg, median 7.2, p95 21.2, max 133.8; largest per plane (deg, plane): 133.8 (56), 105.6 (33), 77.7 (32), 63.7 (86), 63.7 (60)
+  plane count against the gap threshold:
+    threshold  planes  in planes  median  max
+         0.10      95       3077    31.0   51
+         0.20      92       3170    32.5   51
+         0.30      93       3187    32.0   51
+         0.40      93       3187    32.0   51
+         0.50      93       3187    32.0   51
+         0.75      93       3187    32.0   51
+         1.00      93       3187    32.0   51
+         1.50      93       3187    32.0   51
+         2.00      93       3187    32.0   51
+         3.00       4       3218   493.5  2215
+
+97deg: inclination 97.28 +- 0.3 deg, height 476.0 to 479.0 km, plane gap 0.4 deg, planes of 10 or more
+  candidates 1446, in planes 1426, planes 63; plane size min 10 median 24.0 max 24; most common size 24 (44 planes)
+  gaps along the orbit: most common 15.0 deg, median 15.0, p95 15.1, max 120.0; largest per plane (deg, plane): 120.0 (16), 90.0 (14), 75.0 (44), 60.0 (8), 60.0 (50)
+  plane count against the gap threshold:
+    threshold  planes  in planes  median  max
+         0.10      63       1426    24.0   24
+         0.20      63       1426    24.0   24
+         0.30      63       1426    24.0   24
+         0.40      63       1426    24.0   24
+         0.50      63       1426    24.0   24
+         0.75      63       1426    24.0   24
+         1.00      41       1435    39.0   48
+         1.50      41       1435    39.0   48
+         2.00      41       1435    39.0   48
+         3.00      15       1440    25.0  579
+
+70deg: inclination 70.0 +- 0.3 deg, height 483.5 to 489.0 km, plane gap 2.0 deg, planes of 10 or more
+  candidates 596, in planes 586, planes 23; plane size min 10 median 26.0 max 44; most common size 26 (5 planes)
+  gaps along the orbit: most common 15.0 deg, median 15.0, p95 30.1, max 105.1; largest per plane (deg, plane): 105.1 (22), 105.0 (7), 90.1 (9), 81.6 (12), 73.2 (13)
+  plane count against the gap threshold:
+    threshold  planes  in planes  median  max
+         0.10      22        574    26.0   44
+         0.20      23        585    26.0   44
+         0.30      23        585    26.0   44
+         0.40      23        585    26.0   44
+         0.50      23        586    26.0   44
+         0.75      23        586    26.0   44
+         1.00      23        586    26.0   44
+         1.50      23        586    26.0   44
+         2.00      23        586    26.0   44
+         3.00      23        586    26.0   44
+
+53 degree shell: planes of 10 or more against the threshold, by method (each column: planes / satellites in planes / largest plane)
+  (1) raw element RAAN, proposed band
+  (2) common time, one band 440-500 km
+  (3) common time, proposed band
+  (4) common time, 440-500 km split by drift (15 groups)
+    threshold                 (1)                 (2)                 (3)                 (4)
+         0.10    116 / 2433 /   32    137 / 3482 /   47    116 / 2939 /   31    137 / 3464 /   47
+         0.20    123 / 3167 /   32    134 / 3723 /   51    120 / 3116 /   33    134 / 3702 /   51
+         0.30    124 / 3235 /   33    130 / 3831 /   67    121 / 3155 /   33    130 / 3808 /   67
+         0.41    126 / 3280 /   33    124 / 3884 /   73    121 / 3196 /   33    124 / 3860 /   73
+         0.50    126 / 3289 /   33    125 / 3969 /   73    121 / 3200 /   33    125 / 3943 /   73
+         0.74    115 / 3289 /   60    118 / 3999 /  101    126 / 3289 /   33    120 / 3969 /   98
+         1.00     81 / 3292 /   94     95 / 4032 /  109    123 / 3290 /   62    100 / 3997 /  102
+         1.48     47 / 3325 /   94     43 / 4050 /  201     52 / 3311 /   94     45 / 4015 /  200
+         2.00     45 / 3325 /  156     34 / 4059 /  280     46 / 3325 /   94     34 / 4024 /  280
+         2.98     18 / 3325 /  490      8 / 4060 / 1142     44 / 3325 /  156     10 / 4025 / 1134
+
+Averaging over one orbit against osculating values at the reference time
+  53deg: |osculating - mean| RAAN median 0.017 max 0.024 deg; argument of latitude median 0.082 max 0.123 deg; inclination max 0.0194 deg; RAAN groups at 0.4 deg identical: True (0 groups differ)
+  43deg: |osculating - mean| RAAN median 0.021 max 0.029 deg; argument of latitude median 0.047 max 0.084 deg; inclination max 0.0201 deg; RAAN groups at 1.0 deg identical: True (0 groups differ)
+  97deg: |osculating - mean| RAAN median 0.004 max 0.005 deg; argument of latitude median 0.101 max 0.150 deg; inclination max 0.0051 deg; RAAN groups at 0.4 deg identical: True (0 groups differ)
+  70deg: |osculating - mean| RAAN median 0.010 max 0.014 deg; argument of latitude median 0.057 max 0.094 deg; inclination max 0.0130 deg; RAAN groups at 2.0 deg identical: True (0 groups differ)

@@ -2,7 +2,7 @@ find_package(nlohmann_json 3.11 REQUIRED)
 
 satsim_add_test(satsim_orbit_tests
   SOURCES omm_loader_test.cpp element_selection_test.cpp propagator_test.cpp
-    physical_sanity_test.cpp
+    physical_sanity_test.cpp snapshot_loader_test.cpp
   DEPS satsim::orbit satsim::core)
 # propagator_test.cpp checks the internal ElementSet-to-SGP4 conversion (src/orbit).
 target_include_directories(satsim_orbit_tests PRIVATE "${PROJECT_SOURCE_DIR}/src/orbit")
