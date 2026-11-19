@@ -34,3 +34,6 @@ Testing/
 # terms. metadata.json in the snapshot records their checksums.
 data/starlink/*/ephemerides/
 data/starlink/.*.partial/
+
+# Working directory of an interrupted ground-data download.
+data/ground/.*.partial/

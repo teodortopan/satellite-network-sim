@@ -1,0 +1,717 @@
+[
+ {
+  "code": "akl",
+  "routers": [
+   "acklnzl1"
+  ],
+  "city": "Auckland",
+  "country": "NZ",
+  "lat": -36.8485,
+  "lon": 174.7633,
+  "coordinates_from": "community dataset (pop_locations.json)"
+ },
+ {
+  "code": "ala",
+  "routers": [
+   "almykaz1"
+  ],
+  "city": "Almaty",
+  "country": "KZ",
+  "lat": 43.2389,
+  "lon": 76.8897,
+  "coordinates_from": "city centre"
+ },
+ {
+  "code": "arn",
+  "routers": [
+   "stcmswe1"
+  ],
+  "city": "Stockholm",
+  "country": "SE",
+  "lat": 59.3251,
+  "lon": 18.0711,
+  "coordinates_from": "community dataset (pop_locations.json)"
+ },
+ {
+  "code": "atl",
+  "routers": [
+   "atlagax1"
+  ],
+  "city": "Atlanta",
+  "country": "US",
+  "lat": 33.7545,
+  "lon": -84.3898,
+  "coordinates_from": "community dataset (pop_locations.json)"
+ },
+ {
+  "code": "atl2",
+  "routers": [
+   "atlagax3"
+  ],
+  "city": "Atlanta",
+  "country": "US",
+  "lat": 33.7545,
+  "lon": -84.3898,
+  "coordinates_from": "community dataset (pop_locations.json)"
+ },
+ {
+  "code": "bne",
+  "routers": [
+   "brseaus1"
+  ],
+  "city": "Fortitude Valley",
+  "country": "AU",
+  "lat": -27.4573,
+  "lon": 153.0363,
+  "coordinates_from": "community dataset (pop_locations.json)"
+ },
+ {
+  "code": "bog",
+  "routers": [
+   "bgtacol1"
+  ],
+  "city": "Bogota",
+  "country": "CO",
+  "lat": 4.6534,
+  "lon": -74.0836,
+  "coordinates_from": "community dataset (pop_locations.json)"
+ },
+ {
+  "code": "bom",
+  "routers": [
+   "mmbiind1"
+  ],
+  "city": "Mumbai",
+  "country": "IN",
+  "lat": 19.055,
+  "lon": 72.8692,
+  "coordinates_from": "community dataset (pop_locations.json)"
+ },
+ {
+  "code": "bsb",
+  "routers": [
+   "brsabra1"
+  ],
+  "city": "Brasília",
+  "country": "BR",
+  "lat": -15.7939,
+  "lon": -47.8828,
+  "coordinates_from": "city centre (the community dataset places this PoP in the wrong location)"
+ },
+ {
+  "code": "bth",
+  "routers": [
+   "btmmidn1"
+  ],
+  "city": "Batam City",
+  "country": "ID",
+  "lat": 1.1031,
+  "lon": 104.0384,
+  "coordinates_from": "community dataset (pop_locations.json)"
+ },
+ {
+  "code": "ccu",
+  "routers": [
+   "klkaind1"
+  ],
+  "city": "Kolkata",
+  "country": "IN",
+  "lat": 22.5726,
+  "lon": 88.3639,
+  "coordinates_from": "community dataset (pop_locations.json)"
+ },
+ {
+  "code": "chc",
+  "routers": [
+   "chrhnzl1"
+  ],
+  "city": "Christchurch",
+  "country": "NZ",
+  "lat": -43.5321,
+  "lon": 172.6362,
+  "coordinates_from": "community dataset (pop_locations.json)"
+ },
+ {
+  "code": "dac",
+  "routers": [
+   "dhkabgd1"
+  ],
+  "city": "Gazipur",
+  "country": "BD",
+  "lat": 23.9997,
+  "lon": 90.4184,
+  "coordinates_from": "community dataset (pop_locations.json)"
+ },
+ {
+  "code": "del",
+  "routers": [
+   "dlhiind1"
+  ],
+  "city": "Noida",
+  "country": "IN",
+  "lat": 28.5706,
+  "lon": 77.3272,
+  "coordinates_from": "community dataset (pop_locations.json)"
+ },
+ {
+  "code": "den",
+  "routers": [
+   "dnvrcox1"
+  ],
+  "city": "Denver",
+  "country": "US",
+  "lat": 39.7392,
+  "lon": -104.9849,
+  "coordinates_from": "community dataset (pop_locations.json)"
+ },
+ {
+  "code": "dfw",
+  "routers": [
+   "dllstxx1"
+  ],
+  "city": "Dallas",
+  "country": "US",
+  "lat": 32.7763,
+  "lon": -96.7969,
+  "coordinates_from": "community dataset (pop_locations.json)"
+ },
+ {
+  "code": "doh",
+  "routers": [
+   "dohaqat1"
+  ],
+  "city": "Doha",
+  "country": "QA",
+  "lat": 25.3109,
+  "lon": 51.5082,
+  "coordinates_from": "community dataset (pop_locations.json)"
+ },
+ {
+  "code": "drw",
+  "routers": [
+   "drwnaus1"
+  ],
+  "city": "Darwin",
+  "country": "AU",
+  "lat": -12.4604,
+  "lon": 130.841,
+  "coordinates_from": "community dataset (pop_locations.json)"
+ },
+ {
+  "code": "dss",
+  "routers": [
+   "dkrrsen1"
+  ],
+  "city": "Dakar",
+  "country": "SN",
+  "lat": 14.6934,
+  "lon": -17.4479,
+  "coordinates_from": "community dataset (pop_locations.json)"
+ },
+ {
+  "code": "ebb",
+  "routers": [
+   "kmpauga1"
+  ],
+  "city": "Kampala",
+  "country": "UG",
+  "lat": 0.3177,
+  "lon": 32.5814,
+  "coordinates_from": "community dataset (pop_locations.json)"
+ },
+ {
+  "code": "eze",
+  "routers": [
+   "bnssarg1"
+  ],
+  "city": "Buenos Aires",
+  "country": "AR",
+  "lat": -34.6096,
+  "lon": -58.3888,
+  "coordinates_from": "community dataset (pop_locations.json)"
+ },
+ {
+  "code": "for",
+  "routers": [
+   "frtabra1"
+  ],
+  "city": "Fortaleza",
+  "country": "BR",
+  "lat": -3.7305,
+  "lon": -38.5218,
+  "coordinates_from": "community dataset (pop_locations.json)"
+ },
+ {
+  "code": "fra",
+  "routers": [
+   "frntdeu1"
+  ],
+  "city": "Frankfurt",
+  "country": "DE",
+  "lat": 50.1106,
+  "lon": 8.6821,
+  "coordinates_from": "community dataset (pop_locations.json)"
+ },
+ {
+  "code": "gru",
+  "routers": [
+   "splobra1"
+  ],
+  "city": "Barueri",
+  "country": "BR",
+  "lat": -23.5112,
+  "lon": -46.8765,
+  "coordinates_from": "community dataset (pop_locations.json)"
+ },
+ {
+  "code": "gua",
+  "routers": [
+   "gtmygtm1"
+  ],
+  "city": "Guatemala City",
+  "country": "GT",
+  "lat": 14.6416,
+  "lon": -90.5133,
+  "coordinates_from": "community dataset (pop_locations.json)"
+ },
+ {
+  "code": "iad",
+  "routers": [
+   "ashnvax2"
+  ],
+  "city": "Ashburn",
+  "country": "US",
+  "lat": 39.0438,
+  "lon": -77.4874,
+  "coordinates_from": "city centre (the community dataset places this PoP in the wrong location)"
+ },
+ {
+  "code": "jkt",
+  "routers": [
+   "jtnaidn2"
+  ],
+  "city": "Jakarta",
+  "country": "ID",
+  "lat": -6.2088,
+  "lon": 106.8456,
+  "coordinates_from": "city centre"
+ },
+ {
+  "code": "jnb",
+  "routers": [
+   "jhngzaf1"
+  ],
+  "city": "Johannesburg",
+  "country": "ZA",
+  "lat": -26.205,
+  "lon": 28.0497,
+  "coordinates_from": "community dataset (pop_locations.json)"
+ },
+ {
+  "code": "kul",
+  "routers": [
+   "kllrmys1"
+  ],
+  "city": "Cyberjaya",
+  "country": "MY",
+  "lat": 2.9339,
+  "lon": 101.6456,
+  "coordinates_from": "community dataset (pop_locations.json)"
+ },
+ {
+  "code": "lax",
+  "routers": [
+   "lsancax1"
+  ],
+  "city": "Los Angeles",
+  "country": "US",
+  "lat": 34.0537,
+  "lon": -118.2428,
+  "coordinates_from": "community dataset (pop_locations.json)"
+ },
+ {
+  "code": "lga",
+  "routers": [
+   "nwyynyx1"
+  ],
+  "city": "New York",
+  "country": "US",
+  "lat": 40.7127,
+  "lon": -74.006,
+  "coordinates_from": "community dataset (pop_locations.json)"
+ },
+ {
+  "code": "lhr",
+  "routers": [
+   "lndngbr1"
+  ],
+  "city": "London",
+  "country": "GB",
+  "lat": 51.5074,
+  "lon": -0.1278,
+  "coordinates_from": "community dataset (pop_locations.json)"
+ },
+ {
+  "code": "lim",
+  "routers": [
+   "limaper1"
+  ],
+  "city": "Santiago de Surco",
+  "country": "PE",
+  "lat": -12.1251,
+  "lon": -76.9822,
+  "coordinates_from": "community dataset (pop_locations.json)"
+ },
+ {
+  "code": "los",
+  "routers": [
+   "lgosnga1"
+  ],
+  "city": "Lekki",
+  "country": "NG",
+  "lat": 6.4711,
+  "lon": 3.8148,
+  "coordinates_from": "community dataset (pop_locations.json)"
+ },
+ {
+  "code": "maa",
+  "routers": [
+   "chniind1"
+  ],
+  "city": "Chennai",
+  "country": "IN",
+  "lat": 13.0837,
+  "lon": 80.2702,
+  "coordinates_from": "community dataset (pop_locations.json)"
+ },
+ {
+  "code": "mad",
+  "routers": [
+   "mdrdesp1"
+  ],
+  "city": "Madrid",
+  "country": "ES",
+  "lat": 40.4168,
+  "lon": -3.7035,
+  "coordinates_from": "community dataset (pop_locations.json)"
+ },
+ {
+  "code": "mci",
+  "routers": [
+   "knsymox1"
+  ],
+  "city": "Kansas City",
+  "country": "US",
+  "lat": 39.1001,
+  "lon": -94.5781,
+  "coordinates_from": "community dataset (pop_locations.json)"
+ },
+ {
+  "code": "mct",
+  "routers": [
+   "msctomn1"
+  ],
+  "city": "Muscat",
+  "country": "OM",
+  "lat": 23.6124,
+  "lon": 58.5938,
+  "coordinates_from": "community dataset (pop_locations.json)"
+ },
+ {
+  "code": "mel",
+  "routers": [
+   "mlbeaus1"
+  ],
+  "city": "Melbourne",
+  "country": "AU",
+  "lat": -37.8142,
+  "lon": 144.9632,
+  "coordinates_from": "community dataset (pop_locations.json)"
+ },
+ {
+  "code": "mfe",
+  "routers": [
+   "mclntxx1"
+  ],
+  "city": "McAllen",
+  "country": "US",
+  "lat": 26.2041,
+  "lon": -98.2301,
+  "coordinates_from": "community dataset (pop_locations.json)"
+ },
+ {
+  "code": "mia",
+  "routers": [
+   "mmmiflx1"
+  ],
+  "city": "Miami",
+  "country": "US",
+  "lat": 25.7742,
+  "lon": -80.1936,
+  "coordinates_from": "community dataset (pop_locations.json)"
+ },
+ {
+  "code": "mnl",
+  "routers": [
+   "mnlaphl1"
+  ],
+  "city": "Makati",
+  "country": "PH",
+  "lat": 14.5568,
+  "lon": 121.0211,
+  "coordinates_from": "community dataset (pop_locations.json)"
+ },
+ {
+  "code": "msp",
+  "routers": [
+   "mplsmnx1"
+  ],
+  "city": "Minneapolis",
+  "country": "US",
+  "lat": 44.9773,
+  "lon": -93.2655,
+  "coordinates_from": "community dataset (pop_locations.json)"
+ },
+ {
+  "code": "mxp",
+  "routers": [
+   "mlnnita1"
+  ],
+  "city": "Milan",
+  "country": "IT",
+  "lat": 45.4642,
+  "lon": 9.1896,
+  "coordinates_from": "community dataset (pop_locations.json)"
+ },
+ {
+  "code": "nbo",
+  "routers": [
+   "nrbiken1"
+  ],
+  "city": "Karen",
+  "country": "KE",
+  "lat": -1.3284,
+  "lon": 36.705,
+  "coordinates_from": "community dataset (pop_locations.json)"
+ },
+ {
+  "code": "nrt",
+  "routers": [
+   "tkyojpn1"
+  ],
+  "city": "Tokyo",
+  "country": "JP",
+  "lat": 35.6769,
+  "lon": 139.7639,
+  "coordinates_from": "community dataset (pop_locations.json)"
+ },
+ {
+  "code": "ord",
+  "routers": [
+   "chcoilx1"
+  ],
+  "city": "Chicago",
+  "country": "US",
+  "lat": 41.8756,
+  "lon": -87.6244,
+  "coordinates_from": "community dataset (pop_locations.json)"
+ },
+ {
+  "code": "pdx2",
+  "routers": [
+   "prtdorx3"
+  ],
+  "city": "Hillsboro",
+  "country": "US",
+  "lat": 45.5229,
+  "lon": -122.9898,
+  "coordinates_from": "community dataset (pop_locations.json)"
+ },
+ {
+  "code": "per",
+  "routers": [
+   "prthaus1"
+  ],
+  "city": "Málaga",
+  "country": "AU",
+  "lat": -31.8607,
+  "lon": 115.8942,
+  "coordinates_from": "community dataset (pop_locations.json)"
+ },
+ {
+  "code": "phx",
+  "routers": [
+   "tmpeazx1"
+  ],
+  "city": "Tempe",
+  "country": "US",
+  "lat": 33.4255,
+  "lon": -111.94,
+  "coordinates_from": "community dataset (pop_locations.json)"
+ },
+ {
+  "code": "poa",
+  "routers": [
+   "prtebra1"
+  ],
+  "city": "Porto Alegre",
+  "country": "BR",
+  "lat": -30.0325,
+  "lon": -51.2304,
+  "coordinates_from": "community dataset (pop_locations.json)"
+ },
+ {
+  "code": "pvu",
+  "routers": [
+   "sltyutx1"
+  ],
+  "city": "Salt Lake City",
+  "country": "US",
+  "lat": 40.7596,
+  "lon": -111.8868,
+  "coordinates_from": "community dataset (pop_locations.json)"
+ },
+ {
+  "code": "qro",
+  "routers": [
+   "qrtomex1"
+  ],
+  "city": "El Marques",
+  "country": "MX",
+  "lat": 20.7351,
+  "lon": -100.2836,
+  "coordinates_from": "community dataset (pop_locations.json)"
+ },
+ {
+  "code": "scl",
+  "routers": [
+   "sntochl1"
+  ],
+  "city": "Santiago",
+  "country": "CL",
+  "lat": -33.4377,
+  "lon": -70.6511,
+  "coordinates_from": "community dataset (pop_locations.json)"
+ },
+ {
+  "code": "sea",
+  "routers": [
+   "sttlwax1"
+  ],
+  "city": "Seattle",
+  "country": "US",
+  "lat": 47.6038,
+  "lon": -122.3301,
+  "coordinates_from": "community dataset (pop_locations.json)"
+ },
+ {
+  "code": "sgn",
+  "routers": [
+   "sgnnvnm1"
+  ],
+  "city": "Ho Chi Minh City",
+  "country": "VN",
+  "lat": 10.7737,
+  "lon": 106.7166,
+  "coordinates_from": "community dataset (pop_locations.json)"
+ },
+ {
+  "code": "sin",
+  "routers": [
+   "sngesgp1"
+  ],
+  "city": "Singapore",
+  "country": "SG",
+  "lat": 1.3571,
+  "lon": 103.8195,
+  "coordinates_from": "community dataset (pop_locations.json)"
+ },
+ {
+  "code": "sjc",
+  "routers": [
+   "snjecax1"
+  ],
+  "city": "San Jose",
+  "country": "US",
+  "lat": 37.3362,
+  "lon": -121.8906,
+  "coordinates_from": "community dataset (pop_locations.json)"
+ },
+ {
+  "code": "sof",
+  "routers": [
+   "sfiabgr1"
+  ],
+  "city": "Sofia",
+  "country": "BG",
+  "lat": 42.6977,
+  "lon": 23.3217,
+  "coordinates_from": "community dataset (pop_locations.json)"
+ },
+ {
+  "code": "sub",
+  "routers": [
+   "srbaidn2"
+  ],
+  "city": "Surabaya",
+  "country": "ID",
+  "lat": -7.2463,
+  "lon": 112.7378,
+  "coordinates_from": "community dataset (pop_locations.json)"
+ },
+ {
+  "code": "syd",
+  "routers": [
+   "sydyaus1"
+  ],
+  "city": "Sydney",
+  "country": "AU",
+  "lat": -33.8698,
+  "lon": 151.2083,
+  "coordinates_from": "community dataset (pop_locations.json)"
+ },
+ {
+  "code": "waw",
+  "routers": [
+   "wrswpol1"
+  ],
+  "city": "Warsaw",
+  "country": "PL",
+  "lat": 52.2334,
+  "lon": 21.0711,
+  "coordinates_from": "community dataset (pop_locations.json)"
+ },
+ {
+  "code": "yul",
+  "routers": [
+   "mntlcan1"
+  ],
+  "city": "Montreal",
+  "country": "CA",
+  "lat": 45.5032,
+  "lon": -73.5698,
+  "coordinates_from": "community dataset (pop_locations.json)"
+ },
+ {
+  "code": "yyc",
+  "routers": [
+   "clgycan1"
+  ],
+  "city": "Calgary",
+  "country": "CA",
+  "lat": 51.0456,
+  "lon": -114.0575,
+  "coordinates_from": "community dataset (pop_locations.json)"
+ },
+ {
+  "code": "yyz",
+  "routers": [
+   "trnocan1"
+  ],
+  "city": "Toronto",
+  "country": "CA",
+  "lat": 43.6535,
+  "lon": -79.3839,
+  "coordinates_from": "community dataset (pop_locations.json)"
+ }
+]

@@ -1,0 +1,167 @@
+{
+ "note": "Hand-made. Coordinates are city centres (WGS-84 degrees). country, region and geofeed_city are the keys used to look the city up in SpaceX's location feed.",
+ "cities": [
+  {
+   "name": "New York",
+   "country": "US",
+   "region": "US-NY",
+   "geofeed_city": "New York City",
+   "lat": 40.7128,
+   "lon": -74.006
+  },
+  {
+   "name": "London",
+   "country": "GB",
+   "region": "GB-LND",
+   "geofeed_city": "London",
+   "lat": 51.5074,
+   "lon": -0.1278
+  },
+  {
+   "name": "San Francisco",
+   "country": "US",
+   "region": "US-CA",
+   "geofeed_city": "San Francisco",
+   "lat": 37.7749,
+   "lon": -122.4194
+  },
+  {
+   "name": "Tokyo",
+   "country": "JP",
+   "region": "JP-13",
+   "geofeed_city": "Tokyo",
+   "lat": 35.6762,
+   "lon": 139.6503
+  },
+  {
+   "name": "Frankfurt",
+   "country": "DE",
+   "region": "DE-HE",
+   "geofeed_city": "Frankfurt",
+   "lat": 50.1109,
+   "lon": 8.6821
+  },
+  {
+   "name": "Singapore",
+   "country": "SG",
+   "region": "SG-01",
+   "geofeed_city": "Singapore",
+   "lat": 1.3521,
+   "lon": 103.8198
+  },
+  {
+   "name": "Detroit",
+   "country": "US",
+   "region": "US-MI",
+   "geofeed_city": "Detroit",
+   "lat": 42.3314,
+   "lon": -83.0458
+  },
+  {
+   "name": "Buenos Aires",
+   "country": "AR",
+   "region": "AR-C",
+   "geofeed_city": "Buenos Aires",
+   "lat": -34.6037,
+   "lon": -58.3816
+  },
+  {
+   "name": "Chicago",
+   "country": "US",
+   "region": "US-IL",
+   "geofeed_city": "Chicago",
+   "lat": 41.8781,
+   "lon": -87.6298
+  },
+  {
+   "name": "Reykjavik",
+   "country": "IS",
+   "region": "IS-1",
+   "geofeed_city": "Reykjavik",
+   "lat": 64.1466,
+   "lon": -21.9426
+  },
+  {
+   "name": "Vladivostok",
+   "country": "RU",
+   "region": "RU-PRI",
+   "geofeed_city": "Vladivostok",
+   "lat": 43.1155,
+   "lon": 131.8855
+  },
+  {
+   "name": "Paris",
+   "country": "FR",
+   "region": "FR-IDF",
+   "geofeed_city": "Paris",
+   "lat": 48.8566,
+   "lon": 2.3522
+  },
+  {
+   "name": "Luanda",
+   "country": "AO",
+   "region": "AO-LUA",
+   "geofeed_city": "Luanda",
+   "lat": -8.839,
+   "lon": 13.2894
+  },
+  {
+   "name": "Oulu",
+   "country": "FI",
+   "region": "FI-14",
+   "geofeed_city": "Oulu",
+   "lat": 65.0121,
+   "lon": 25.4651
+  }
+ ],
+ "pairs": [
+  {
+   "from": "New York",
+   "to": "London",
+   "role": "study",
+   "why": "transatlantic benchmark"
+  },
+  {
+   "from": "San Francisco",
+   "to": "Tokyo",
+   "role": "study",
+   "why": "transpacific"
+  },
+  {
+   "from": "Frankfurt",
+   "to": "Singapore",
+   "role": "study",
+   "why": "Europe to Asia"
+  },
+  {
+   "from": "Detroit",
+   "to": "Buenos Aires",
+   "role": "study",
+   "why": "north to south"
+  },
+  {
+   "from": "New York",
+   "to": "Chicago",
+   "role": "study",
+   "why": "short control, fibre should win"
+  },
+  {
+   "from": "Reykjavik",
+   "to": "Vladivostok",
+   "role": "study",
+   "why": "high-latitude test"
+  },
+  {
+   "from": "Paris",
+   "to": "Luanda",
+   "role": "validation",
+   "why": "printed in the Hypatia paper's repository (Starlink first shell)"
+  },
+  {
+   "from": "Oulu",
+   "to": "New York",
+   "role": "validation",
+   "why": "measured path in 'Starlink in Northern Europe' (arXiv 2502.15552)"
+  }
+ ]
+}

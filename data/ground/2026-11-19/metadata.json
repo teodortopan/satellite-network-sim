@@ -1,0 +1,64 @@
+{
+  "starlink_pops.csv": {
+    "source_url": "https://geoip.starlinkisp.net/pops.csv",
+    "fetched_at_utc": "2026-11-19T14:55:19Z",
+    "sha256": "6f338ddf7564fc1d16e8185916a1168971c80a54f39c29b60a81a1bb3eed3865",
+    "bytes": 121759,
+    "rows": 4122
+  },
+  "starlink_geofeed.csv": {
+    "source_url": "https://geoip.starlinkisp.net/feed.csv",
+    "fetched_at_utc": "2026-11-19T14:55:19Z",
+    "sha256": "d5fd397ea3c9f6f988e4f502fb26bb1622f7ed5bd3f0a3adf9867ee18f18beaf",
+    "bytes": 521300,
+    "rows": 13103
+  },
+  "gateways.json": {
+    "dataset": "juliensimon/starlink-ground-stations",
+    "licence": "CC-BY-4.0",
+    "attribution": "Julien Simon, Starlink Ground Stations & Points of Presence",
+    "revision": "90b80585c62b6a232cee3e9587a45781c29e05a6",
+    "last_modified": "2026-11-04T16:48:24.000Z",
+    "official": false,
+    "subset": "gateways",
+    "rows": 208,
+    "responses": [
+      {
+        "source_url": "https://datasets-server.huggingface.co/rows?dataset=juliensimon%2Fstarlink-ground-stations&config=gateways&split=train&offset=0&length=100",
+        "fetched_at_utc": "2026-11-19T14:55:21Z",
+        "sha256": "624d93ae3a224aab8f86620113f057c62a0128e32904bfeaa39997cfc8812d55",
+        "bytes": 12194
+      },
+      {
+        "source_url": "https://datasets-server.huggingface.co/rows?dataset=juliensimon%2Fstarlink-ground-stations&config=gateways&split=train&offset=100&length=100",
+        "fetched_at_utc": "2026-11-19T14:55:21Z",
+        "sha256": "99258e9d9c0c4d4467add9b321d617a22c73017808c57880d55876330aefb3b7",
+        "bytes": 12310
+      },
+      {
+        "source_url": "https://datasets-server.huggingface.co/rows?dataset=juliensimon%2Fstarlink-ground-stations&config=gateways&split=train&offset=200&length=100",
+        "fetched_at_utc": "2026-11-19T14:55:22Z",
+        "sha256": "a208054768150c4aacf9de9ab80ffc923f54ef7bbadee56c1ee9268e221b4f03",
+        "bytes": 1347
+      }
+    ]
+  },
+  "pop_locations.json": {
+    "dataset": "juliensimon/starlink-ground-stations",
+    "licence": "CC-BY-4.0",
+    "attribution": "Julien Simon, Starlink Ground Stations & Points of Presence",
+    "revision": "90b80585c62b6a232cee3e9587a45781c29e05a6",
+    "last_modified": "2026-11-04T16:48:24.000Z",
+    "official": false,
+    "subset": "pops",
+    "rows": 65,
+    "responses": [
+      {
+        "source_url": "https://datasets-server.huggingface.co/rows?dataset=juliensimon%2Fstarlink-ground-stations&config=pops&split=train&offset=0&length=100",
+        "fetched_at_utc": "2026-11-19T14:55:22Z",
+        "sha256": "eaf886736a774b98125ef7a966e4390c812b131f7e74905851765f582da01136",
+        "bytes": 8156
+      }
+    ]
+  }
+}
