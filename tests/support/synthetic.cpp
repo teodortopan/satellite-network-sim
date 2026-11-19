@@ -1,4 +1,4 @@
-#include "synthetic.hpp"
+#include "support/synthetic.hpp"
 
 #include <SGP4.h>
 #include <gtest/gtest.h>

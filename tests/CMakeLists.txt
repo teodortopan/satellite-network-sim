@@ -17,6 +17,7 @@ satsim_enable_sanitizers(gtest_main)
 
 include(GoogleTest)
 
+add_subdirectory(support)
 add_subdirectory(core)
 add_subdirectory(time)
 add_subdirectory(frames)
@@ -25,3 +26,4 @@ add_subdirectory(orbit)
 add_subdirectory(propagate)
 add_subdirectory(constellation)
 add_subdirectory(constellation_app)
+add_subdirectory(topology)

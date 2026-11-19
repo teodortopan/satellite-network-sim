@@ -1,7 +1,7 @@
 #pragma once
 
-// Synthetic constellations for the constellation tests: ideal Walker shells as element sets,
-// and the same orbit's element set at another epoch.
+// Synthetic constellations for the constellation and topology tests: ideal Walker shells as
+// element sets, and the same orbit's element set at another epoch.
 
 #include <cstddef>
 #include <cstdint>

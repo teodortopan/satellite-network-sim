@@ -1,10 +1,7 @@
-# The constellation module. synthetic.cpp builds ideal Walker shells; it reads SGP4's secular
-# rates from Vallado's sgp4init (hence the vendored library and src/orbit's internal header) to
-# move an element set to another epoch exactly.
+# The constellation module. Ideal Walker shells come from tests/support (satsim::test_support).
 satsim_add_test(satsim_constellation_tests
-  SOURCES geometry_test.cpp classification_test.cpp synthetic.cpp
-  DEPS satsim::constellation satsim::orbit satsim::sgp4 satsim::time satsim::core)
-target_include_directories(satsim_constellation_tests PRIVATE "${PROJECT_SOURCE_DIR}/src/orbit")
+  SOURCES geometry_test.cpp classification_test.cpp
+  DEPS satsim::constellation satsim::test_support satsim::orbit satsim::time satsim::core)
 
 # Classifies the full committed snapshot. Kept out of the sanitizer builds and out of Valgrind,
 # like tests/orbit's snapshot check, for the same reason (parsing the snapshot under GCC's ASan

@@ -32,6 +32,7 @@ add_subdirectory(src/frames)
 add_subdirectory(src/ground)
 add_subdirectory(src/orbit)
 add_subdirectory(src/constellation)
+add_subdirectory(src/topology)
 
 # Programs.
 add_subdirectory(apps/propagate)

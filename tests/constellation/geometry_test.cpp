@@ -17,7 +17,7 @@
 #include "satsim/orbit/propagator.hpp"
 #include "satsim/time/civil_time.hpp"
 #include "satsim/time/utc_time.hpp"
-#include "synthetic.hpp"
+#include "support/synthetic.hpp"
 
 namespace {
 
