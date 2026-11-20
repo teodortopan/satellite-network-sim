@@ -319,6 +319,38 @@ bool keeps_line_of_sight_for_an_orbit(const constellation::OrbitGeometry& a,
     return Eigen::Vector3d(o.radius_km *
                            ((std::cos(u) * o.node_teme) + (std::sin(u) * o.along_teme)));
   };
+  // A shortcut that gives the same answer as the sampling below. With unit vectors
+  // a = cos(ua + t) na + sin(ua + t) la and b = cos(ub + t) nb + sin(ub + t) lb, the cosine of
+  // the angle between the satellites is
+  //   a.b = 1/2 [(na.nb + la.lb) cos(ua - ub) + (la.nb - na.lb) sin(ua - ub)]
+  //       + 1/2 [(na.nb - la.lb) cos(ua + ub + 2t) + (na.lb + la.nb) sin(ua + ub + 2t)],
+  // a constant plus one sine wave, so its smallest value over an orbit is the constant minus
+  // the wave's amplitude. That is the widest angle the two ever reach, and at fixed radii a
+  // wider angle only brings the segment closer to the Earth. The samples are 1 deg of t apart,
+  // so the widest sampled angle is short of the true one by less than 0.02 deg; an answer
+  // that holds with kClearRad to spare either way is therefore the samples' answer.
+  const double nn = orbit_a.node_teme.dot(orbit_b.node_teme);
+  const double nl = orbit_a.node_teme.dot(orbit_b.along_teme);
+  const double ln = orbit_a.along_teme.dot(orbit_b.node_teme);
+  const double ll = orbit_a.along_teme.dot(orbit_b.along_teme);
+  const double apart_rad = orbit_a.argument_of_latitude_rad - orbit_b.argument_of_latitude_rad;
+  const double smallest_cosine =
+      (0.5 * (((nn + ll) * std::cos(apart_rad)) + ((ln - nl) * std::sin(apart_rad)))) -
+      (0.5 * std::hypot(nn - ll, nl + ln));
+  const double widest_rad = std::acos(std::clamp(smallest_cosine, -1.0, 1.0));
+  constexpr double kClearRad = 0.1 * std::numbers::pi / 180.0;
+  const auto in_sight_at = [&](double angle_rad) {
+    return has_line_of_sight(
+        Eigen::Vector3d(orbit_a.radius_km, 0.0, 0.0),
+        orbit_b.radius_km * Eigen::Vector3d(std::cos(angle_rad), std::sin(angle_rad), 0.0),
+        atmosphere_km);
+  };
+  if (in_sight_at(std::min(widest_rad + kClearRad, std::numbers::pi))) {
+    return true;
+  }
+  if (!in_sight_at(std::max(widest_rad - kClearRad, 0.0))) {
+    return false;
+  }
   for (std::size_t k = 0; k < kPermanenceSamplesPerOrbit; ++k) {
     const double advance_rad = 2.0 * std::numbers::pi * static_cast<double>(k) /
                                static_cast<double>(kPermanenceSamplesPerOrbit);

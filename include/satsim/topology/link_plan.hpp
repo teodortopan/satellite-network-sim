@@ -147,7 +147,9 @@ inline constexpr std::size_t kPermanenceSamplesPerOrbit = 360;
 /// positions must clear line_of_sight_radius_km(atmosphere_km) at each of
 /// kPermanenceSamplesPerOrbit equally spaced points of one orbit, the first at the reference
 /// time. Two circular orbits at one rate return to the same relative geometry after one orbit,
-/// so one orbit covers every time. The test is done in TEME, where the geometry is held:
+/// so one orbit covers every time. Where the widest angle the two ever reach (known in closed
+/// form) decides the answer with 0.1 deg to spare, the points are not visited: the answer is
+/// the same. The test is done in TEME, where the geometry is held:
 /// line of sight does not change under a rotation about the Earth's centre, so the answer is
 /// the one the Earth-fixed frame would give.
 [[nodiscard]] bool keeps_line_of_sight_for_an_orbit(const constellation::OrbitGeometry& a,

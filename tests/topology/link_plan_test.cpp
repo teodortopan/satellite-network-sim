@@ -3,6 +3,7 @@
 #include <gtest/gtest.h>
 
 #include <Eigen/Core>
+#include <Eigen/Geometry>
 #include <algorithm>
 #include <array>
 #include <cmath>
@@ -206,6 +207,57 @@ TEST(PermanentLinkTest, TwoPlanesDependOnWhichSatelliteLeads) {
   using satsim::topology::keeps_line_of_sight_for_an_orbit;
   EXPECT_TRUE(keeps_line_of_sight_for_an_orbit(at(0.0, 10.0), at(30.0, -20.0)));
   EXPECT_FALSE(keeps_line_of_sight_for_an_orbit(at(0.0, 10.0), at(30.0, 40.0)));
+}
+
+// The function may skip the 360 points where the widest angle decides the answer. On random
+// pairs of orbits (any tilt, RAAN and start, radii 300 to 1200 km up) its answer must be the
+// one the 360 points give, visited here one by one. Both answers occur many times.
+TEST(PermanentLinkTest, AgreesWithVisitingEveryPointOnRandomOrbits) {
+  std::mt19937 rng(20261120);
+  std::uniform_real_distribution<double> turn(0.0, 2.0 * std::numbers::pi);
+  std::uniform_real_distribution<double> tilt(0.0, std::numbers::pi);
+  std::uniform_real_distribution<double> radius(6678.0, 7578.0);
+  std::uniform_real_distribution<double> near(-0.9, 0.9);
+  const auto orbit = [](double inclination_rad, double raan_rad, double u_rad, double radius_km) {
+    satsim::constellation::OrbitGeometry g;
+    const double sin_i = std::sin(inclination_rad);
+    g.mean_normal_teme = Eigen::Vector3d(sin_i * std::sin(raan_rad), -sin_i * std::cos(raan_rad),
+                                         std::cos(inclination_rad));
+    g.inclination_rad = inclination_rad;
+    g.raan_teme_rad = raan_rad;
+    g.argument_of_latitude_rad = u_rad;
+    g.mean_radius_km = radius_km;
+    return g;
+  };
+  const auto position = [](const satsim::constellation::OrbitGeometry& g, double advance_rad) {
+    const Eigen::Vector3d node(std::cos(g.raan_teme_rad), std::sin(g.raan_teme_rad), 0.0);
+    const Eigen::Vector3d along = g.mean_normal_teme.cross(node);
+    const double u = g.argument_of_latitude_rad + advance_rad;
+    return Eigen::Vector3d(g.mean_radius_km * ((std::cos(u) * node) + (std::sin(u) * along)));
+  };
+  std::size_t permanent = 0;
+  std::size_t not_permanent = 0;
+  for (int trial = 0; trial < 600; ++trial) {
+    const auto a = orbit(tilt(rng), turn(rng), turn(rng), radius(rng));
+    // Half the pairs are close to a (planes and starts within 0.9 rad), so that many links
+    // sit near the limit; the other half are anywhere.
+    const auto b = trial % 2 == 0
+                       ? orbit(a.inclination_rad + (0.3 * near(rng)), a.raan_teme_rad + near(rng),
+                               a.argument_of_latitude_rad + near(rng), radius(rng))
+                       : orbit(tilt(rng), turn(rng), turn(rng), radius(rng));
+    bool every_point = true;
+    const std::size_t points = satsim::topology::kPermanenceSamplesPerOrbit;
+    for (std::size_t k = 0; k < points; ++k) {
+      const double advance_rad =
+          2.0 * std::numbers::pi * static_cast<double>(k) / static_cast<double>(points);
+      every_point = every_point && satsim::topology::has_line_of_sight(position(a, advance_rad),
+                                                                       position(b, advance_rad));
+    }
+    EXPECT_EQ(satsim::topology::keeps_line_of_sight_for_an_orbit(a, b), every_point) << trial;
+    ++(every_point ? permanent : not_permanent);
+  }
+  EXPECT_GT(permanent, 50U);
+  EXPECT_GT(not_permanent, 50U);
 }
 
 TEST(LinkPlanTest, HypatiaShellPlusGridHasExactly3168Links) {

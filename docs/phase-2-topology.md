@@ -187,7 +187,9 @@ Positions for all link geometry are in the Earth-fixed frame (ITRF) at the same 
 - **Permanent link.** Each satellite is modelled on a circular orbit of its own mean radius,
   in its own orbit plane, starting from its argument of latitude at the reference time;
   both move at the same rate. The link is permanent if the segment between the two keeps
-  line of sight at each of 360 equally spaced points of one orbit. Across a RAAN gap too
+  line of sight at each of 360 equally spaced points of one orbit. (The widest angle the two
+  ever reach has an exact formula; where it settles the answer with 0.1° to spare, the
+  program skips the 360 points, with the same result.) Across a RAAN gap too
   wide for any permanent link, no cross-plane link is made and those lasers stay unused
   (`no_free_partner`). This rule is this project's assumption: SpaceX publishes nothing on
   which planes link.
