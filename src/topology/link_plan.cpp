@@ -1,11 +1,13 @@
 #include "satsim/topology/link_plan.hpp"
 
 #include <Eigen/Core>
+#include <Eigen/Geometry>
 #include <algorithm>
 #include <array>
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
+#include <numbers>
 #include <optional>
 #include <span>
 #include <string_view>
@@ -14,7 +16,7 @@
 #include <vector>
 
 #include "satsim/constellation/classification.hpp"
-#include "satsim/core/angles.hpp"
+#include "satsim/constellation/geometry.hpp"
 #include "satsim/topology/geometry.hpp"
 
 namespace satsim::topology {
@@ -51,7 +53,6 @@ class Planner {
   LinkPlan run() && {
     const std::size_t shell_count = classification_->planes.size();
     plan_.neighbours.resize(shell_count);
-    plan_.median_plane_gap_rad.resize(shell_count);
     for (std::size_t shell = 0; shell < shell_count; ++shell) {
       plan_in_plane(shell);
       find_neighbours(shell);
@@ -96,6 +97,14 @@ class Planner {
     }
     const std::optional<Eigen::Vector3d>& p = positions_[satellite];
     return p.has_value() ? &*p : nullptr;
+  }
+
+  // Whether a link between a and b keeps line of sight for a whole orbit.
+  [[nodiscard]] bool permanent(std::size_t a, std::size_t b) const {
+    const std::optional<constellation::OrbitGeometry>& ga = classification_->satellites[a].geometry;
+    const std::optional<constellation::OrbitGeometry>& gb = classification_->satellites[b].geometry;
+    return ga.has_value() && gb.has_value() &&
+           keeps_line_of_sight_for_an_orbit(*ga, *gb, settings_.atmosphere_km);
   }
 
   // Whether a and b already share a link: one of a's lasers (at most six) links to b.
@@ -148,23 +157,10 @@ class Planner {
     if (count < 2) {
       return;
     }
-    std::vector<double> gaps(count);
     for (std::size_t p = 0; p < count; ++p) {
-      gaps[p] =
-          wrap_two_pi(planes[(p + 1) % count].mean_raan_teme_rad - planes[p].mean_raan_teme_rad);
-    }
-    std::vector<double> sorted = gaps;
-    std::ranges::sort(sorted);
-    const double median =
-        count % 2 == 1 ? sorted[count / 2] : 0.5 * (sorted[(count / 2) - 1] + sorted[count / 2]);
-    plan_.median_plane_gap_rad[shell] = median;
-    const double limit = settings_.max_gap_over_median * median;
-    for (std::size_t p = 0; p < count; ++p) {
-      if (gaps[p] <= limit) {
-        const std::size_t east = (p + 1) % count;
-        neighbours[p].east = east;
-        neighbours[east].west = p;
-      }
+      const std::size_t east = (p + 1) % count;
+      neighbours[p].east = east;
+      neighbours[east].west = p;
     }
     for (std::size_t p = 0; p < count; ++p) {
       const std::optional<std::size_t> east = neighbours[p].east;
@@ -267,8 +263,10 @@ class Planner {
       }
       return x.id_b < y.id_b;
     });
+    // Permanence depends only on the pair, so it is tested last, and only for a pair that
+    // would otherwise be linked: the result is the same as testing every candidate first.
     for (const Candidate& c : candidates) {
-      if (free(c.a, side_from) && free(c.b, side_to) && !linked(c.a, c.b)) {
+      if (free(c.a, side_from) && free(c.b, side_to) && !linked(c.a, c.b) && permanent(c.a, c.b)) {
         add_link(shell, c.a, side_from, c.b, side_to, kind);
       }
     }
@@ -318,6 +316,43 @@ class Planner {
 };
 
 }  // namespace
+
+bool keeps_line_of_sight_for_an_orbit(const constellation::OrbitGeometry& a,
+                                      const constellation::OrbitGeometry& b, double atmosphere_km) {
+  // Each orbit's ascending node and the direction 90 deg further along it, in TEME: a point at
+  // argument of latitude u is radius * (cos u * node + sin u * along).
+  struct CircularOrbit {
+    Eigen::Vector3d node_teme;
+    Eigen::Vector3d along_teme;
+    double radius_km;
+    double argument_of_latitude_rad;
+  };
+  const auto circular = [](const constellation::OrbitGeometry& g) {
+    const Eigen::Vector3d node_teme(std::cos(g.raan_teme_rad), std::sin(g.raan_teme_rad), 0.0);
+    return CircularOrbit{.node_teme = node_teme,
+                         .along_teme = g.mean_normal_teme.cross(node_teme),
+                         .radius_km = g.mean_radius_km,
+                         .argument_of_latitude_rad = g.argument_of_latitude_rad};
+  };
+  const CircularOrbit orbit_a = circular(a);
+  const CircularOrbit orbit_b = circular(b);
+  const auto position_teme_km = [](const CircularOrbit& o, double advance_rad) {
+    const double u = o.argument_of_latitude_rad + advance_rad;
+    return Eigen::Vector3d(o.radius_km *
+                           ((std::cos(u) * o.node_teme) + (std::sin(u) * o.along_teme)));
+  };
+  for (std::size_t k = 0; k < kPermanenceSamplesPerOrbit; ++k) {
+    const double advance_rad = 2.0 * std::numbers::pi * static_cast<double>(k) /
+                               static_cast<double>(kPermanenceSamplesPerOrbit);
+    // has_line_of_sight is written for Earth-fixed positions; it uses only distances from the
+    // Earth's centre, which TEME and ITRF share.
+    if (!has_line_of_sight(position_teme_km(orbit_a, advance_rad),
+                           position_teme_km(orbit_b, advance_rad), atmosphere_km)) {
+      return false;
+    }
+  }
+  return true;
+}
 
 std::string_view name_of(LaserPattern pattern) noexcept {
   switch (pattern) {

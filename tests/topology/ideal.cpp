@@ -45,11 +45,6 @@ Ideal ideal_shells(std::span<const WalkerShell> shells, const IdealOptions& opti
         satellite.norad_cat_id = set.norad_cat_id;
         satellite.object_name = set.object_name;
         satellite.object_id = set.object_id;
-        constellation::OrbitGeometry geometry;
-        geometry.mean_normal_teme = Eigen::Vector3d::UnitZ();
-        geometry.mean_height_km = w.height_km;
-        geometry.mean_radius_km = 6378.135 + w.height_km;
-        satellite.geometry = geometry;
         satellite.shell_index = shell;
         if (options.exclude && options.exclude(shell, p, s)) {
           satellite.placement = constellation::ExclusionReason::kNoLasers;
@@ -58,13 +53,25 @@ Ideal ideal_shells(std::span<const WalkerShell> shells, const IdealOptions& opti
               .plane_index = p, .index_in_plane = planes[p].members.size()};
           planes[p].members.push_back(index);
         }
-        ideal.classification.satellites.push_back(satellite);
-        ideal.element_sets.push_back(set);
-
         const orbit::PropagatorOrError built = orbit::Propagator::create(set);
         const orbit::StateOrError state = std::get<orbit::Propagator>(built).propagate(reference);
-        ideal.positions_ecef_km.emplace_back(frames::teme_to_ecef(
-            std::get<orbit::TemeState>(state).position_km, reference, time::EarthOrientation{}));
+        const auto& teme = std::get<orbit::TemeState>(state);
+        // The orbit plane and argument of latitude from the state at the reference time (the
+        // osculating values; classify_constellation would average them over an orbit).
+        constellation::OrbitGeometry geometry;
+        geometry.mean_normal_teme =
+            constellation::orbit_normal_teme(teme.position_km, teme.velocity_km_s);
+        geometry.inclination_rad = constellation::inclination_rad(geometry.mean_normal_teme);
+        geometry.raan_teme_rad = constellation::raan_teme_rad(geometry.mean_normal_teme);
+        geometry.argument_of_latitude_rad =
+            constellation::argument_of_latitude_rad(teme.position_km, geometry.mean_normal_teme);
+        geometry.mean_height_km = w.height_km;
+        geometry.mean_radius_km = 6378.135 + w.height_km;
+        satellite.geometry = geometry;
+        ideal.classification.satellites.push_back(satellite);
+        ideal.element_sets.push_back(set);
+        ideal.positions_ecef_km.emplace_back(
+            frames::teme_to_ecef(teme.position_km, reference, time::EarthOrientation{}));
       }
     }
     // Planes left empty by drop or exclude are not planes: remove them and renumber.

@@ -5,8 +5,10 @@
 #include <Eigen/Core>
 #include <algorithm>
 #include <array>
+#include <cmath>
 #include <cstddef>
 #include <cstdint>
+#include <numbers>
 #include <numeric>
 #include <optional>
 #include <random>
@@ -17,11 +19,13 @@
 
 #include "ideal.hpp"
 #include "satsim/constellation/classification.hpp"
+#include "satsim/constellation/geometry.hpp"
 #include "satsim/orbit/element_set.hpp"
 #include "satsim/orbit/propagator.hpp"
 #include "satsim/time/civil_time.hpp"
 #include "satsim/time/earth_orientation.hpp"
 #include "satsim/time/utc_time.hpp"
+#include "satsim/topology/geometry.hpp"
 #include "satsim/topology/link_state.hpp"
 #include "satsim/topology/physical_checks.hpp"
 #include "satsim/topology/positions.hpp"
@@ -158,6 +162,52 @@ TEST(LaserPatternTest, NamesBudgetsAndSides) {
   EXPECT_EQ(laser_sides(LaserPattern::kThree, 5).back(), LaserSide::kWest);
 }
 
+// Two satellites in one circular plane keep a fixed angle between them, so the permanence test
+// is exact there: at r = 6928.135 km and R = 6458.137 km the widest angle with line of sight
+// is 2 acos(R / r) = 42.45 deg.
+TEST(PermanentLinkTest, SamePlaneHoldsUpToTheLineOfSightAngle) {
+  const auto at = [](double argument_of_latitude_deg) {
+    satsim::constellation::OrbitGeometry g;
+    g.mean_normal_teme = Eigen::Vector3d(0.0, -std::sin(0.925), std::cos(0.925));
+    g.inclination_rad = 0.925;
+    g.raan_teme_rad = 0.0;
+    g.argument_of_latitude_rad = argument_of_latitude_deg * std::numbers::pi / 180.0;
+    g.mean_radius_km = 6928.135;
+    return g;
+  };
+  using satsim::topology::keeps_line_of_sight_for_an_orbit;
+  EXPECT_TRUE(keeps_line_of_sight_for_an_orbit(at(10.0), at(52.4)));
+  EXPECT_FALSE(keeps_line_of_sight_for_an_orbit(at(10.0), at(52.5)));
+  EXPECT_TRUE(keeps_line_of_sight_for_an_orbit(at(350.0), at(20.0)));  // Across the node.
+  // A lower atmosphere layer lets the same pair through.
+  EXPECT_TRUE(keeps_line_of_sight_for_an_orbit(at(10.0), at(52.5), 70.0));
+}
+
+// Two planes at 53 deg whose RAANs differ by 30 deg, the first satellite at argument of
+// latitude 10 deg. Which way the satellites move decides the answer: with the second 30 deg
+// behind (-20 deg) the link's closest approach to the Earth's centre over one orbit is 285 km
+// above the 6458.137 km limit, with the second 30 deg ahead (40 deg) it is 273 km below
+// (computed apart from this code, at 3600 points of the orbit). Satellites moving the wrong
+// way round would swap the two answers.
+TEST(PermanentLinkTest, TwoPlanesDependOnWhichSatelliteLeads) {
+  const auto at = [](double raan_deg, double argument_of_latitude_deg) {
+    const double inclination_rad = 53.0 * std::numbers::pi / 180.0;
+    const double raan_rad = raan_deg * std::numbers::pi / 180.0;
+    satsim::constellation::OrbitGeometry g;
+    const double sin_i = std::sin(inclination_rad);
+    g.mean_normal_teme = Eigen::Vector3d(sin_i * std::sin(raan_rad), -sin_i * std::cos(raan_rad),
+                                         std::cos(inclination_rad));
+    g.inclination_rad = inclination_rad;
+    g.raan_teme_rad = raan_rad;
+    g.argument_of_latitude_rad = argument_of_latitude_deg * std::numbers::pi / 180.0;
+    g.mean_radius_km = 6928.135;
+    return g;
+  };
+  using satsim::topology::keeps_line_of_sight_for_an_orbit;
+  EXPECT_TRUE(keeps_line_of_sight_for_an_orbit(at(0.0, 10.0), at(30.0, -20.0)));
+  EXPECT_FALSE(keeps_line_of_sight_for_an_orbit(at(0.0, 10.0), at(30.0, 40.0)));
+}
+
 TEST(LinkPlanTest, HypatiaShellPlusGridHasExactly3168Links) {
   const Ideal& ideal = hypatia_shell();
   const std::size_t n = ideal.classification.satellites.size();
@@ -242,10 +292,10 @@ TEST(LinkPlanTest, HypatiaShellSixGivesEverySatelliteSix) {
 // the orbit, more than the 42 deg a link at 550 km can span.
 // - In-plane: 5 rings of 5, 25 links, all planned although none has line of sight.
 // - three: positions 0, 2, 4 face east, 1 and 3 west, so each plane offers 3 east and 2 west
-//   lasers and a plane pair could take 2 links, 10 in all. With satellites 72 deg apart few
-//   east-west pairs are in sight of each other: the plan has 5 cross links (on 3 of the 5
-//   plane pairs, measured), and the other 15 of the 25 cross-plane lasers have no partner.
-//   Every satellite has at most 3 links, and only the 5 cross links are up.
+//   lasers. A few east-west pairs are in sight of each other at the reference time, but planes
+//   72 deg apart meet at gamma = 56.0 deg (see the hand computation below), so once an orbit
+//   every pair is at least 6504 km apart, over the 5016.6 km limit: no cross link is planned,
+//   and all 25 cross-plane lasers have no partner. Nothing is up.
 TEST(LinkPlanTest, FivePlanesOfFiveWithThree) {
   const std::array<WalkerShell, 1> shells = {WalkerShell{.planes = 5,
                                                          .per_plane = 5,
@@ -258,18 +308,18 @@ TEST(LinkPlanTest, FivePlanesOfFiveWithThree) {
   const auto kinds = count_links_by_kind(p);
   const auto unassigned = count_unassigned_lasers(p);
   EXPECT_EQ(kinds[kInPlane], 25U);
-  EXPECT_EQ(kinds[kCross], 5U);
+  EXPECT_EQ(kinds[kCross], 0U);
   EXPECT_EQ(unassigned[kTooSmall], 0U);
   EXPECT_EQ(unassigned[kNoNeighbour], 0U);
-  // 15 east and 10 west lasers; each cross link uses one of each.
-  EXPECT_EQ(unassigned[kNoPartner], 15U);
+  // 15 east and 10 west lasers.
+  EXPECT_EQ(unassigned[kNoPartner], 25U);
   // None of the in-plane links (72 deg) is up.
   const auto positions = satsim::topology::testing::step_positions(
       satsim::constellation::testing::utc(kEpoch), ideal.positions_ecef_km);
   satsim::topology::LinkStateEvaluator evaluator(p, {});
-  EXPECT_EQ(satsim::topology::count_up(evaluator.step(positions)), 5U);
+  EXPECT_EQ(satsim::topology::count_up(evaluator.step(positions)), 0U);
   for (const std::size_t count : links_per_satellite(p, 25)) {
-    EXPECT_LE(count, 3U);
+    EXPECT_EQ(count, 2U);
   }
   EXPECT_EQ(violations(ideal, p), 0U);
 }
@@ -311,9 +361,69 @@ TEST(LinkPlanTest, GapTooLongToBridgeIsPlannedButDown) {
   EXPECT_EQ(violations(ideal, p), 0U);
 }
 
-// 16 planes 22.5 deg apart with planes 7, 8 and 9 removed: the 90 deg gap is over 3 times the
-// median (22.5 deg), so plane 6 has no east neighbour and plane 10 (now 7) no west one.
-TEST(LinkPlanTest, MissingNeighbourPlane) {
+// The neighbouring-planes rule (spec 4.3): the next plane in RAAN order is always the
+// neighbour, and a cross-plane link is planned only if it keeps line of sight for a whole
+// orbit. The hand computation for the tests below: at 550 km above WGS-72's radius
+// (r = 6928.135 km) and a limit of R = 6458.137 km, the longest link is 2 sqrt(r^2 - R^2) =
+// 5016.6 km. Two planes of tilt i whose RAANs differ by g meet at an angle gamma with
+// cos gamma = cos^2 i + sin^2 i cos g. Once an orbit, each satellite is 90 deg from the line
+// where the planes cross, and then at least gamma from every point of the other plane: a
+// link between them is at least 2 r sin(gamma / 2) long at that moment.
+
+// Hypatia's shell with only planes 0 to 9 and 15 to 24 kept: the 30 deg gap between them is
+// 6 times the median gap (5 deg), and 240 deg are empty after plane 24. Across 30 deg
+// (gamma = 23.9 deg, at least 2864 km) the groups are joined; across 240 deg (gamma =
+// 87.5 deg, 9584 km) nothing is.
+TEST(LinkPlanTest, GroupsBeyondThreeTimesTheMedianGapAreJoinedByPermanentLinks) {
+  const std::array<WalkerShell, 1> shells = {WalkerShell{.planes = 72,
+                                                         .per_plane = 22,
+                                                         .inclination_deg = 53.0,
+                                                         .height_km = 550.0,
+                                                         .phasing = 17,
+                                                         .epoch = kEpoch}};
+  const Ideal ideal = ideal_shells(
+      shells, IdealOptions{.drop = [](std::size_t, std::size_t p,
+                                      std::size_t) { return p > 9 && (p < 15 || p > 24); },
+                           .exclude = {}});
+  const auto& planes = ideal.classification.planes[0];
+  ASSERT_EQ(planes.size(), 20U);
+  const std::size_t n = ideal.classification.satellites.size();
+  const LinkPlan p = plan(ideal, LaserPattern::kPlusGrid);
+  EXPECT_EQ(p.neighbours[0][9].east, 10U);
+  EXPECT_EQ(p.neighbours[0][19].east, 0U);
+  std::size_t across_30 = 0;
+  std::size_t across_240 = 0;
+  for (const PlannedLink& link : p.links) {
+    if (link.kind != LinkKind::kCrossPlane) {
+      continue;
+    }
+    const std::size_t pa = plane_of(ideal.classification, link.satellite_a);
+    if (pa == 9) {
+      ++across_30;
+    } else if (pa == 19) {
+      ++across_240;
+    }
+  }
+  EXPECT_EQ(across_30, 22U);
+  EXPECT_EQ(across_240, 0U);
+  // The other 18 plane pairs are 5 deg apart and fully linked; plane 19's east and plane 0's
+  // west lasers are left without a partner.
+  EXPECT_EQ(count_links_by_kind(p)[kCross], 19U * 22U);
+  const auto unassigned = count_unassigned_lasers(p);
+  EXPECT_EQ(unassigned[kNoNeighbour], 0U);
+  EXPECT_EQ(unassigned[kNoPartner], 2U * 22U);
+  for (const std::size_t s : planes[19].members) {
+    EXPECT_EQ(laser_at(p, s, LaserSide::kEast).unassigned, UnassignedReason::kNoFreePartner);
+  }
+  EXPECT_EQ(components(p, n), 1U);
+  EXPECT_TRUE(no_duplicate_pairs(p));
+  EXPECT_EQ(violations(ideal, p), 0U);
+}
+
+// 16 planes 22.5 deg apart with planes 7, 8 and 9 removed: plane 6's east neighbour is plane
+// 10 (now 7), 90 deg away. gamma = 68.8 deg, so a link between them is at least 7825 km long
+// once an orbit, over the 5016.6 km limit: no cross-plane link is planned across the gap.
+TEST(LinkPlanTest, NoCrossPlaneLinkAcrossAGapTooWideForAPermanentLink) {
   const std::array<WalkerShell, 1> shells = {WalkerShell{.planes = 16,
                                                          .per_plane = 12,
                                                          .inclination_deg = 53.0,
@@ -326,22 +436,64 @@ TEST(LinkPlanTest, MissingNeighbourPlane) {
                    .exclude = {}});
   ASSERT_EQ(ideal.classification.planes[0].size(), 13U);
   const LinkPlan p = plan(ideal, LaserPattern::kPlusGrid);
-  ASSERT_TRUE(p.median_plane_gap_rad[0].has_value());
-  EXPECT_NEAR(p.median_plane_gap_rad[0].value_or(0.0), 22.5 * std::numbers::pi / 180.0, 1e-9);
   const auto& n = p.neighbours[0];
-  EXPECT_FALSE(n[6].east.has_value());
-  EXPECT_FALSE(n[7].west.has_value());
+  EXPECT_EQ(n[6].east, 7U);
+  EXPECT_EQ(n[7].west, 6U);
   EXPECT_EQ(n[5].east, 6U);
   EXPECT_EQ(n[7].east, 8U);
   EXPECT_EQ(n[12].east, 0U);  // Across RAAN 0.
   EXPECT_EQ(n[0].west, 12U);
-  const auto unassigned = count_unassigned_lasers(p);
-  EXPECT_EQ(unassigned[kNoNeighbour], 24U);  // Plane 6's east and plane 7's west lasers.
-  for (const std::size_t s : ideal.classification.planes[0][6].members) {
-    EXPECT_EQ(laser_at(p, s, LaserSide::kEast).unassigned, UnassignedReason::kNoNeighbourPlane);
+  for (const PlannedLink& link : p.links) {
+    if (link.kind == LinkKind::kCrossPlane) {
+      EXPECT_NE(plane_of(ideal.classification, link.satellite_a), 6U);
+    }
   }
-  EXPECT_EQ(count_links_by_kind(p)[kCross] + (unassigned[kNoPartner] / 2) + 12, 13U * 12U);
+  const auto unassigned = count_unassigned_lasers(p);
+  EXPECT_EQ(unassigned[kNoNeighbour], 0U);
+  for (const std::size_t s : ideal.classification.planes[0][6].members) {
+    EXPECT_EQ(laser_at(p, s, LaserSide::kEast).unassigned, UnassignedReason::kNoFreePartner);
+  }
+  for (const std::size_t s : ideal.classification.planes[0][7].members) {
+    EXPECT_EQ(laser_at(p, s, LaserSide::kWest).unassigned, UnassignedReason::kNoFreePartner);
+  }
+  // Every east laser is linked or has no partner (each link uses one east laser).
+  EXPECT_EQ(count_links_by_kind(p)[kCross] + (unassigned[kNoPartner] / 2), 13U * 12U);
   EXPECT_EQ(violations(ideal, p), 0U);
+}
+
+// Two planes 60 deg apart (planes 0 and 1 of a 6-plane shell): near the northern and southern
+// turns the planes come close and some pairs see each other at the reference time, but
+// gamma = 47.1 deg, so once an orbit every pair is at least 5533 km apart, over the
+// 5016.6 km limit. No cross-plane link is planned.
+TEST(LinkPlanTest, LineOfSightAtTheStartButNotForAWholeOrbitIsRefused) {
+  const std::array<WalkerShell, 1> shells = {WalkerShell{.planes = 6,
+                                                         .per_plane = 24,
+                                                         .inclination_deg = 53.0,
+                                                         .height_km = 550.0,
+                                                         .phasing = 1,
+                                                         .epoch = kEpoch}};
+  const Ideal ideal = ideal_shells(
+      shells, IdealOptions{.drop = [](std::size_t, std::size_t p, std::size_t) { return p > 1; },
+                           .exclude = {}});
+  const auto& planes = ideal.classification.planes[0];
+  ASSERT_EQ(planes.size(), 2U);
+  std::size_t in_sight = 0;
+  for (const std::size_t a : planes[0].members) {
+    for (const std::size_t b : planes[1].members) {
+      const std::optional<Eigen::Vector3d>& pa = ideal.positions_ecef_km[a];
+      const std::optional<Eigen::Vector3d>& pb = ideal.positions_ecef_km[b];
+      if (pa.has_value() && pb.has_value() && satsim::topology::has_line_of_sight(*pa, *pb)) {
+        ++in_sight;
+      }
+    }
+  }
+  ASSERT_GT(in_sight, 0U);
+  for (const LaserPattern pattern : satsim::topology::kAllLaserPatterns) {
+    const LinkPlan p = plan(ideal, pattern);
+    EXPECT_EQ(count_links_by_kind(p)[kCross], 0U) << satsim::topology::name_of(pattern);
+    EXPECT_EQ(count_links_by_kind(p)[kSecondCross], 0U) << satsim::topology::name_of(pattern);
+    EXPECT_EQ(components(p, 48), 2U) << satsim::topology::name_of(pattern);
+  }
 }
 
 // Two shells at different heights and tilts: no link between them; each shell's links are the
@@ -453,14 +605,14 @@ TEST(LinkPlanTest, ShellOfOnePlane) {
   const Ideal ideal = ideal_shells(shells);
   const LinkPlan p = plan(ideal, LaserPattern::kSix);
   EXPECT_EQ(p.links.size(), 15U);
-  EXPECT_FALSE(p.median_plane_gap_rad[0].has_value());
   EXPECT_EQ(p.neighbours[0][0], satsim::topology::PlaneNeighbours{});
   EXPECT_EQ(count_unassigned_lasers(p)[kNoNeighbour], 15U * 4U);
 }
 
 // Two planes 20 deg apart (the rest of an 18-plane shell removed): each is the other's east
-// and west neighbour (gaps of 20 and 340 deg, median 180), so they are matched on both sides,
-// but no pair is linked twice. Two planes east would be the plane itself: none.
+// and west neighbour, so they are matched on both sides (the planes are 20 deg apart seen from
+// either side, so permanent links exist on both), but no pair is linked twice. Two planes east
+// would be the plane itself: none.
 TEST(LinkPlanTest, ShellOfTwoPlanes) {
   const std::array<WalkerShell, 1> shells = {WalkerShell{.planes = 18,
                                                          .per_plane = 12,

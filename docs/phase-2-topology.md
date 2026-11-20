@@ -176,15 +176,21 @@ Positions for all link geometry are in the Earth-fixed frame (ITRF) at the same 
 - **Lasers stay within a shell.** Planes in different shells drift at different rates.
 - **In-plane links (all patterns).** Each satellite links to the next and the previous
   satellite in its plane. A plane is a ring, so the last links to the first.
-- **Neighbouring planes.** Plane p's neighbour to the east is plane p+1, and the last
-  plane's is the first, provided the RAAN gap between the two is no more than 3 times
-  the shell's median gap between consecutive planes. Otherwise there is no neighbour on
-  that side. Neighbouring planes are a few hundred kilometres apart, so range is never
-  the limit; the rule keeps planes on either side of a large empty stretch apart.
+- **Neighbouring planes.** Plane p's neighbour to the east is always plane p+1, and the
+  last plane's is the first, however wide the RAAN gap between them. Two planes to the east
+  is plane p+2. A shell of one plane has no neighbour; in a shell of two planes each is the
+  other's neighbour on both sides.
 - **Matching across two planes.** Candidate pairs (one satellite from each plane) are
   taken shortest distance first, at the reference time. A pair is accepted if both
-  satellites still have a free laser facing that side and the link has line of sight.
-  Ties go to the lower catalogue numbers.
+  satellites still have a free laser facing that side, the link has line of sight at the
+  reference time, and the link is permanent. Ties go to the lower catalogue numbers.
+- **Permanent link.** Each satellite is modelled on a circular orbit of its own mean radius,
+  in its own orbit plane, starting from its argument of latitude at the reference time;
+  both move at the same rate. The link is permanent if the segment between the two keeps
+  line of sight at each of 360 equally spaced points of one orbit. Across a RAAN gap too
+  wide for any permanent link, no cross-plane link is made and those lasers stay unused
+  (`no_free_partner`). This rule is this project's assumption: SpaceX publishes nothing on
+  which planes link.
 - **The three patterns** differ only in which lasers face where:
 
 | Pattern | In-plane | Cross-plane | Lasers |
@@ -357,7 +363,7 @@ Hypatia publishes one pair on this shell: Paris to Luanda, 85 to 117 ms.
 |---|---|
 | Shells and planes | Ideal shells come back exactly; a plane across RAAN 0°; two shells; element sets at different epochs; every exclusion reason; shuffled input |
 | Geometry | Line of sight at, above and below the limit; elevation at the horizon, overhead and on the ellipsoid's poles and equator |
-| Patterns | Exact link counts on ideal shells; at most 3, 4, 6 lasers; uneven planes; a missing neighbour plane; a gap too long to bridge |
+| Patterns | Exact link counts on ideal shells; at most 3, 4, 6 lasers; uneven planes; groups of planes joined across a wide RAAN gap; no link across a gap too wide for a permanent link; a link in sight at the start but not for a whole orbit; an in-plane gap too long to bridge |
 | Ground | Every loader error; address blocks; the home-PoP rule at every level |
 | Shortest path | Hand-worked graphs; no path; equal paths |
 | Program | Arguments; a small end-to-end run checked against values computed through the library |

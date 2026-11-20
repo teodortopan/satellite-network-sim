@@ -61,13 +61,25 @@ The evidence for each threshold is in spec section 5 and `docs/img/phase-2/table
 
 | Pattern | In plane | Cross plane | Second cross plane | Lasers left unused: no neighbour plane / no free partner | Link-steps down, no line of sight |
 |---|---|---|---|---|---|
-| `three` | 8,395 | 3,421 | 0 | 271 / 1,282 | 318,043 of 34.0 million (0.9%) |
-| `plus-grid` | 8,395 | 6,867 | 0 | 542 / 2,514 | 320,440 of 44.0 million (0.7%) |
-| `six` | 8,395 | 6,867 | 6,707 | 1,393 / 5,039 | 333,591 of 63.3 million (0.5%) |
+| `three` | 8,395 | 3,524 | 0 | 0 / 1,347 | 316,922 of 34.3 million (0.9%) |
+| `plus-grid` | 8,395 | 7,086 | 0 | 0 / 2,618 | 317,230 of 44.6 million (0.7%) |
+| `six` | 8,395 | 7,086 | 6,965 | 0 / 5,478 | 317,273 of 64.7 million (0.5%) |
 
-The links down without line of sight are in-plane links across the long gaps along the orbit
-that every shell has (spec section 5). None of them comes back during the 12 hours (see the
-lock-on result below).
+Each plane links to the next plane in RAAN order wherever a laser between them stays in
+range for a whole orbit (spec 4.3), so no laser is left without a neighbour plane. The lasers
+without a partner face a gap too wide for a permanent link, or found every partner taken.
+At the start, with the links that are up, the 43°, 97° and 70° shells are each one connected
+piece under every pattern; the 53° shell is one piece under `plus-grid` and `six`, and under
+`three` two of its 3,196 satellites are cut off from the rest (3 pieces). The 97° shell's
+planes form a chain, not a ring: its widest RAAN gap (46.5°) is more than a laser at its
+height can span for a whole orbit, so nothing crosses it (see the Detroit to Buenos Aires
+section below).
+
+The links down without line of sight are mostly in-plane links across the long gaps along
+the orbit that every shell has (spec section 5): 110 links are down at the start in all three
+patterns, and 110 × 2,881 steps = 316,910 link-steps. The remaining 12, 320 and 363
+link-steps (`three`, `plus-grid`, `six`) are other links down for a short time; the program
+does not export the state of each link, so which links they are is not reported.
 
 **Ground.** 196 operational gateways from the community list (208 in all, United States and
 territories only) and 45 gateways ASSUMED at PoPs that have no listed gateway within 500 km,
@@ -97,7 +109,7 @@ code for that part.
 
 The program checks every step's network against the rules of spec 6.1 and exits with
 status 1 on any failure. Over all 48 runs of this report (2,881 steps each for the 12-hour
-runs; together 1.47 billion laser link-steps), every count was zero: no laser below
+runs; together 1.49 billion laser link-steps), every count was zero: no laser below
 80 km, none over the range cap, no satellite over its laser budget, no one-sided link, no
 link between shells or to an excluded satellite, no ground link below its mask, and no delay
 below its lower bound. `docs/phase-2-data/runs.csv` holds every count of every run.
@@ -246,7 +258,7 @@ their traceroute showed the dish using ground stations in Germany or Belgium.
 
 This model's realistic round trip (the program's `round_trip_ms`: Oulu to New York plus New
 York to Oulu at the same step): median 92.0 ms, 5th to 95th percentile range up to 93.2 ms,
-minimum 91.1 ms, maximum 140.8 ms; the same for all three patterns. That is 51 ms below the
+minimum 91.1 ms; the same for all three patterns except the maximum (140.4 / 116.3 / 111.8 ms for `three` / `plus-grid` / `six`). That is 51 ms below the
 Starlink measurement, and also below the terrestrial one. Every difference between the two:
 
 - The model has only propagation delay. The measurement includes the Starlink link layer
@@ -284,8 +296,8 @@ downlink; to the home PoP, plus twice the gateway-to-PoP fibre):
 | Chicago | ord | 6.5 ms | 6.6 ms (6.8) |
 | Paris | mad | 10.6 ms | 19.6 ms (23.9) |
 | Oulu | arn | 9.7 ms | 9.7 ms (12.0) |
-| Reykjavik | lhr | 32.1 ms | 44.0 ms (155.6) |
-| Luanda | jnb | 25.0 ms | 56.3 ms (103.8) |
+| Reykjavik | lhr | 31.3 ms | 41.9 ms (152.6) |
+| Luanda | jnb | 25.0 ms | 50.6 ms (96.8) |
 
 Propagation alone accounts for 6 to 8 ms of the measured 40 ms where a gateway is near the
 city. The rest, about 30 ms, is what the model leaves out: Starlink's radio scheduling and
@@ -298,11 +310,11 @@ some hundreds of kilometres from their PoP.
 
 | Direction | Model, pattern | Median stretch | Why |
 |---|---|---|---|
-| Luanda to Paris | realistic, `three` | 3.96 | Luanda's home PoP is Johannesburg (`jnb`, SpaceX's own file). Traffic goes south 2,500 km to a gateway near Johannesburg or Kampala (both assumed), then by fibre to Johannesburg and from there 8,700 km north to Paris, times 1.98. |
+| Luanda to Paris | realistic, `three` | 3.82 | Luanda's home PoP is Johannesburg (`jnb`, SpaceX's own file). Traffic goes south 2,500 km to a gateway near Johannesburg or Kampala (both assumed), then by fibre to Johannesburg and from there 8,700 km north to Paris, times 1.98. |
 | Luanda to Paris | realistic, `plus-grid` | 3.28 | The same; more steps reach the Johannesburg gateway with fewer laser hops. |
 | Luanda to Paris | realistic, `six` | 3.23 | The same. |
 
-Close to the line: Reykjavik to Vladivostok, realistic `three`, median stretch 2.98 (below),
+Close to the line: Reykjavik to Vladivostok, realistic `three`, median stretch 2.94 (below),
 explained below. New York to Chicago, realistic, 2.84: on a short pair the 1,000 km up and
 down to a satellite are a large share of the path.
 
@@ -316,26 +328,25 @@ Realistic is "Starlink as an ISP"; best case is "Starlink as a backbone". Full s
 |---|---|---|---|---|---|
 | New York → London | 18.58 ms | 40.06 ms (2.16) | 20.68 ms (1.11) | 20.67 ms (1.11) | 20.67 ms (1.11) |
 | London → New York | 18.58 ms | 39.98 ms (2.15) | same as above | | |
-| San Francisco → Tokyo | 27.60 ms | 58.43 ms (2.12) | 31.40 ms (1.14) | 30.84 ms (1.12) | 30.69 ms (1.11) |
+| San Francisco → Tokyo | 27.60 ms | 58.43 ms (2.12) | 31.39 ms (1.14) | 30.84 ms (1.12) | 30.69 ms (1.11) |
 | Tokyo → San Francisco | 27.60 ms | 57.87 ms (2.10) | | | |
-| Frankfurt → Singapore | 34.22 ms | 70.95 ms (2.07) | 37.91 ms (1.11) | 37.90 ms (1.11) | 37.83 ms (1.11) |
+| Frankfurt → Singapore | 34.22 ms | 70.95 ms (2.07) | 37.91 ms (1.11) | 37.89 ms (1.11) | 37.81 ms (1.11) |
 | Singapore → Frankfurt | 34.22 ms | 71.04 ms (2.08) | | | |
-| Detroit → Buenos Aires | 29.74 ms | 63.28 ms (2.13) | 35.18 ms (1.18) | 35.31 ms (1.19) | 34.36 ms (1.16) |
+| Detroit → Buenos Aires | 29.74 ms | 63.28 ms (2.13) | 35.17 ms (1.18) | 35.30 ms (1.19) | 33.69 ms (1.13) |
 | Buenos Aires → Detroit | 29.74 ms | 62.21 ms (2.09) | | | |
 | New York → Chicago | 3.82 ms | 10.83 ms (2.84) | 5.08 ms (1.33) | 5.08 ms (1.33) | 5.08 ms (1.33) |
 | Chicago → New York | 3.82 ms | 10.86 ms (2.85) | | | |
-| Reykjavik → Vladivostok | 26.25 ms | 78.31 / 68.51 / 66.76 ms (2.98 / 2.61 / 2.54) | 30.54 ms (1.16) | 30.54 ms (1.16) | 30.46 ms (1.16) |
+| Reykjavik → Vladivostok | 26.25 ms | 77.23 / 68.34 / 66.59 ms (2.94 / 2.60 / 2.54) | 30.54 ms (1.16) | 30.47 ms (1.16) | 30.43 ms (1.16) |
 | Vladivostok → Reykjavik | 26.25 ms | no service | | | |
-| Paris → Luanda | 21.70 ms | 47.77 / 44.14 / 44.03 ms (2.20 / 2.03 / 2.03) | 27.18 ms (1.25) | 26.22 ms (1.21) | 25.18 ms (1.16) |
-| Luanda → Paris | 21.70 ms | 85.80 / 71.18 / 70.04 ms (3.96 / 3.28 / 3.23) | | | |
-| Oulu → New York | 21.30 ms | 46.57 ms (2.19) | 25.32 ms (1.19) | 25.19 ms (1.18) | 24.95 ms (1.17) |
+| Paris → Luanda | 21.70 ms | 47.75 / 44.13 / 44.03 ms (2.20 / 2.03 / 2.03) | 27.18 ms (1.25) | 26.21 ms (1.21) | 24.75 ms (1.14) |
+| Luanda → Paris | 21.70 ms | 82.97 / 71.06 / 70.02 ms (3.82 / 3.28 / 3.23) | | | |
+| Oulu → New York | 21.30 ms | 46.57 ms (2.19) | 25.32 ms (1.19) | 25.19 ms (1.18) | 24.96 ms (1.17) |
 | New York → Oulu | 21.30 ms | 45.44 ms (2.13) | | | |
 
 Where three values are given they are `three` / `plus-grid` / `six`. The best case is the
 same in both directions (the same graph, any satellite at either end). Every direction had a
 path at every step except: Vladivostok has no home PoP (no Russian address blocks in SpaceX's
-files), so Vladivostok → Reykjavik realistic is "no service" throughout; Reykjavik →
-Vladivostok realistic `three` has 6 steps with no gateway (below).
+files), so Vladivostok → Reykjavik realistic is "no service" throughout.
 
 What this shows:
 
@@ -349,11 +360,13 @@ What this shows:
 - **As a backbone, Starlink is close to the lower bound**: stretch 1.11 to 1.19 for the long
   pairs, 1.33 for New York to Chicago. Realistic is 1.8 to 2.1 times the best case for the
   five pairs (New York to London 1.94, San Francisco to Tokyo 1.86, Frankfurt to Singapore
-  1.87, Detroit to Buenos Aires 1.80, New York to Chicago 2.13), and 2.56 for Reykjavik.
-- **The patterns differ in the tails, not the medians.** Best-case medians are within
-  1 ms across patterns; the maxima are not: Detroit to Buenos Aires 95.1 / 51.0 / 37.2 ms,
-  Reykjavik to Vladivostok 86.2 / 47.9 / 42.7 ms, Paris to Luanda 119.1 / 46.2 / 28.6 ms,
-  Oulu to New York 154.7 / 60.8 / 37.0 ms (`three` / `plus-grid` / `six`).
+  1.87, Detroit to Buenos Aires 1.80, New York to Chicago 2.13), and 2.53 for Reykjavik.
+- **The patterns differ in the tails more than in the medians.** Best-case medians are within
+  1 ms across patterns except Detroit to Buenos Aires (35.17 / 35.30 / 33.69 ms) and Paris to
+  Luanda (27.18 / 26.21 / 24.75 ms); the maxima differ much more: Detroit to Buenos Aires
+  95.1 / 51.0 / 37.2 ms, Reykjavik to Vladivostok 54.8 / 45.9 / 36.8 ms, Paris to Luanda
+  119.1 / 46.2 / 28.6 ms, Oulu to New York 143.4 / 56.3 / 36.1 ms (`three` / `plus-grid` /
+  `six`).
 - **Fibre beats Starlink for New York to Chicago as an ISP** (10.8 ms against a fibre-only
   estimate of 3.82 × 1.98 = 7.6 ms), as the spec expected; as a backbone Starlink would win
   (5.1 ms).
@@ -373,36 +386,43 @@ from the 12-hour runs.
 |---|---|
 | Realistic study paths except Reykjavik's are bent pipes to a gateway near the sender, then fibre | Confirmed: 0 laser hops at every step for the ten directions of the five pairs, in all three patterns; gateways New York, Chicago, Santa Clara (6 steps San Jose) and assumed ones at lhr, nrt, fra, sin, eze |
 | Realistic stretch about the fibre factor (≈ 2.1); the pattern hardly matters there | Confirmed: 2.07 to 2.16 for the long pairs, identical in all patterns |
-| Realistic roughly twice the best case | Confirmed: 1.80 to 2.13 for the five pairs, 2.56 for Reykjavik |
-| Reykjavik → Vladivostok realistic uses lasers to the assumed London gateway, swings widely (median 78 ms, max 154 ms), a few steps with no gateway | Confirmed: median 78.3 ms, maximum 154.1 ms, 6 steps with no gateway; London is the gateway at 1,829 of 2,875 steps, but also Madrid (346), Fortaleza (306), Stockholm (257) and Dakar (113). Cause below |
+| Realistic roughly twice the best case | Confirmed: 1.80 to 2.13 for the five pairs, 2.53 for Reykjavik |
+| Reykjavik → Vladivostok realistic uses lasers to the assumed London gateway, swings widely (median 78 ms, max 154 ms), a few steps with no gateway | Swings confirmed: median 77.2 ms, maximum 154.1 ms; London is the gateway at 1,987 of 2,881 steps, but also Madrid (296), Stockholm (272), Fortaleza (219) and Dakar (66). Corrected: no step without a gateway since the 97° shell is connected (spec 4.3). Cause below |
 | Vladivostok → Reykjavik realistic is "no service" throughout | Confirmed: 2,881 of 2,881 steps |
-| Detroit ↔ Buenos Aires best case has a long tail, up to 95 ms and 25 hops | Confirmed: maximum 95.1 ms, 25 hops, 95th percentile 61.0 ms against a median of 35.2 ms. Cause below |
+| Detroit ↔ Buenos Aires best case has a long tail, up to 95 ms and 25 hops | Confirmed: maximum 95.1 ms, 25 hops, 95th percentile 52.2 ms against a median of 35.2 ms. Cause below |
 
 ### Why Detroit to Buenos Aires has a long tail in the best case
 
 A best-case path stays in one shell (no lasers between shells), so both cities must reach the
-same shell. Over the 12 hours the best path is in the 70° shell at 1,486 steps and in the 97°
-shell at 1,297: their planes run nearly north-south, the direction of this pair. At 209 steps
-(7.3%) the delay is above 50 ms; there the best path is in the 70° shell (111 steps), the 53°
-shell (94) or the 43° shell (4), with up to 25 laser hops.
+same shell. Over the 12 hours the best path is in the 70° shell at 1,433 steps and in the 97°
+shell at 1,395: their planes run nearly north-south, the direction of this pair. At 183 steps
+(6.4%) the delay is above 50 ms; there the best path is in the 70° shell (96 steps), the 53°
+shell (49), the 97° shell (34, at most 55.8 ms) or the 43° shell (4), with up to 25 laser
+hops. The worst step (95.1 ms) is in the 53° shell.
 
 The runs with one shell alone show why:
 
-- **The 97° shell** has no path at all at every one of those 209 steps: at 112 a city sees no
-  97° satellite above the mask, at 97 the two cities' satellites are not connected. Under
-  `three` the 97° shell is badly fragmented: alone, it connects Detroit and Buenos Aires at
-  only 1,629 of 2,881 steps (no path at 834). Its planes have long empty stretches along the
-  orbit (spec section 5), and with one cross-plane laser per satellite, alternately east and
-  west, a broken ring leaves pieces that no cross-plane laser joins.
-- **The 70° shell alone** gives a median of 67.8 ms at those steps (maximum 123 ms): only 23
+- **The 97° shell** is one connected piece under `three` (spec 4.3: each plane links to the
+  next wherever a laser stays in range for a whole orbit), but a poorly connected one. Its 63
+  planes have ten RAAN gaps more than 3 times the median gap of 3.0°, from 10.7° to 46.5°.
+  Planes 46.5° apart in RAAN meet at 46.1°, more than the 39.2° a laser at 477 km can span
+  once an orbit, so nothing crosses that gap and the planes form
+  a chain, not a ring; under `three` the 38.7° gap is crossed by only 3 links (19 with
+  `plus-grid`). Alone, the shell connects Detroit and Buenos Aires at every step where both
+  cities see one of its satellites (2,463 of 2,881; no coverage at 418), with a median of
+  35.5 ms but a 95th percentile of 302 ms and a maximum of 617 ms (127 laser hops): a path
+  between planes on the two sides of the 46.5° gap must go the long way round the chain. At
+  the 183 slow steps of the full run, a city sees no 97° satellite at 112; at the other 71 the
+  97° shell alone has a path, median 54.6 ms.
+- **The 70° shell alone** gives a median of 63.6 ms at those steps (maximum 123 ms): only 23
   planes 13° apart, so a path must zig-zag sideways.
-- **The 53° and 43° shells alone** give medians of 78.5 ms and 107.5 ms there: their planes
+- **The 53° and 43° shells alone** give medians of 80.4 ms and 109.3 ms there: their planes
   are tilted away from the pair's direction, and under `three` crossing k planes sideways
   takes about 2k hops, since each satellite has a cross-plane laser on one side only.
 
-With `plus-grid` the same 209 steps cost 37.0 ms median and 51.0 ms at most; with `six` the
+With `plus-grid` the same 183 steps cost 37.3 ms median and 51.0 ms at most; with `six` the
 whole run stays below 37.2 ms. So the tail is the `three` pattern's single cross-plane laser,
-made visible whenever the near-polar shells cannot connect the pair.
+made visible whenever the near-polar shells cannot give the pair a short path.
 
 ### Why Reykjavik to Vladivostok swings in the realistic model
 
@@ -412,21 +432,23 @@ shell: 70° at 1,571 steps, 97° at 1,310. The home PoP is London (`lhr`).
 
 - **Served by the 70° shell**, the path lasers to a satellite over the assumed London gateway
   (1,298 steps; median 66.8 ms) or Stockholm (257).
-- **Served by the 97° shell**, the path reaches a satellite over London at only 531 steps.
-  Otherwise London is not in the serving satellite's connected piece of the fragmented 97°
-  shell, and the path runs south along the plane and comes down at the assumed gateways of
-  Madrid (341 steps), Dakar (113) or Fortaleza in Brazil (306 steps, 132 to 150 ms), then goes
-  by fibre back to London and on to Vladivostok. The serving satellite changes every half
-  minute or so (104 times in the first hour at 1 s steps), and its shell with it, so the delay
-  jumps between about 65 ms and 140 ms from one step to the next (largest jump: 87 ms).
-- **No gateway at 6 steps** (2026-11-19 01:46:00 to 01:47:15): the serving satellite
-  (catalogue number 53485, 97° shell) is in a piece of the 97° shell's laser network with no
-  satellite over any gateway; the 97° shell alone gives "no gateway" at the same steps.
+- **Served by the 97° shell**, the path comes down at the assumed London gateway at 689 of
+  1,310 steps. The 97° shell is connected (see above), but through few links: from the
+  serving satellite the laser path to a satellite over London is often long, and coming down
+  at the assumed gateways of Madrid (291 steps), Fortaleza in Brazil (219 steps, 132 to
+  141 ms) or Dakar (66), then going by fibre back to London and on to Vladivostok, is then the
+  smaller total. The serving satellite changes every half minute or so (104 times in the
+  first hour at 1 s steps), and its shell with it, so the delay jumps between about 65 ms and
+  140 ms from one step to the next (largest jump: 84.9 ms).
+- **A gateway at every step.** With the earlier neighbouring-planes rule the 97° shell broke
+  into pieces and 6 steps had no gateway; now none has, and the 97° shell alone also finds a
+  gateway at all 2,881 steps. The maximum (154.1 ms) is a 97° serving satellite coming down at
+  the assumed Tokyo gateway (2 steps).
 
-`plus-grid` and `six` reduce the swings (medians 68.5 and 66.8 ms; no step without a
-gateway) but not the maximum (154.0 ms both): with any pattern, a 97° serving satellite
-sometimes reaches only the Fortaleza gateway. A serving rule that took connectivity into
-account would avoid this; the model's rule is the highest satellite (spec 4.5).
+`plus-grid` and `six` reduce the swings (medians 68.3 and 66.6 ms) and the maximum (147.7 and
+111.3 ms). With `plus-grid` a 97° serving satellite still comes down at Fortaleza at 36
+steps; with `six`, never. A serving rule that took connectivity into account would avoid
+the rest; the model's rule is the highest satellite (spec 4.5).
 
 ![Reykjavik to Vladivostok by shell](img/phase-2/high_latitude.png)
 
@@ -436,28 +458,29 @@ Pattern `three`, one parameter changed at a time from the defaults (12 hours, ev
 Change of the median one-way delay against the default, and steps without a path; full
 statistics in `docs/phase-2-data/sensitivity.csv`.
 
-- **Range cap.** 3,000 km changes nothing that matters (best-case medians within 0.4%;
-  567,624 more link-steps down). 2,000 km: medians within 0.6% but tails grow (Detroit to
-  Buenos Aires maximum 112.7 ms; Reykjavik to Vladivostok 153.4 ms). **1,000 km breaks the
-  network**: 21.1 million link-steps over the cap (62% of all), most cross-plane links of the
+- **Range cap.** 3,000 km changes nothing that matters (best-case medians of the study pairs
+  within 0.3%; 604,755 more link-steps down). 2,000 km: medians within 0.6% but tails grow
+  (Detroit to Buenos Aires maximum 112.7 ms; Reykjavik to Vladivostok 60.2 ms). **1,000 km
+  breaks the network**: 21.4 million link-steps over the cap (62% of all), most cross-plane links of the
   sparser shells. Best case, Detroit to Buenos Aires has a path at only 18 of 2,881 steps,
   Reykjavik to Vladivostok at 7, New York to London at 1,741 (median +125%). Realistic is
   unaffected for the bent-pipe pairs; Reykjavik has no gateway at 1,999 steps.
-- **Sun exclusion.** 5°: 105,405 link-steps down (0.3%); 10°: 445,552 (1.3%). Medians move by
+- **Sun exclusion.** 5°: 105,920 link-steps down (0.3%); 10°: 446,725 (1.3%). Medians move by
   under 0.3%; at 10° the best-case maximum for San Francisco to Tokyo rises from 33.1 to
-  41.3 ms and the 95th percentile for Reykjavik to Vladivostok from 41.9 to 47.4 ms.
+  41.3 ms and the 95th percentile for Reykjavik to Vladivostok from 40.7 to 44.4 ms.
 - **Lock-on time** (15 s, 60 s). The only effect is at the start: the program treats every
   link as just come up at the first step (documented in `link_state.hpp`), so with 15 s no
-  laser carries traffic at the first step and with 60 s at the first four (11,722 and 46,888
-  link-steps locking on, exactly one and four steps' worth). No laser link goes down and comes
-  back during the 12 hours, so nothing else changes. With neighbours fixed at the start and
+  laser carries traffic at the first step and with 60 s at the first four (11,810 and 47,240
+  link-steps locking on: one and four steps' worth of the 11,809 links up at the start, plus
+  one link that comes up once later in the run). Apart from that one link, no laser link
+  comes up during the 12 hours, so nothing else changes. With neighbours fixed at the start and
   only line of sight as a limit, lock-on can matter only together with Sun exclusion or a
   range cap, which these one-at-a-time runs do not combine.
 - **Fibre factor** (realistic only). 1.5 lowers the medians by 17% to 23%, 2.5 raises them by
   18% to 25%: realistic delay is mostly fibre (New York to London 31.1 / 40.1 / 49.7 ms at
   1.5 / 1.98 / 2.5).
 - **5° mask above 62° latitude.** Changes only Reykjavik (64.1° N) and Oulu (65.0° N): best
-  case Reykjavik to Vladivostok median −1.8% (29.98 ms) and maximum 86.2 → 49.9 ms. Realistic
+  case Reykjavik to Vladivostok median −1.9% (29.96 ms) and maximum 54.8 → 49.9 ms. Realistic
   is unchanged.
 
 ![Sensitivity](img/phase-2/sensitivity.png)
@@ -486,13 +509,15 @@ measurements, spec 4.7).
 - **The largest jump between consecutive steps** grows with the step for smooth paths
   (realistic New York to London: 0.17 ms at 1 s and 0.26 ms at 15 s in the first hour; 0.41 ms
   at 15 s and 0.47 ms at 60 s over 12 hours) and is set by path changes for the others
-  (Reykjavik realistic: 72 ms at 1 s, 67 ms at 15 s in the first hour; 87 to 88 ms over 12
-  hours at 15 s and 60 s; Detroit to Buenos Aires best case: 17 ms in the first hour, 44 ms
+  (Reykjavik realistic: 72 ms at 1 s, 67 ms at 15 s in the first hour; 85 ms and 88 ms over
+  12 hours at 15 s and 60 s; Detroit to Buenos Aires best case: 17 ms in the first hour, 42 ms
   over 12 hours).
-- **The delay distribution barely changes**: medians agree within 0.03 ms between 1 s and
-  15 s in the first hour (Detroit to Buenos Aires best case excepted: 36.80 against
-  37.03 ms) and within 0.03 ms between 15 s and 60 s over 12 hours. Rare events are sampled
-  differently (Reykjavik realistic 95th percentile 134.1 ms at 15 s, 132.7 ms at 60 s).
+- **The delay distribution barely changes**: medians agree within 0.05 ms between 1 s and
+  15 s in the first hour, except Detroit to Buenos Aires best case (36.71 against 36.93 ms)
+  and Reykjavik to Vladivostok realistic (0.15 ms with `three`, 0.62 ms with `six`); between
+  15 s and 60 s over 12 hours they agree within 0.25 ms, except Luanda to Paris realistic
+  `three` (82.97 against 80.57 ms). Rare events are sampled differently (Reykjavik realistic
+  95th percentile 132.6 ms at 15 s, 132.4 ms at 60 s).
 
 ![Time step](img/phase-2/timestep.png)
 
@@ -500,8 +525,9 @@ measurements, spec 4.7).
 
 | Assumption or simplification | Effect, and which way it biases the result |
 |---|---|
+| Which planes link: each plane to the next in RAAN order, a link only where a laser stays in range for a whole orbit (both satellites on circular orbits at the same rate, spec 4.3). This project's assumption; SpaceX publishes nothing on which planes link | Joins the 97° shell's groups of planes across RAAN gaps up to 38.7°, with few links; nothing crosses its 46.5° gap, so its planes form a chain. A real operator could link differently (for example across that gap at times, re-pointing lasers), which would shorten the long 97° paths |
 | The cross-plane rule of `three` (even positions face east, odd west) and the layout of `six` are this project's assumptions; SpaceX has published neither | `three` gives the long tails above (Detroit to Buenos Aires up to 95 ms, against 51 ms with `plus-grid`); the real layout could be better or worse. Medians barely depend on it |
-| Neighbours chosen once at the start and kept for 12 hours | No re-planning when a link is lost: pessimistic for a real operator, which re-points lasers. 0.5% to 0.9% of link-steps are down for line of sight; none of them comes back |
+| Neighbours chosen once at the start and kept for 12 hours | No re-planning when a link is lost: pessimistic for a real operator, which re-points lasers. 0.5% to 0.9% of link-steps are down for line of sight, nearly all of them at every step |
 | Excluded satellites (2,814) carry nothing | Pessimistic: some (the 474 satellites 8 km above the 53° shell, raising satellites) surely carry traffic |
 | No lasers between shells | Pessimistic for the best case: it is why Detroit to Buenos Aires depends on the 70° and 97° shells alone |
 | Delay is propagation only: no queueing, processing, radio scheduling or Wi-Fi | Optimistic, by about 30 ms per round trip on the bent pipe (measured 40 ms against 6 to 8 ms here) |
@@ -525,8 +551,13 @@ measurements, spec 4.7).
 - **The program is compared with Hypatia through the independent model, not directly.** Its
   `plus-grid` is a different, shorter set of links than Hypatia's on Hypatia's shell
   (−43% / −55% on Paris to Luanda). See above.
-- **The 97° shell under `three` is largely disconnected** (alone, New York to London has no
-  path at 2,344 of 2,881 steps), which drives both anomalies.
+- **The 97° shell is connected, but as a chain of planes with few links across its wide
+  RAAN gaps.** Alone, under `three`, it gives New York to London a path at every step where
+  both cities see it (2,661 of 2,881), but with a median of 81.5 ms and a maximum of 590 ms,
+  against 20.7 ms with all shells. It drives both anomalies.
+- **The permanence of a cross-plane link is tested on a model** (circular orbits at one rate),
+  not on the propagated orbits, and once, at the start. A few links still go down for a short
+  time (12 link-steps under `three`), and which links they are is not reported.
 - **Lock-on is measured only at the start** of a run; it is not combined with Sun exclusion.
 - **`timestep.csv` has 480 rows** (3 patterns × 2 models × 16 directions × 5 series), more
   than the other summaries.

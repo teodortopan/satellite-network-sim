@@ -7,13 +7,16 @@
 
 #include <gtest/gtest.h>
 
+#include <algorithm>
 #include <array>
 #include <chrono>
 #include <cstddef>
 #include <cstdlib>
 #include <filesystem>
 #include <iostream>
+#include <map>
 #include <numbers>
+#include <numeric>
 #include <optional>
 #include <string>
 #include <utility>
@@ -76,6 +79,45 @@ const Snapshot& snapshot() {
                     .reference = *reference};
   }();
   return kSnapshot;
+}
+
+// Per shell, the connected pieces of the laser links up at the step over the shell's plane
+// members: how many, and the size of the largest.
+struct Pieces {
+  std::size_t count = 0;
+  std::size_t largest = 0;
+};
+
+std::vector<Pieces> pieces_per_shell(const Classification& c, const topology::LinkPlan& plan,
+                                     const topology::StepLinks& links) {
+  std::vector<std::size_t> parent(c.satellites.size());
+  std::iota(parent.begin(), parent.end(), 0);
+  const auto find = [&](std::size_t x) {
+    while (parent[x] != x) {
+      parent[x] = parent[parent[x]];
+      x = parent[x];
+    }
+    return x;
+  };
+  for (std::size_t i = 0; i < plan.links.size(); ++i) {
+    if (links.states[i].up()) {
+      parent[find(plan.links[i].satellite_a)] = find(plan.links[i].satellite_b);
+    }
+  }
+  std::vector<Pieces> out(c.planes.size());
+  for (std::size_t shell = 0; shell < c.planes.size(); ++shell) {
+    std::map<std::size_t, std::size_t> sizes;
+    for (const auto& plane : c.planes[shell]) {
+      for (const std::size_t member : plane.members) {
+        ++sizes[find(member)];
+      }
+    }
+    out[shell].count = sizes.size();
+    for (const auto& [root, size] : sizes) {
+      out[shell].largest = std::max(out[shell].largest, size);
+    }
+  }
+  return out;
 }
 
 std::vector<satsim::ground::GroundSite> city_sites() {
@@ -184,6 +226,10 @@ TEST(TopologySnapshotTest, EveryPatternPassesThePhysicalChecks) {
     for (const auto reason : topology::kAllLinkDownReasons) {
       std::cout << " " << topology::name_of(reason) << " "
                 << down[static_cast<std::size_t>(reason)];
+    }
+    std::cout << "\n  pieces per shell, links up (count, largest):";
+    for (const Pieces& pieces : pieces_per_shell(c, plan, links)) {
+      std::cout << " " << pieces.count << " " << pieces.largest << ";";
     }
     std::cout << "\n  physical-check violations: " << counts.total() << "\n";
   }

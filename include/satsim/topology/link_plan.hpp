@@ -92,12 +92,14 @@ enum class UnassignedReason : std::uint8_t {
   /// to, and in a plane of two the two satellites share one link (0's ahead to 1's behind),
   /// never two, so 0's behind and 1's ahead stay unused.
   kPlaneTooSmall,
-  /// A cross-plane laser whose side has no neighbour plane (spec 4.3: the RAAN gap is over the
-  /// limit, the shell has a single plane, or for two planes away the plane would be the
-  /// satellite's own or a gap on the way is over the limit).
+  /// A cross-plane laser whose side has no neighbour plane (spec 4.3): the shell has a single
+  /// plane, or, for two planes away, the shell has two planes (the plane would be the
+  /// satellite's own).
   kNoNeighbourPlane,
   /// A cross-plane laser whose neighbour plane exists, but whose satellite found no partner
-  /// with a free laser facing back and line of sight at the reference time.
+  /// with a free laser facing back, line of sight at the reference time and line of sight for
+  /// a whole orbit (keeps_line_of_sight_for_an_orbit). Across a RAAN gap too wide for any
+  /// permanent link, every laser facing the gap ends here.
   kNoFreePartner,
 };
 
@@ -130,12 +132,27 @@ struct PlaneNeighbours {
 /// Settings of plan_laser_links.
 struct LinkPlanSettings {
   LaserPattern pattern = LaserPattern::kThree;
-  /// Two consecutive planes are neighbours only if the RAAN gap between them is at most this
-  /// many times the shell's median gap between consecutive planes (spec 4.3).
-  double max_gap_over_median = 3.0;
-  /// Line of sight at the reference time is required of cross-plane links (spec 4.3).
+  /// Line of sight at the reference time and for a whole orbit is required of cross-plane
+  /// links (spec 4.3).
   double atmosphere_km = kDefaultAtmosphereKm;
 };
+
+/// Points of one orbit at which keeps_line_of_sight_for_an_orbit tests the link.
+inline constexpr std::size_t kPermanenceSamplesPerOrbit = 360;
+
+/// Whether a laser link between two satellites keeps line of sight for a whole orbit (spec
+/// 4.3), in a model: each satellite on a circular orbit of radius mean_radius_km in its own
+/// mean plane (mean_normal_teme, raan_teme_rad), both moving at the same angular rate from
+/// their arguments of latitude at the reference time. The segment between the two model
+/// positions must clear line_of_sight_radius_km(atmosphere_km) at each of
+/// kPermanenceSamplesPerOrbit equally spaced points of one orbit, the first at the reference
+/// time. Two circular orbits at one rate return to the same relative geometry after one orbit,
+/// so one orbit covers every time. The test is done in TEME, where the geometry is held:
+/// line of sight does not change under a rotation about the Earth's centre, so the answer is
+/// the one the Earth-fixed frame would give.
+[[nodiscard]] bool keeps_line_of_sight_for_an_orbit(const constellation::OrbitGeometry& a,
+                                                    const constellation::OrbitGeometry& b,
+                                                    double atmosphere_km = kDefaultAtmosphereKm);
 
 /// The plan.
 struct LinkPlan {
@@ -149,10 +166,6 @@ struct LinkPlan {
   std::vector<std::vector<Laser>> lasers;
   /// neighbours[s][p]: plane p of shell s.
   std::vector<std::vector<PlaneNeighbours>> neighbours;
-  /// Per shell: the median RAAN gap between consecutive planes, radians, around the full
-  /// circle (P gaps for P planes, including the one across RAAN 0). nullopt with fewer than two
-  /// planes.
-  std::vector<std::optional<double>> median_plane_gap_rad;
 
   friend bool operator==(const LinkPlan&, const LinkPlan&) = default;
 };
@@ -165,18 +178,21 @@ struct LinkPlan {
 ///   1 none (UnassignedReason::kPlaneTooSmall). In-plane links are planned without regard to
 ///   line of sight; one across a gap too long to bridge is planned and is down at every step.
 /// - Neighbour planes: planes are in RAAN order (Classification::planes). With P >= 2 planes,
-///   gap p is the RAAN from plane p to plane p+1 (mod P), in [0, 2*pi). Plane p's east
-///   neighbour is p+1 (mod P) if gap p <= max_gap_over_median times the median of the P gaps,
-///   and then p+1's west neighbour is p. A single plane has no neighbours. With 2 planes each
-///   is the other's east and west neighbour. Two planes east is the east neighbour's east
-///   neighbour, if both exist and it is not the plane itself (so never with 2 planes).
-/// - Matching, for each plane p with an east neighbour q, in increasing p (then likewise for
+///   plane p's east neighbour is p+1 (mod P), and p+1's west neighbour is p, however wide the
+///   RAAN gap between them: a gap too wide to bridge leaves no link through the permanence
+///   test below. A single plane has no neighbours. With 2 planes each is the other's east and
+///   west neighbour. Two planes east is p+2 (mod P), if that is not the plane itself (so never
+///   with 2 planes).
+/// - Matching, for each plane p in increasing p, with its east neighbour q (then likewise for
 ///   two planes east): every pair (a in p, b in q) where a's east laser and b's west laser
 ///   are free, both have a position and a and b are not already linked is a candidate. Taken
 ///   in increasing distance, ties by a's then b's catalogue number, a pair is linked if both
-///   lasers are still free, a and b are not yet linked, and the segment has line of sight.
-///   "Not already linked" keeps a pair from being linked twice where the same two planes meet
-///   on both sides (2 planes) or as both neighbour and second neighbour (3 or 4 planes).
+///   lasers are still free, a and b are not yet linked, the segment has line of sight at the
+///   reference time, and the link keeps line of sight for a whole orbit
+///   (keeps_line_of_sight_for_an_orbit, from the satellites' OrbitGeometry; a satellite
+///   without geometry has no permanent link). "Not already linked" keeps a pair from being
+///   linked twice where the same two planes meet on both sides (2 planes) or as both
+///   neighbour and second neighbour (3 or 4 planes).
 /// - Lasers never leave a shell and excluded satellites get none. Every satellite gets exactly
 ///   laser_budget(pattern) lasers, each linked at most once, so the budget holds by
 ///   construction. A laser left without a link records why.

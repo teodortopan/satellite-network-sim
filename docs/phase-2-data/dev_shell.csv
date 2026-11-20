@@ -11,18 +11,18 @@ dev-three-realistic,dev-shell,three,realistic,default,New York,Chicago,study,288
 dev-three-realistic,dev-shell,three,realistic,default,Chicago,New York,study,2881,2881,0,0,0,0,10.696,10.843,11.182,11.876,2.802,2.841,2.929,3.111,0.0,0,1144.3,"Chicago, IL (real): 2881",ord: 2881
 dev-three-realistic,dev-shell,three,realistic,default,Reykjavik,Vladivostok,study,2881,0,0,2881,0,0,,,,,,,,,,,7869.2,,lhr: 2881
 dev-three-realistic,dev-shell,three,realistic,default,Vladivostok,Reykjavik,study,2881,0,2881,0,0,0,,,,,,,,,,,7869.2,,
-dev-three-realistic,dev-shell,three,realistic,default,Paris,Luanda,validation,2881,2881,0,0,0,0,42.957,47.842,49.936,50.170,1.980,2.205,2.302,2.312,0.0,3,6504.1,"Assumed gateway at PoP mad (Madrid, ES) (assumed): 1553; Assumed gateway at PoP lhr (London, GB) (assumed): 993; Assumed gateway at PoP mxp (Milan, IT) (assumed): 335",mad: 2881
-dev-three-realistic,dev-shell,three,realistic,default,Luanda,Paris,validation,2881,2876,0,0,5,0,67.486,71.517,115.250,147.760,3.111,3.296,5.312,6.811,2.0,16,6504.1,"Assumed gateway at PoP jnb (Johannesburg, ZA) (assumed): 1523; Assumed gateway at PoP ebb (Kampala, UG) (assumed): 1195; Assumed gateway at PoP los (Lekki, NG) (assumed): 106; Assumed gateway at PoP doh (Doha, QA) (assumed): 50; Assumed gateway at PoP nbo (Karen, KE) (assumed): 2",jnb: 2881
+dev-three-realistic,dev-shell,three,realistic,default,Paris,Luanda,validation,2881,2881,0,0,0,0,42.957,47.827,49.936,50.170,1.980,2.204,2.302,2.312,0.0,3,6504.1,"Assumed gateway at PoP mad (Madrid, ES) (assumed): 1559; Assumed gateway at PoP lhr (London, GB) (assumed): 987; Assumed gateway at PoP mxp (Milan, IT) (assumed): 335",mad: 2881
+dev-three-realistic,dev-shell,three,realistic,default,Luanda,Paris,validation,2881,2876,0,0,5,0,67.486,71.517,110.620,137.457,3.111,3.296,5.099,6.336,2.0,16,6504.1,"Assumed gateway at PoP jnb (Johannesburg, ZA) (assumed): 1564; Assumed gateway at PoP ebb (Kampala, UG) (assumed): 1175; Assumed gateway at PoP los (Lekki, NG) (assumed): 102; Assumed gateway at PoP nbo (Karen, KE) (assumed): 18; Assumed gateway at PoP doh (Doha, QA) (assumed): 17",jnb: 2881
 dev-three-realistic,dev-shell,three,realistic,default,Oulu,New York,validation,2881,0,0,2881,0,0,,,,,,,,,,,6384.5,,arn: 2881
 dev-three-realistic,dev-shell,three,realistic,default,New York,Oulu,validation,2881,2881,0,0,0,0,45.276,45.425,45.804,46.509,2.126,2.133,2.151,2.184,0.0,0,6384.5,"New York, NY (real): 2881",lga: 2881
 dev-three-best-case,dev-shell,three,best-case,default,New York,London,study,2881,2881,0,0,0,0,20.346,20.676,21.855,22.926,1.095,1.113,1.176,1.234,3.0,5,5570.2,,
 dev-three-best-case,dev-shell,three,best-case,default,London,New York,study,2881,2881,0,0,0,0,20.346,20.676,21.855,22.926,1.095,1.113,1.176,1.234,3.0,5,5570.2,,
-dev-three-best-case,dev-shell,three,best-case,default,San Francisco,Tokyo,study,2881,2881,0,0,0,0,30.540,32.258,32.870,35.458,1.106,1.169,1.191,1.285,6.0,9,8274.6,,
-dev-three-best-case,dev-shell,three,best-case,default,Tokyo,San Francisco,study,2881,2881,0,0,0,0,30.540,32.258,32.870,35.458,1.106,1.169,1.191,1.285,6.0,9,8274.6,,
-dev-three-best-case,dev-shell,three,best-case,default,Frankfurt,Singapore,study,2881,2881,0,0,0,0,37.313,37.911,39.096,41.628,1.090,1.108,1.143,1.217,7.0,11,10258.0,,
-dev-three-best-case,dev-shell,three,best-case,default,Singapore,Frankfurt,study,2881,2881,0,0,0,0,37.313,37.911,39.096,41.628,1.090,1.108,1.143,1.217,7.0,11,10258.0,,
-dev-three-best-case,dev-shell,three,best-case,default,Detroit,Buenos Aires,study,2881,2881,0,0,0,0,44.191,83.573,202.119,235.248,1.486,2.810,6.796,7.910,19.0,58,8915.7,,
-dev-three-best-case,dev-shell,three,best-case,default,Buenos Aires,Detroit,study,2881,2881,0,0,0,0,44.191,83.573,202.119,235.248,1.486,2.810,6.796,7.910,19.0,58,8915.7,,
+dev-three-best-case,dev-shell,three,best-case,default,San Francisco,Tokyo,study,2881,2881,0,0,0,0,30.540,32.244,32.860,35.458,1.106,1.168,1.191,1.285,6.0,9,8274.6,,
+dev-three-best-case,dev-shell,three,best-case,default,Tokyo,San Francisco,study,2881,2881,0,0,0,0,30.540,32.244,32.860,35.458,1.106,1.168,1.191,1.285,6.0,9,8274.6,,
+dev-three-best-case,dev-shell,three,best-case,default,Frankfurt,Singapore,study,2881,2881,0,0,0,0,37.313,37.911,39.044,41.628,1.090,1.108,1.141,1.217,7.0,11,10258.0,,
+dev-three-best-case,dev-shell,three,best-case,default,Singapore,Frankfurt,study,2881,2881,0,0,0,0,37.313,37.911,39.044,41.628,1.090,1.108,1.141,1.217,7.0,11,10258.0,,
+dev-three-best-case,dev-shell,three,best-case,default,Detroit,Buenos Aires,study,2881,2881,0,0,0,0,37.397,79.624,123.558,164.515,1.257,2.677,4.155,5.532,18.0,41,8915.7,,
+dev-three-best-case,dev-shell,three,best-case,default,Buenos Aires,Detroit,study,2881,2881,0,0,0,0,37.397,79.624,123.558,164.515,1.257,2.677,4.155,5.532,18.0,41,8915.7,,
 dev-three-best-case,dev-shell,three,best-case,default,New York,Chicago,study,2881,2881,0,0,0,0,5.035,5.087,5.235,5.656,1.319,1.333,1.371,1.482,0.0,0,1144.3,,
 dev-three-best-case,dev-shell,three,best-case,default,Chicago,New York,study,2881,2881,0,0,0,0,5.035,5.087,5.235,5.656,1.319,1.333,1.371,1.482,0.0,0,1144.3,,
 dev-three-best-case,dev-shell,three,best-case,default,Reykjavik,Vladivostok,study,2881,0,0,2881,0,0,,,,,,,,,,,7869.2,,
@@ -43,24 +43,24 @@ dev-plus-grid-realistic,dev-shell,plus-grid,realistic,default,New York,Chicago,s
 dev-plus-grid-realistic,dev-shell,plus-grid,realistic,default,Chicago,New York,study,2881,2881,0,0,0,0,10.696,10.843,11.182,11.876,2.802,2.841,2.929,3.111,0.0,0,1144.3,"Chicago, IL (real): 2881",ord: 2881
 dev-plus-grid-realistic,dev-shell,plus-grid,realistic,default,Reykjavik,Vladivostok,study,2881,0,0,2881,0,0,,,,,,,,,,,7869.2,,lhr: 2881
 dev-plus-grid-realistic,dev-shell,plus-grid,realistic,default,Vladivostok,Reykjavik,study,2881,0,2881,0,0,0,,,,,,,,,,,7869.2,,
-dev-plus-grid-realistic,dev-shell,plus-grid,realistic,default,Paris,Luanda,validation,2881,2881,0,0,0,0,42.957,44.128,49.921,50.170,1.980,2.034,2.301,2.312,1.0,6,6504.1,"Assumed gateway at PoP mad (Madrid, ES) (assumed): 2127; Assumed gateway at PoP lhr (London, GB) (assumed): 547; Assumed gateway at PoP mxp (Milan, IT) (assumed): 207",mad: 2881
-dev-plus-grid-realistic,dev-shell,plus-grid,realistic,default,Luanda,Paris,validation,2881,2881,0,0,0,0,67.486,70.422,95.712,122.954,3.111,3.246,4.412,5.667,3.0,16,6504.1,"Assumed gateway at PoP jnb (Johannesburg, ZA) (assumed): 2454; Assumed gateway at PoP ebb (Kampala, UG) (assumed): 303; Assumed gateway at PoP los (Lekki, NG) (assumed): 123; Assumed gateway at PoP doh (Doha, QA) (assumed): 1",jnb: 2881
+dev-plus-grid-realistic,dev-shell,plus-grid,realistic,default,Paris,Luanda,validation,2881,2881,0,0,0,0,42.957,44.113,49.921,50.170,1.980,2.033,2.301,2.312,1.0,6,6504.1,"Assumed gateway at PoP mad (Madrid, ES) (assumed): 2137; Assumed gateway at PoP lhr (London, GB) (assumed): 537; Assumed gateway at PoP mxp (Milan, IT) (assumed): 207",mad: 2881
+dev-plus-grid-realistic,dev-shell,plus-grid,realistic,default,Luanda,Paris,validation,2881,2881,0,0,0,0,67.486,70.363,93.042,112.560,3.111,3.243,4.289,5.188,3.0,16,6504.1,"Assumed gateway at PoP jnb (Johannesburg, ZA) (assumed): 2721; Assumed gateway at PoP ebb (Kampala, UG) (assumed): 110; Assumed gateway at PoP los (Lekki, NG) (assumed): 44; Assumed gateway at PoP nbo (Karen, KE) (assumed): 6",jnb: 2881
 dev-plus-grid-realistic,dev-shell,plus-grid,realistic,default,Oulu,New York,validation,2881,0,0,2881,0,0,,,,,,,,,,,6384.5,,arn: 2881
 dev-plus-grid-realistic,dev-shell,plus-grid,realistic,default,New York,Oulu,validation,2881,2881,0,0,0,0,45.276,45.425,45.804,46.509,2.126,2.133,2.151,2.184,0.0,0,6384.5,"New York, NY (real): 2881",lga: 2881
 dev-plus-grid-best-case,dev-shell,plus-grid,best-case,default,New York,London,study,2881,2881,0,0,0,0,20.312,20.673,21.289,22.734,1.093,1.113,1.146,1.224,3.0,9,5570.2,,
 dev-plus-grid-best-case,dev-shell,plus-grid,best-case,default,London,New York,study,2881,2881,0,0,0,0,20.312,20.673,21.289,22.734,1.093,1.113,1.146,1.224,3.0,9,5570.2,,
-dev-plus-grid-best-case,dev-shell,plus-grid,best-case,default,San Francisco,Tokyo,study,2881,2881,0,0,0,0,30.401,30.846,32.490,33.442,1.101,1.118,1.177,1.212,7.0,15,8274.6,,
-dev-plus-grid-best-case,dev-shell,plus-grid,best-case,default,Tokyo,San Francisco,study,2881,2881,0,0,0,0,30.401,30.846,32.490,33.442,1.101,1.118,1.177,1.212,7.0,15,8274.6,,
-dev-plus-grid-best-case,dev-shell,plus-grid,best-case,default,Frankfurt,Singapore,study,2881,2881,0,0,0,0,37.272,37.902,38.835,42.042,1.089,1.108,1.135,1.229,7.0,16,10258.0,,
-dev-plus-grid-best-case,dev-shell,plus-grid,best-case,default,Singapore,Frankfurt,study,2881,2881,0,0,0,0,37.272,37.902,38.835,42.042,1.089,1.108,1.135,1.229,7.0,16,10258.0,,
-dev-plus-grid-best-case,dev-shell,plus-grid,best-case,default,Detroit,Buenos Aires,study,2881,2881,0,0,0,0,33.836,37.210,72.057,106.665,1.138,1.251,2.423,3.587,15.0,40,8915.7,,
-dev-plus-grid-best-case,dev-shell,plus-grid,best-case,default,Buenos Aires,Detroit,study,2881,2881,0,0,0,0,33.836,37.210,72.057,106.665,1.138,1.251,2.423,3.587,15.0,40,8915.7,,
+dev-plus-grid-best-case,dev-shell,plus-grid,best-case,default,San Francisco,Tokyo,study,2881,2881,0,0,0,0,30.401,30.837,32.287,33.442,1.101,1.117,1.170,1.212,7.0,15,8274.6,,
+dev-plus-grid-best-case,dev-shell,plus-grid,best-case,default,Tokyo,San Francisco,study,2881,2881,0,0,0,0,30.401,30.837,32.287,33.442,1.101,1.117,1.170,1.212,7.0,15,8274.6,,
+dev-plus-grid-best-case,dev-shell,plus-grid,best-case,default,Frankfurt,Singapore,study,2881,2881,0,0,0,0,37.272,37.893,38.748,41.521,1.089,1.107,1.132,1.213,7.0,16,10258.0,,
+dev-plus-grid-best-case,dev-shell,plus-grid,best-case,default,Singapore,Frankfurt,study,2881,2881,0,0,0,0,37.272,37.893,38.748,41.521,1.089,1.107,1.132,1.213,7.0,16,10258.0,,
+dev-plus-grid-best-case,dev-shell,plus-grid,best-case,default,Detroit,Buenos Aires,study,2881,2881,0,0,0,0,33.836,36.846,53.813,76.854,1.138,1.239,1.809,2.584,15.0,34,8915.7,,
+dev-plus-grid-best-case,dev-shell,plus-grid,best-case,default,Buenos Aires,Detroit,study,2881,2881,0,0,0,0,33.836,36.846,53.813,76.854,1.138,1.239,1.809,2.584,15.0,34,8915.7,,
 dev-plus-grid-best-case,dev-shell,plus-grid,best-case,default,New York,Chicago,study,2881,2881,0,0,0,0,5.035,5.087,5.235,5.656,1.319,1.333,1.371,1.482,0.0,0,1144.3,,
 dev-plus-grid-best-case,dev-shell,plus-grid,best-case,default,Chicago,New York,study,2881,2881,0,0,0,0,5.035,5.087,5.235,5.656,1.319,1.333,1.371,1.482,0.0,0,1144.3,,
 dev-plus-grid-best-case,dev-shell,plus-grid,best-case,default,Reykjavik,Vladivostok,study,2881,0,0,2881,0,0,,,,,,,,,,,7869.2,,
 dev-plus-grid-best-case,dev-shell,plus-grid,best-case,default,Vladivostok,Reykjavik,study,2881,0,0,2881,0,0,,,,,,,,,,,7869.2,,
-dev-plus-grid-best-case,dev-shell,plus-grid,best-case,default,Paris,Luanda,validation,2881,2881,0,0,0,0,24.940,29.102,60.882,79.086,1.150,1.341,2.806,3.645,14.0,30,6504.1,,
-dev-plus-grid-best-case,dev-shell,plus-grid,best-case,default,Luanda,Paris,validation,2881,2881,0,0,0,0,24.940,29.102,60.882,79.086,1.150,1.341,2.806,3.645,14.0,30,6504.1,,
+dev-plus-grid-best-case,dev-shell,plus-grid,best-case,default,Paris,Luanda,validation,2881,2881,0,0,0,0,24.503,28.722,54.117,79.086,1.129,1.324,2.494,3.645,14.0,30,6504.1,,
+dev-plus-grid-best-case,dev-shell,plus-grid,best-case,default,Luanda,Paris,validation,2881,2881,0,0,0,0,24.503,28.722,54.117,79.086,1.129,1.324,2.494,3.645,14.0,30,6504.1,,
 dev-plus-grid-best-case,dev-shell,plus-grid,best-case,default,Oulu,New York,validation,2881,0,0,2881,0,0,,,,,,,,,,,6384.5,,
 dev-plus-grid-best-case,dev-shell,plus-grid,best-case,default,New York,Oulu,validation,2881,0,0,2881,0,0,,,,,,,,,,,6384.5,,
 dev-six-realistic,dev-shell,six,realistic,default,New York,London,study,2881,2881,0,0,0,0,39.899,40.048,40.427,41.131,2.147,2.155,2.176,2.214,0.0,0,5570.2,"New York, NY (real): 2881",lga: 2881
@@ -75,23 +75,23 @@ dev-six-realistic,dev-shell,six,realistic,default,New York,Chicago,study,2881,28
 dev-six-realistic,dev-shell,six,realistic,default,Chicago,New York,study,2881,2881,0,0,0,0,10.696,10.843,11.182,11.876,2.802,2.841,2.929,3.111,0.0,0,1144.3,"Chicago, IL (real): 2881",ord: 2881
 dev-six-realistic,dev-shell,six,realistic,default,Reykjavik,Vladivostok,study,2881,0,0,2881,0,0,,,,,,,,,,,7869.2,,lhr: 2881
 dev-six-realistic,dev-shell,six,realistic,default,Vladivostok,Reykjavik,study,2881,0,2881,0,0,0,,,,,,,,,,,7869.2,,
-dev-six-realistic,dev-shell,six,realistic,default,Paris,Luanda,validation,2881,2881,0,0,0,0,42.957,44.021,49.905,50.170,1.980,2.029,2.300,2.312,1.0,5,6504.1,"Assumed gateway at PoP mad (Madrid, ES) (assumed): 2314; Assumed gateway at PoP lhr (London, GB) (assumed): 398; Assumed gateway at PoP mxp (Milan, IT) (assumed): 169",mad: 2881
-dev-six-realistic,dev-shell,six,realistic,default,Luanda,Paris,validation,2881,2881,0,0,0,0,67.486,70.188,93.246,98.296,3.111,3.235,4.298,4.531,2.0,8,6504.1,"Assumed gateway at PoP jnb (Johannesburg, ZA) (assumed): 2529; Assumed gateway at PoP ebb (Kampala, UG) (assumed): 274; Assumed gateway at PoP los (Lekki, NG) (assumed): 78",jnb: 2881
+dev-six-realistic,dev-shell,six,realistic,default,Paris,Luanda,validation,2881,2881,0,0,0,0,42.957,44.020,49.905,50.170,1.980,2.029,2.300,2.312,1.0,5,6504.1,"Assumed gateway at PoP mad (Madrid, ES) (assumed): 2324; Assumed gateway at PoP lhr (London, GB) (assumed): 388; Assumed gateway at PoP mxp (Milan, IT) (assumed): 169",mad: 2881
+dev-six-realistic,dev-shell,six,realistic,default,Luanda,Paris,validation,2881,2881,0,0,0,0,67.486,70.136,75.437,85.368,3.111,3.233,3.477,3.935,3.0,8,6504.1,"Assumed gateway at PoP jnb (Johannesburg, ZA) (assumed): 2881",jnb: 2881
 dev-six-realistic,dev-shell,six,realistic,default,Oulu,New York,validation,2881,0,0,2881,0,0,,,,,,,,,,,6384.5,,arn: 2881
 dev-six-realistic,dev-shell,six,realistic,default,New York,Oulu,validation,2881,2881,0,0,0,0,45.276,45.425,45.804,46.509,2.126,2.133,2.151,2.184,0.0,0,6384.5,"New York, NY (real): 2881",lga: 2881
 dev-six-best-case,dev-shell,six,best-case,default,New York,London,study,2881,2881,0,0,0,0,20.312,20.669,21.173,22.364,1.093,1.112,1.140,1.204,3.0,6,5570.2,,
 dev-six-best-case,dev-shell,six,best-case,default,London,New York,study,2881,2881,0,0,0,0,20.312,20.669,21.173,22.364,1.093,1.112,1.140,1.204,3.0,6,5570.2,,
-dev-six-best-case,dev-shell,six,best-case,default,San Francisco,Tokyo,study,2881,2881,0,0,0,0,30.368,30.768,32.110,33.442,1.100,1.115,1.163,1.212,6.0,11,8274.6,,
-dev-six-best-case,dev-shell,six,best-case,default,Tokyo,San Francisco,study,2881,2881,0,0,0,0,30.368,30.768,32.110,33.442,1.100,1.115,1.163,1.212,6.0,11,8274.6,,
-dev-six-best-case,dev-shell,six,best-case,default,Frankfurt,Singapore,study,2881,2881,0,0,0,0,37.169,37.827,38.727,42.042,1.086,1.105,1.132,1.229,8.0,13,10258.0,,
-dev-six-best-case,dev-shell,six,best-case,default,Singapore,Frankfurt,study,2881,2881,0,0,0,0,37.169,37.827,38.727,42.042,1.086,1.105,1.132,1.229,8.0,13,10258.0,,
-dev-six-best-case,dev-shell,six,best-case,default,Detroit,Buenos Aires,study,2881,2881,0,0,0,0,32.551,35.212,40.281,49.869,1.095,1.184,1.354,1.677,12.0,20,8915.7,,
-dev-six-best-case,dev-shell,six,best-case,default,Buenos Aires,Detroit,study,2881,2881,0,0,0,0,32.551,35.212,40.281,49.869,1.095,1.184,1.354,1.677,12.0,20,8915.7,,
+dev-six-best-case,dev-shell,six,best-case,default,San Francisco,Tokyo,study,2881,2881,0,0,0,0,30.368,30.760,31.349,32.657,1.100,1.114,1.136,1.183,6.0,11,8274.6,,
+dev-six-best-case,dev-shell,six,best-case,default,Tokyo,San Francisco,study,2881,2881,0,0,0,0,30.368,30.760,31.349,32.657,1.100,1.114,1.136,1.183,6.0,11,8274.6,,
+dev-six-best-case,dev-shell,six,best-case,default,Frankfurt,Singapore,study,2881,2881,0,0,0,0,37.169,37.809,38.657,41.407,1.086,1.105,1.130,1.210,8.0,13,10258.0,,
+dev-six-best-case,dev-shell,six,best-case,default,Singapore,Frankfurt,study,2881,2881,0,0,0,0,37.169,37.809,38.657,41.407,1.086,1.105,1.130,1.210,8.0,13,10258.0,,
+dev-six-best-case,dev-shell,six,best-case,default,Detroit,Buenos Aires,study,2881,2881,0,0,0,0,32.551,34.333,35.984,38.925,1.095,1.154,1.210,1.309,13.0,18,8915.7,,
+dev-six-best-case,dev-shell,six,best-case,default,Buenos Aires,Detroit,study,2881,2881,0,0,0,0,32.551,34.333,35.984,38.925,1.095,1.154,1.210,1.309,13.0,18,8915.7,,
 dev-six-best-case,dev-shell,six,best-case,default,New York,Chicago,study,2881,2881,0,0,0,0,5.035,5.087,5.235,5.656,1.319,1.333,1.371,1.482,0.0,0,1144.3,,
 dev-six-best-case,dev-shell,six,best-case,default,Chicago,New York,study,2881,2881,0,0,0,0,5.035,5.087,5.235,5.656,1.319,1.333,1.371,1.482,0.0,0,1144.3,,
 dev-six-best-case,dev-shell,six,best-case,default,Reykjavik,Vladivostok,study,2881,0,0,2881,0,0,,,,,,,,,,,7869.2,,
 dev-six-best-case,dev-shell,six,best-case,default,Vladivostok,Reykjavik,study,2881,0,0,2881,0,0,,,,,,,,,,,7869.2,,
-dev-six-best-case,dev-shell,six,best-case,default,Paris,Luanda,validation,2881,2881,0,0,0,0,23.943,25.702,27.331,36.543,1.104,1.185,1.260,1.684,9.0,13,6504.1,,
-dev-six-best-case,dev-shell,six,best-case,default,Luanda,Paris,validation,2881,2881,0,0,0,0,23.943,25.702,27.331,36.543,1.104,1.185,1.260,1.684,9.0,13,6504.1,,
+dev-six-best-case,dev-shell,six,best-case,default,Paris,Luanda,validation,2881,2881,0,0,0,0,23.943,25.379,26.764,30.754,1.104,1.170,1.234,1.418,10.0,13,6504.1,,
+dev-six-best-case,dev-shell,six,best-case,default,Luanda,Paris,validation,2881,2881,0,0,0,0,23.943,25.379,26.764,30.754,1.104,1.170,1.234,1.418,10.0,13,6504.1,,
 dev-six-best-case,dev-shell,six,best-case,default,Oulu,New York,validation,2881,0,0,2881,0,0,,,,,,,,,,,6384.5,,
 dev-six-best-case,dev-shell,six,best-case,default,New York,Oulu,validation,2881,0,0,2881,0,0,,,,,,,,,,,6384.5,,

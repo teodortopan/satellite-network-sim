@@ -434,10 +434,9 @@ PreparedRunOrError prepare_run(const Options& requested) {
   const topology::StepPositions at_start =
       topology::positions_at(run.propagators, options.start, *eop_start);
   run.start_propagation_failures = at_start.failed_count;
-  run.plan = topology::plan_laser_links(run.working, at_start.position_ecef_km,
-                                        {.pattern = options.pattern,
-                                         .max_gap_over_median = 3.0,
-                                         .atmosphere_km = options.limits.atmosphere_km});
+  run.plan = topology::plan_laser_links(
+      run.working, at_start.position_ecef_km,
+      {.pattern = options.pattern, .atmosphere_km = options.limits.atmosphere_km});
   return run;
 }
 

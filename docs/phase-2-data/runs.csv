@@ -1,49 +1,49 @@
 run,group,pattern,model,parameter,duration_s,step_s,options,exit_status,physical_check_failures,lower_bound_failures,planned_links,link_steps_up,down_end_not_propagated,down_no_line_of_sight,down_over_range_cap,down_sun_exclusion,down_locking_on,unused_plane_too_small,unused_no_neighbour_plane,unused_no_free_partner
-main-three-realistic,main,three,realistic,default,43200,15,,0,0,0,11816,33723853,0,318043,0,0,0,0,271,1282
-dev-three-realistic,dev-shell,three,realistic,default,43200,15,--shells 53deg,0,0,0,4560,12978905,0,158455,0,0,0,0,48,420
-step60-three-realistic,step-60,three,realistic,default,43200,60,,0,0,0,11816,8439744,0,79592,0,0,0,0,271,1282
-step1-three-realistic,step-1,three,realistic,default,3600,1,,0,0,0,11816,42152095,0,397321,0,0,0,0,271,1282
-main-three-best-case,main,three,best-case,default,43200,15,,0,0,0,11816,33723853,0,318043,0,0,0,0,271,1282
-dev-three-best-case,dev-shell,three,best-case,default,43200,15,--shells 53deg,0,0,0,4560,12978905,0,158455,0,0,0,0,48,420
-step60-three-best-case,step-60,three,best-case,default,43200,60,,0,0,0,11816,8439744,0,79592,0,0,0,0,271,1282
-step1-three-best-case,step-1,three,best-case,default,3600,1,,0,0,0,11816,42152095,0,397321,0,0,0,0,271,1282
-main-plus-grid-realistic,main,plus-grid,realistic,default,43200,15,,0,0,0,15262,43649382,0,320440,0,0,0,0,542,2514
-dev-plus-grid-realistic,dev-shell,plus-grid,realistic,default,43200,15,--shells 53deg,0,0,0,5949,16980294,0,158775,0,0,0,0,97,789
-step60-plus-grid-realistic,step-60,plus-grid,realistic,default,43200,60,,0,0,0,15262,10923706,0,80196,0,0,0,0,542,2514
-step1-plus-grid-realistic,step-1,plus-grid,realistic,default,3600,1,,0,0,0,15262,54558891,0,399571,0,0,0,0,542,2514
-main-plus-grid-best-case,main,plus-grid,best-case,default,43200,15,,0,0,0,15262,43649382,0,320440,0,0,0,0,542,2514
-dev-plus-grid-best-case,dev-shell,plus-grid,best-case,default,43200,15,--shells 53deg,0,0,0,5949,16980294,0,158775,0,0,0,0,97,789
-step60-plus-grid-best-case,step-60,plus-grid,best-case,default,43200,60,,0,0,0,15262,10923706,0,80196,0,0,0,0,542,2514
-step1-plus-grid-best-case,step-1,plus-grid,best-case,default,3600,1,,0,0,0,15262,54558891,0,399571,0,0,0,0,542,2514
-main-six-realistic,main,six,realistic,default,43200,15,,0,0,0,21969,62959098,0,333591,0,0,0,0,1393,5039
-dev-six-realistic,dev-shell,six,realistic,default,43200,15,--shells 53deg,0,0,0,8604,24627611,0,160513,0,0,0,0,302,1666
-step60-six-realistic,step-60,six,realistic,default,43200,60,,0,0,0,21969,15756164,0,83485,0,0,0,0,1393,5039
-step1-six-realistic,step-1,six,realistic,default,3600,1,,0,0,0,21969,78695490,0,414879,0,0,0,0,1393,5039
-main-six-best-case,main,six,best-case,default,43200,15,,0,0,0,21969,62959098,0,333591,0,0,0,0,1393,5039
-dev-six-best-case,dev-shell,six,best-case,default,43200,15,--shells 53deg,0,0,0,8604,24627611,0,160513,0,0,0,0,302,1666
-step60-six-best-case,step-60,six,best-case,default,43200,60,,0,0,0,21969,15756164,0,83485,0,0,0,0,1393,5039
-step1-six-best-case,step-1,six,best-case,default,3600,1,,0,0,0,21969,78695490,0,414879,0,0,0,0,1393,5039
-sens-range-cap-km-1000-realistic,sensitivity,three,realistic,range-cap-km=1000,43200,15,--range-cap-km 1000,0,0,0,11816,12590314,0,318043,21133539,0,0,0,271,1282
-sens-range-cap-km-1000-best-case,sensitivity,three,best-case,range-cap-km=1000,43200,15,--range-cap-km 1000,0,0,0,11816,12590314,0,318043,21133539,0,0,0,271,1282
-sens-range-cap-km-2000-realistic,sensitivity,three,realistic,range-cap-km=2000,43200,15,--range-cap-km 2000,0,0,0,11816,31563506,0,318043,2160347,0,0,0,271,1282
-sens-range-cap-km-2000-best-case,sensitivity,three,best-case,range-cap-km=2000,43200,15,--range-cap-km 2000,0,0,0,11816,31563506,0,318043,2160347,0,0,0,271,1282
-sens-range-cap-km-3000-realistic,sensitivity,three,realistic,range-cap-km=3000,43200,15,--range-cap-km 3000,0,0,0,11816,33156229,0,318043,567624,0,0,0,271,1282
-sens-range-cap-km-3000-best-case,sensitivity,three,best-case,range-cap-km=3000,43200,15,--range-cap-km 3000,0,0,0,11816,33156229,0,318043,567624,0,0,0,271,1282
-sens-sun-exclusion-deg-5-realistic,sensitivity,three,realistic,sun-exclusion-deg=5,43200,15,--sun-exclusion-deg 5,0,0,0,11816,33618448,0,318043,0,105405,0,0,271,1282
-sens-sun-exclusion-deg-5-best-case,sensitivity,three,best-case,sun-exclusion-deg=5,43200,15,--sun-exclusion-deg 5,0,0,0,11816,33618448,0,318043,0,105405,0,0,271,1282
-sens-sun-exclusion-deg-10-realistic,sensitivity,three,realistic,sun-exclusion-deg=10,43200,15,--sun-exclusion-deg 10,0,0,0,11816,33278301,0,318043,0,445552,0,0,271,1282
-sens-sun-exclusion-deg-10-best-case,sensitivity,three,best-case,sun-exclusion-deg=10,43200,15,--sun-exclusion-deg 10,0,0,0,11816,33278301,0,318043,0,445552,0,0,271,1282
-sens-lock-on-s-15-realistic,sensitivity,three,realistic,lock-on-s=15,43200,15,--lock-on-s 15,0,0,0,11816,33712131,0,318043,0,0,11722,0,271,1282
-sens-lock-on-s-15-best-case,sensitivity,three,best-case,lock-on-s=15,43200,15,--lock-on-s 15,0,0,0,11816,33712131,0,318043,0,0,11722,0,271,1282
-sens-lock-on-s-60-realistic,sensitivity,three,realistic,lock-on-s=60,43200,15,--lock-on-s 60,0,0,0,11816,33676965,0,318043,0,0,46888,0,271,1282
-sens-lock-on-s-60-best-case,sensitivity,three,best-case,lock-on-s=60,43200,15,--lock-on-s 60,0,0,0,11816,33676965,0,318043,0,0,46888,0,271,1282
-sens-fibre-factor-1.5-realistic,sensitivity,three,realistic,fibre-factor=1.5,43200,15,--fibre-factor 1.5,0,0,0,11816,33723853,0,318043,0,0,0,0,271,1282
-sens-fibre-factor-2.5-realistic,sensitivity,three,realistic,fibre-factor=2.5,43200,15,--fibre-factor 2.5,0,0,0,11816,33723853,0,318043,0,0,0,0,271,1282
-sens-high-latitude-mask-on-realistic,sensitivity,three,realistic,high-latitude-mask=on,43200,15,--high-latitude-mask on,0,0,0,11816,33723853,0,318043,0,0,0,0,271,1282
-sens-high-latitude-mask-on-best-case,sensitivity,three,best-case,high-latitude-mask=on,43200,15,--high-latitude-mask on,0,0,0,11816,33723853,0,318043,0,0,0,0,271,1282
-shell-43deg-three-realistic,single-shell,three,realistic,shells=43deg,43200,15,--shells 43deg,0,0,0,4452,12764578,0,61634,0,0,0,0,0,657
-shell-43deg-three-best-case,single-shell,three,best-case,shells=43deg,43200,15,--shells 43deg,0,0,0,4452,12764578,0,61634,0,0,0,0,0,657
-shell-97deg-three-realistic,single-shell,three,realistic,shells=97deg,43200,15,--shells 97deg,0,0,0,2000,5713023,0,48977,0,0,0,0,223,55
-shell-97deg-three-best-case,single-shell,three,best-case,shells=97deg,43200,15,--shells 97deg,0,0,0,2000,5713023,0,48977,0,0,0,0,223,55
+main-three-realistic,main,three,realistic,default,43200,15,,0,0,0,11919,34021717,0,316922,0,0,0,0,0,1347
+dev-three-realistic,dev-shell,three,realistic,default,43200,15,--shells 53deg,0,0,0,4580,13036525,0,158455,0,0,0,0,0,428
+step60-three-realistic,step-60,three,realistic,default,43200,60,,0,0,0,11919,8514286,0,79313,0,0,0,0,0,1347
+step1-three-realistic,step-1,three,realistic,default,3600,1,,0,0,0,11919,42524032,0,396287,0,0,0,0,0,1347
+main-three-best-case,main,three,best-case,default,43200,15,,0,0,0,11919,34021717,0,316922,0,0,0,0,0,1347
+dev-three-best-case,dev-shell,three,best-case,default,43200,15,--shells 53deg,0,0,0,4580,13036525,0,158455,0,0,0,0,0,428
+step60-three-best-case,step-60,three,best-case,default,43200,60,,0,0,0,11919,8514286,0,79313,0,0,0,0,0,1347
+step1-three-best-case,step-1,three,best-case,default,3600,1,,0,0,0,11919,42524032,0,396287,0,0,0,0,0,1347
+main-plus-grid-realistic,main,plus-grid,realistic,default,43200,15,,0,0,0,15481,44283531,0,317230,0,0,0,0,0,2618
+dev-plus-grid-realistic,dev-shell,plus-grid,realistic,default,43200,15,--shells 53deg,0,0,0,5988,17092653,0,158775,0,0,0,0,0,808
+step60-plus-grid-realistic,step-60,plus-grid,realistic,default,43200,60,,0,0,0,15481,11082411,0,79390,0,0,0,0,0,2618
+step1-plus-grid-realistic,step-1,plus-grid,realistic,default,3600,1,,0,0,0,15481,55350971,0,396110,0,0,0,0,0,2618
+main-plus-grid-best-case,main,plus-grid,best-case,default,43200,15,,0,0,0,15481,44283531,0,317230,0,0,0,0,0,2618
+dev-plus-grid-best-case,dev-shell,plus-grid,best-case,default,43200,15,--shells 53deg,0,0,0,5988,17092653,0,158775,0,0,0,0,0,808
+step60-plus-grid-best-case,step-60,plus-grid,best-case,default,43200,60,,0,0,0,15481,11082411,0,79390,0,0,0,0,0,2618
+step1-plus-grid-best-case,step-1,plus-grid,best-case,default,3600,1,,0,0,0,15481,55350971,0,396110,0,0,0,0,0,2618
+main-six-realistic,main,six,realistic,default,43200,15,,0,0,0,22446,64349653,0,317273,0,0,0,0,0,5478
+dev-six-realistic,dev-shell,six,realistic,default,43200,15,--shells 53deg,0,0,0,8729,24989474,0,158775,0,0,0,0,0,1718
+step60-six-realistic,step-60,six,realistic,default,43200,60,,0,0,0,22446,16104164,0,79402,0,0,0,0,0,5478
+step1-six-realistic,step-1,six,realistic,default,3600,1,,0,0,0,22446,80431936,0,396110,0,0,0,0,0,5478
+main-six-best-case,main,six,best-case,default,43200,15,,0,0,0,22446,64349653,0,317273,0,0,0,0,0,5478
+dev-six-best-case,dev-shell,six,best-case,default,43200,15,--shells 53deg,0,0,0,8729,24989474,0,158775,0,0,0,0,0,1718
+step60-six-best-case,step-60,six,best-case,default,43200,60,,0,0,0,22446,16104164,0,79402,0,0,0,0,0,5478
+step1-six-best-case,step-1,six,best-case,default,3600,1,,0,0,0,22446,80431936,0,396110,0,0,0,0,0,5478
+sens-range-cap-km-1000-realistic,sensitivity,three,realistic,range-cap-km=1000,43200,15,--range-cap-km 1000,0,0,0,11919,12651670,0,316922,21370047,0,0,0,0,1347
+sens-range-cap-km-1000-best-case,sensitivity,three,best-case,range-cap-km=1000,43200,15,--range-cap-km 1000,0,0,0,11919,12651670,0,316922,21370047,0,0,0,0,1347
+sens-range-cap-km-2000-realistic,sensitivity,three,realistic,range-cap-km=2000,43200,15,--range-cap-km 2000,0,0,0,11919,31790837,0,316922,2230880,0,0,0,0,1347
+sens-range-cap-km-2000-best-case,sensitivity,three,best-case,range-cap-km=2000,43200,15,--range-cap-km 2000,0,0,0,11919,31790837,0,316922,2230880,0,0,0,0,1347
+sens-range-cap-km-3000-realistic,sensitivity,three,realistic,range-cap-km=3000,43200,15,--range-cap-km 3000,0,0,0,11919,33416962,0,316922,604755,0,0,0,0,1347
+sens-range-cap-km-3000-best-case,sensitivity,three,best-case,range-cap-km=3000,43200,15,--range-cap-km 3000,0,0,0,11919,33416962,0,316922,604755,0,0,0,0,1347
+sens-sun-exclusion-deg-5-realistic,sensitivity,three,realistic,sun-exclusion-deg=5,43200,15,--sun-exclusion-deg 5,0,0,0,11919,33915797,0,316922,0,105920,0,0,0,1347
+sens-sun-exclusion-deg-5-best-case,sensitivity,three,best-case,sun-exclusion-deg=5,43200,15,--sun-exclusion-deg 5,0,0,0,11919,33915797,0,316922,0,105920,0,0,0,1347
+sens-sun-exclusion-deg-10-realistic,sensitivity,three,realistic,sun-exclusion-deg=10,43200,15,--sun-exclusion-deg 10,0,0,0,11919,33574992,0,316922,0,446725,0,0,0,1347
+sens-sun-exclusion-deg-10-best-case,sensitivity,three,best-case,sun-exclusion-deg=10,43200,15,--sun-exclusion-deg 10,0,0,0,11919,33574992,0,316922,0,446725,0,0,0,1347
+sens-lock-on-s-15-realistic,sensitivity,three,realistic,lock-on-s=15,43200,15,--lock-on-s 15,0,0,0,11919,34009907,0,316922,0,0,11810,0,0,1347
+sens-lock-on-s-15-best-case,sensitivity,three,best-case,lock-on-s=15,43200,15,--lock-on-s 15,0,0,0,11919,34009907,0,316922,0,0,11810,0,0,1347
+sens-lock-on-s-60-realistic,sensitivity,three,realistic,lock-on-s=60,43200,15,--lock-on-s 60,0,0,0,11919,33974477,0,316922,0,0,47240,0,0,1347
+sens-lock-on-s-60-best-case,sensitivity,three,best-case,lock-on-s=60,43200,15,--lock-on-s 60,0,0,0,11919,33974477,0,316922,0,0,47240,0,0,1347
+sens-fibre-factor-1.5-realistic,sensitivity,three,realistic,fibre-factor=1.5,43200,15,--fibre-factor 1.5,0,0,0,11919,34021717,0,316922,0,0,0,0,0,1347
+sens-fibre-factor-2.5-realistic,sensitivity,three,realistic,fibre-factor=2.5,43200,15,--fibre-factor 2.5,0,0,0,11919,34021717,0,316922,0,0,0,0,0,1347
+sens-high-latitude-mask-on-realistic,sensitivity,three,realistic,high-latitude-mask=on,43200,15,--high-latitude-mask on,0,0,0,11919,34021717,0,316922,0,0,0,0,0,1347
+sens-high-latitude-mask-on-best-case,sensitivity,three,best-case,high-latitude-mask=on,43200,15,--high-latitude-mask on,0,0,0,11919,34021717,0,316922,0,0,0,0,0,1347
+shell-43deg-three-realistic,single-shell,three,realistic,shells=43deg,43200,15,--shells 43deg,0,0,0,4451,12762818,0,60513,0,0,0,0,0,659
+shell-43deg-three-best-case,single-shell,three,best-case,shells=43deg,43200,15,--shells 43deg,0,0,0,4451,12762818,0,60513,0,0,0,0,0,659
+shell-97deg-three-realistic,single-shell,three,realistic,shells=97deg,43200,15,--shells 97deg,0,0,0,2084,5955027,0,48977,0,0,0,0,0,110
+shell-97deg-three-best-case,single-shell,three,best-case,shells=97deg,43200,15,--shells 97deg,0,0,0,2084,5955027,0,48977,0,0,0,0,0,110
 shell-70deg-three-realistic,single-shell,three,realistic,shells=70deg,43200,15,--shells 70deg,0,0,0,804,2267347,0,48977,0,0,0,0,0,150
 shell-70deg-three-best-case,single-shell,three,best-case,shells=70deg,43200,15,--shells 70deg,0,0,0,804,2267347,0,48977,0,0,0,0,0,150
