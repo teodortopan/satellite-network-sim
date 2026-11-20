@@ -27,20 +27,23 @@ struct PhysicalCheckCounts {
   std::size_t line_of_sight = 0;
   /// Laser links marked up that are longer than the range cap (distance recomputed).
   std::size_t range_cap = 0;
-  /// Satellites with more planned laser links than the pattern's budget (counted from the
-  /// link list itself).
+  /// Satellites with more planned laser links than max_lasers_of(plan), the pattern's budget
+  /// for a planned plan (counted from the link list itself).
   std::size_t laser_budget = 0;
   /// Laser links not recorded exactly once at each end (in LinkPlan::lasers) with matching
   /// sides, laser records naming a link that is out of range or does not have that satellite
   /// at that side, pairs of satellites linked more than once, and links joining a satellite
   /// to itself.
   std::size_t symmetry = 0;
-  /// Laser links joining two shells (by the classification's shell_index), touching a
-  /// satellite that is not a plane member, or whose recorded shell is wrong.
+  /// Laser links joining two shells (by the classification's shell_index; not counted when
+  /// plan.cross_shell_links, a file's links), touching a satellite that is not a plane member,
+  /// or whose recorded shell is not satellite_a's.
   std::size_t shells = 0;
   /// Ground links below their mask (elevation recomputed with a different formula from the
-  /// builder's, mask recomputed from the shell's mean height and the site's latitude), to a
-  /// satellite not in a plane, or to a satellite without a position.
+  /// builder's, mask recomputed from the shell's mean height and the site's latitude, or the
+  /// override mask_settings.min_elevation_rad), beyond mask_settings.max_ground_range_km under
+  /// the range rule (distance recomputed from the site's coordinates), to a satellite not in a
+  /// plane, or to a satellite without a position.
   std::size_t mask = 0;
   /// The step's link states and the plan disagree in size, or the per-satellite tables do
   /// not cover the classification: nothing else can be trusted.

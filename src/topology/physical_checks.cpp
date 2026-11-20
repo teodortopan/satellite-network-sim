@@ -41,6 +41,17 @@ double independent_min_radius_km(const Eigen::Vector3d& a, const Eigen::Vector3d
   return a.cross(b).norm() / length;
 }
 
+// A site's Earth-fixed position recomputed from its geodetic coordinates (height 0).
+Eigen::Vector3d independent_site_position_km(const ground::GroundSite& site) {
+  const double sin_lat = std::sin(site.latitude_rad);
+  const double cos_lat = std::cos(site.latitude_rad);
+  const double n_km = frames::kWgs84EquatorialRadiusKm /
+                      std::sqrt(1.0 - (frames::kWgs84EccentricitySquared * sin_lat * sin_lat));
+  return {n_km * cos_lat * std::cos(site.longitude_rad),
+          n_km * cos_lat * std::sin(site.longitude_rad),
+          n_km * (1.0 - frames::kWgs84EccentricitySquared) * sin_lat};
+}
+
 // The elevation of `satellite` from a site at geodetic latitude `lat`, longitude `lon` on the
 // ellipsoid, through the local east-north-up frame, rather than the builder's normal vector:
 // the up component of the site-to-satellite vector against its length.
@@ -49,12 +60,7 @@ double independent_elevation_rad(const ground::GroundSite& site, const Eigen::Ve
   const double cos_lat = std::cos(site.latitude_rad);
   const double sin_lon = std::sin(site.longitude_rad);
   const double cos_lon = std::cos(site.longitude_rad);
-  // Site position recomputed from its geodetic coordinates (height 0).
-  const double n_km = frames::kWgs84EquatorialRadiusKm /
-                      std::sqrt(1.0 - (frames::kWgs84EccentricitySquared * sin_lat * sin_lat));
-  const Eigen::Vector3d site_km(n_km * cos_lat * cos_lon, n_km * cos_lat * sin_lon,
-                                n_km * (1.0 - frames::kWgs84EccentricitySquared) * sin_lat);
-  const Eigen::Vector3d d = satellite - site_km;
+  const Eigen::Vector3d d = satellite - independent_site_position_km(site);
   const double east = (-sin_lon * d.x()) + (cos_lon * d.y());
   const double north =
       (-sin_lat * cos_lon * d.x()) - (sin_lat * sin_lon * d.y()) + (cos_lat * d.z());
@@ -126,11 +132,12 @@ PhysicalCheckCounts run_physical_checks(const constellation::Classification& cla
       }
     }
 
-    // Shells: both ends plane members of the same shell, the link's recorded shell.
+    // Shells: both ends plane members, the link's recorded shell satellite_a's, and the same
+    // shell at both ends unless the plan allows otherwise (a file's links).
     const std::optional<std::size_t> shell_a = member_shell(classification, a);
     const std::optional<std::size_t> shell_b = member_shell(classification, b);
-    if (!shell_a.has_value() || !shell_b.has_value() || *shell_a != *shell_b ||
-        *shell_a != link.shell_index) {
+    if (!shell_a.has_value() || !shell_b.has_value() || *shell_a != link.shell_index ||
+        (*shell_a != *shell_b && !plan.cross_shell_links)) {
       ++counts.shells;
     }
 
@@ -180,7 +187,7 @@ PhysicalCheckCounts run_physical_checks(const constellation::Classification& cla
     }
   }
 
-  const std::size_t budget = laser_budget(plan.pattern);
+  const std::size_t budget = max_lasers_of(plan);
   counts.laser_budget = static_cast<std::size_t>(
       std::ranges::count_if(links_per_satellite, [&](std::size_t n) { return n > budget; }));
 
@@ -192,6 +199,13 @@ PhysicalCheckCounts run_physical_checks(const constellation::Classification& cla
       const std::optional<std::size_t> shell = member_shell(classification, v.satellite);
       if (!shell.has_value() || p == nullptr || *shell >= heights.size()) {
         ++counts.mask;
+        continue;
+      }
+      if (const std::optional<double>& range_km = mask_settings.max_ground_range_km) {
+        if ((*p - independent_site_position_km(sites[site])).norm() >
+            *range_km + kLengthToleranceKm) {
+          ++counts.mask;
+        }
         continue;
       }
       const double mask = elevation_mask_rad(heights[*shell].value_or(0.0),

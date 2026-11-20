@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <array>
+#include <charconv>
 #include <cstddef>
 #include <cstdint>
 #include <filesystem>
@@ -10,6 +11,7 @@
 #include <span>
 #include <string>
 #include <string_view>
+#include <system_error>
 #include <utility>
 #include <vector>
 
@@ -28,6 +30,10 @@ namespace {
 
 using app::quote;
 
+// The largest --max-lasers accepted: far above any terminal count, small enough to be a typo
+// guard.
+constexpr std::size_t kMaxLasersLimit = 1000;
+
 constexpr std::string_view kUsage =
     R"(usage: topology --snapshot <dir> --ground <dir> --cities <file> --start <UTC>
                 --duration-s <s> --step-s <s> --pattern <three|plus-grid|six>
@@ -37,6 +43,8 @@ constexpr std::string_view kUsage =
                 [--range-cap-km <km>] [--sun-exclusion-deg <deg>] [--lock-on-s <s>]
                 [--fibre-factor <x>] [--high-latitude-mask <on|off>]
                 [--serving <highest-elevation>]
+                [--min-elevation-deg <deg> | --max-ground-range-km <km>]
+                [--links-file <file> [--max-lasers <n>]] [--links-out <file>]
 
 Builds the Starlink network at each time step of a saved snapshot (shells and planes,
 laser links, ground links) and writes, for every city pair in both directions, the one-way
@@ -74,6 +82,17 @@ for physical possibility (spec 6.1).
                               5 deg elevation mask above 62 deg latitude (default off)
   --serving <rule>            how a city's serving satellite is chosen: highest-elevation
                               (default, the only rule)
+  --min-elevation-deg <deg>   one elevation mask for every site and shell, in [0, 90),
+                              replacing the FCC masks; for published setups only
+  --max-ground-range-km <km>  a site may use any satellite at most this far away, with no
+                              elevation test (Hypatia's rule), replacing the masks; for
+                              published setups only. Not with --min-elevation-deg
+  --links-file <file>         read the laser links from this file instead of planning them
+                              (lines of two catalogue numbers, optionally the two laser
+                              sides; docs/phase-3-routing.md 4.9)
+  --max-lasers <n>            the most links one satellite may have in --links-file
+                              (default: the pattern's laser count)
+  --links-out <file>          write the laser links used to this file, in the same format
   --help, -h                  print this text
 
 Each satellite uses its supplemental element set if there is one, else its standard one.
@@ -110,6 +129,11 @@ enum Option : std::uint8_t {
   kFibreFactor,
   kHighLatitude,
   kServing,
+  kMinElevation,
+  kMaxGroundRange,
+  kLinksFile,
+  kMaxLasers,
+  kLinksOut,
   kOptionCount
 };
 constexpr std::array<std::string_view, kOptionCount> kOptionNames = {"--snapshot",
@@ -129,7 +153,12 @@ constexpr std::array<std::string_view, kOptionCount> kOptionNames = {"--snapshot
                                                                      "--lock-on-s",
                                                                      "--fibre-factor",
                                                                      "--high-latitude-mask",
-                                                                     "--serving"};
+                                                                     "--serving",
+                                                                     "--min-elevation-deg",
+                                                                     "--max-ground-range-km",
+                                                                     "--links-file",
+                                                                     "--max-lasers",
+                                                                     "--links-out"};
 
 std::optional<RoleFilter> parse_roles(std::string_view text) noexcept {
   for (const RoleFilter roles : {RoleFilter::kStudy, RoleFilter::kValidation, RoleFilter::kAll}) {
@@ -335,6 +364,52 @@ ParsedArguments parse_arguments(std::span<const std::string_view> args) {
   }
   if (values[kServing] && *values[kServing] != "highest-elevation") {
     return failure("--serving " + quote(*values[kServing]) + " is not highest-elevation");
+  }
+  if (values[kMinElevation]) {
+    const std::optional<double> angle = app::parse_finite_double(*values[kMinElevation]);
+    if (!angle || *angle < 0.0 || *angle >= 90.0) {
+      return failure("--min-elevation-deg " + quote(*values[kMinElevation]) +
+                     " is not an angle in [0, 90) degrees");
+    }
+    options.mask.min_elevation_rad = *angle / 180.0 * std::numbers::pi;
+  }
+  if (values[kMaxGroundRange]) {
+    const std::optional<double> range = app::parse_finite_double(*values[kMaxGroundRange]);
+    if (!range || *range <= 0.0) {
+      return failure("--max-ground-range-km " + quote(*values[kMaxGroundRange]) +
+                     " is not a finite number of kilometres > 0");
+    }
+    options.mask.max_ground_range_km = range;
+  }
+  if (values[kMinElevation] && values[kMaxGroundRange]) {
+    return failure("--min-elevation-deg and --max-ground-range-km cannot be combined");
+  }
+  if ((values[kMinElevation] || values[kMaxGroundRange]) && options.mask.high_latitude_allowance) {
+    return failure(
+        std::string(values[kMinElevation] ? "--min-elevation-deg" : "--max-ground-range-km") +
+        " replaces the masks and cannot be combined with --high-latitude-mask on");
+  }
+  for (const auto& [option, target] :
+       {std::pair{kLinksFile, &options.links_file}, std::pair{kLinksOut, &options.links_out}}) {
+    if (values[option]) {
+      if (values[option]->empty()) {
+        return failure(std::string(kOptionNames.at(option)) + " is empty");
+      }
+      *target = std::filesystem::path(*values[option]);
+    }
+  }
+  if (values[kMaxLasers]) {
+    const std::string_view text = *values[kMaxLasers];
+    std::size_t count = 0;
+    const auto [end, ec] = std::from_chars(text.data(), text.data() + text.size(), count);
+    if (text.empty() || text.front() < '0' || text.front() > '9' || ec != std::errc() ||
+        end != text.data() + text.size() || count < 1 || count > kMaxLasersLimit) {
+      return failure("--max-lasers " + quote(text) + " is not a whole number from 1 to 1000");
+    }
+    if (!options.links_file) {
+      return failure("--max-lasers applies only to --links-file");
+    }
+    options.max_lasers = count;
   }
 
   ParsedArguments result;

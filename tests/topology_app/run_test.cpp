@@ -758,4 +758,141 @@ TEST(TopologyMainTest, ADelayBelowTheLowerBoundExits1) {
   }
 }
 
+// The number after `label` in a summary, or 0 (and a failure) if there is none.
+std::size_t summary_count(const std::string& summary, std::string_view label) {
+  const std::size_t at = summary.find(label);
+  if (at == std::string::npos) {
+    ADD_FAILURE() << "no " << label << " in " << summary;
+    return 0;
+  }
+  return static_cast<std::size_t>(std::stoull(summary.substr(at + label.size())));
+}
+
+std::vector<std::string> with(std::vector<std::string> args,
+                              const std::vector<std::string>& extra) {
+  args.insert(args.end(), extra.begin(), extra.end());
+  return args;
+}
+
+// --links-out writes the plan used, and a run reading it back with --links-file gives the same
+// CSV, byte for byte; the summaries say where the links came from. Under six, the pattern with
+// every kind of link (the library tests do the round trip for every pattern; each run here
+// takes about 30 s under GCC's ASan).
+TEST(TopologyMainTest, LinksOutThenLinksFileGivesTheSameCsv) {
+  const Snapshot snapshot;
+  {
+    const std::string_view pattern = "six";
+    const fs::path links = snapshot.dir.path() / ("links_" + std::string(pattern) + ".csv");
+    const fs::path planned_csv = snapshot.dir.path() / "planned.csv";
+    const fs::path read_csv = snapshot.dir.path() / "read.csv";
+    std::vector<std::string> args = main_args(snapshot.dir.path(), planned_csv);
+    args.at(13) = std::string(pattern);  // The value of --pattern.
+    ASSERT_EQ(args.at(12), "--pattern");
+    const MainResult planned = run_main(with(args, {"--links-out", links.string()}));
+    ASSERT_EQ(planned.status, 0) << planned.err;
+    EXPECT_NE(planned.out.find("  laser links written to " + links.string() + "\n"),
+              std::string::npos);
+    const std::size_t count = summary_count(planned.out, "  planned laser links: ");
+    EXPECT_GT(count, 0U);
+    // Two comment lines, the header, one line per link.
+    const std::string text = read_file(links);
+    EXPECT_EQ(static_cast<std::size_t>(std::count(text.begin(), text.end(), '\n')), count + 3);
+
+    args.at(args.size() - 1) = read_csv.string();  // The value of --out.
+    const MainResult read = run_main(with(args, {"--links-file", links.string()}));
+    ASSERT_EQ(read.status, 0) << read.err;
+    EXPECT_EQ(read_file(read_csv), read_file(planned_csv)) << pattern;
+    EXPECT_EQ(summary_count(read.out, "  laser links read from the file: "), count);
+    EXPECT_NE(read.out.find(", laser links from the file " + links.string() + " (at most "),
+              std::string::npos);
+    EXPECT_EQ(planned.out.find("from the file"), std::string::npos);
+    EXPECT_NE(read.out.find("checks: PASSED"), std::string::npos);
+  }
+}
+
+// A plus-grid plan (four links per satellite) read under three: refused without
+// --max-lasers 4 (exit 1, nothing written), accepted with it.
+TEST(TopologyMainTest, LinksFileLimitsAndRefusals) {
+  const Snapshot snapshot;
+  const fs::path links = snapshot.dir.path() / "links.csv";
+  const fs::path out = snapshot.dir.path() / "out.csv";
+  std::vector<std::string> plus_grid = main_args(snapshot.dir.path(), out);
+  plus_grid.at(13) = "plus-grid";
+  ASSERT_EQ(run_main(with(plus_grid, {"--links-out", links.string()})).status, 0);
+  fs::remove(out);
+
+  const std::vector<std::string> three = main_args(snapshot.dir.path(), out);
+  const MainResult refused = run_main(with(three, {"--links-file", links.string()}));
+  EXPECT_EQ(refused.status, 1);
+  EXPECT_NE(refused.err.find("topology: --links-file " + links.string() + ": line "),
+            std::string::npos)
+      << refused.err;
+  EXPECT_NE(refused.err.find("more than 3 links"), std::string::npos) << refused.err;
+  EXPECT_FALSE(fs::exists(out));
+
+  const MainResult allowed =
+      run_main(with(three, {"--links-file", links.string(), "--max-lasers", "4"}));
+  EXPECT_EQ(allowed.status, 0) << allowed.err;
+  EXPECT_NE(allowed.out.find("(at most 4 per satellite)"), std::string::npos);
+  EXPECT_NE(allowed.out.find("checks: PASSED"), std::string::npos);
+
+  const fs::path bad = snapshot.dir.path() / "bad.csv";
+  {
+    std::ofstream file(bad);
+    file << "norad_cat_id_a,norad_cat_id_b\n1,2\n";
+  }
+  const MainResult unknown = run_main(with(three, {"--links-file", bad.string()}));
+  EXPECT_EQ(unknown.status, 1);
+  EXPECT_NE(unknown.err.find("line 2: satellite 1 is not in the classification"), std::string::npos)
+      << unknown.err;
+  const MainResult unwritable =
+      run_main(with(three, {"--links-out", (snapshot.dir.path() / "no_dir" / "l.csv").string()}));
+  EXPECT_EQ(unwritable.status, 1);
+  EXPECT_NE(unwritable.err.find("topology: --links-out cannot open"), std::string::npos);
+}
+
+// The mask overrides: a minimum of 20 deg equals the FCC mask of the fixture's shell (mean
+// height 467.5 to 471 km: the 20 deg tier), so the CSV is the default one; Hypatia's range
+// rule passes the checks. The summary names the override;
+// bad values exit 2.
+TEST(TopologyMainTest, MaskOverrides) {
+  const Snapshot snapshot;
+  const fs::path out = snapshot.dir.path() / "out.csv";
+  const fs::path other = snapshot.dir.path() / "other.csv";
+  const std::vector<std::string> args = main_args(snapshot.dir.path(), out);
+  const MainResult normal = run_main(args);
+  ASSERT_EQ(normal.status, 0) << normal.err;
+  EXPECT_EQ(normal.out.find("override"), std::string::npos);
+  const std::string normal_csv = read_file(out);
+
+  std::vector<std::string> args_other = main_args(snapshot.dir.path(), other);
+  const MainResult twenty = run_main(with(args_other, {"--min-elevation-deg", "20"}));
+  ASSERT_EQ(twenty.status, 0) << twenty.err;
+  EXPECT_EQ(read_file(other), normal_csv);
+  EXPECT_NE(twenty.out.find(", ground mask override: one minimum elevation of 20.000 deg "
+                            "replaces the FCC masks"),
+            std::string::npos)
+      << twenty.out;
+
+  const MainResult range = run_main(with(args_other, {"--max-ground-range-km", "1089.686"}));
+  ASSERT_EQ(range.status, 0) << range.err;
+  EXPECT_NE(range.out.find(", ground mask override: any satellite within 1089.686 km, no "
+                           "elevation test"),
+            std::string::npos)
+      << range.out;
+  EXPECT_GT(summary_count(range.out, "ground link-steps: cities "), 0U);
+  EXPECT_NE(range.out.find("checks: PASSED"), std::string::npos);
+
+  fs::remove(other);
+  for (const std::vector<std::string>& bad :
+       {std::vector<std::string>{"--min-elevation-deg", "90"},
+        std::vector<std::string>{"--max-ground-range-km", "0"},
+        std::vector<std::string>{"--min-elevation-deg", "10", "--max-ground-range-km", "1000"},
+        std::vector<std::string>{"--max-lasers", "4"}}) {
+    const MainResult r = run_main(with(args_other, bad));
+    EXPECT_EQ(r.status, 2) << bad[0];
+    EXPECT_FALSE(fs::exists(other));
+  }
+}
+
 }  // namespace

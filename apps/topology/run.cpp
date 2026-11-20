@@ -35,6 +35,7 @@
 #include "satsim/time/utc_time.hpp"
 #include "satsim/topology/geometry.hpp"
 #include "satsim/topology/ground_links.hpp"
+#include "satsim/topology/link_file.hpp"
 #include "satsim/topology/link_plan.hpp"
 #include "satsim/topology/link_state.hpp"
 #include "satsim/topology/physical_checks.hpp"
@@ -236,6 +237,12 @@ std::optional<std::string> check_options(const Options& options) {
   if (auto error = topology::check_limits(options.limits)) {
     return "limits: " + *error;
   }
+  if (auto error = topology::check_mask_settings(options.mask)) {
+    return "ground mask: " + *error;
+  }
+  if (options.max_lasers && (*options.max_lasers == 0 || !options.links_file)) {
+    return "max lasers: must be at least 1, and only with a links file";
+  }
   if (!(options.fibre_factor >= 1.0) || !std::isfinite(options.fibre_factor)) {
     return "the fibre factor must be finite and at least 1";
   }
@@ -434,9 +441,19 @@ PreparedRunOrError prepare_run(const Options& requested) {
   const topology::StepPositions at_start =
       topology::positions_at(run.propagators, options.start, *eop_start);
   run.start_propagation_failures = at_start.failed_count;
-  run.plan = topology::plan_laser_links(
-      run.working, at_start.position_ecef_km,
-      {.pattern = options.pattern, .atmosphere_km = options.limits.atmosphere_km});
+  if (options.links_file) {
+    topology::LinkPlanOrError read = topology::read_link_plan_file(
+        *options.links_file, run.working,
+        {.pattern = options.pattern, .max_lasers = options.max_lasers});
+    if (auto* error = std::get_if<std::string>(&read)) {
+      return "--links-file " + *error;
+    }
+    run.plan = std::move(std::get<topology::LinkPlan>(read));
+  } else {
+    run.plan = topology::plan_laser_links(
+        run.working, at_start.position_ecef_km,
+        {.pattern = options.pattern, .atmosphere_km = options.limits.atmosphere_km});
+  }
   return run;
 }
 
@@ -615,7 +632,12 @@ void write_summary(const PreparedRun& run, const RunStatistics& stats, std::ostr
   out << "topology summary\n";
   out << "  inputs: snapshot " << o.snapshot_dir.string() << ", ground " << o.ground_dir.string()
       << ", cities " << o.cities_file.string() << ", shells "
-      << (o.shells_file ? "file " + o.shells_file->string() : std::string("built-in")) << '\n';
+      << (o.shells_file ? "file " + o.shells_file->string() : std::string("built-in"));
+  if (o.links_file) {
+    out << ", laser links from the file " << o.links_file->string() << " (at most "
+        << topology::max_lasers_of(run.plan) << " per satellite)";
+  }
+  out << '\n';
   out << "  times: " << run.time_count << ", from " << run.first_time << " to " << run.last_time
       << " UTC every " << app::seconds_text(o.step_ns) << " s (steps done: " << stats.steps
       << ")\n";
@@ -629,7 +651,17 @@ void write_summary(const PreparedRun& run, const RunStatistics& stats, std::ostr
               : "off")
       << ", lock-on " << fixed(o.limits.lock_on_s, 3) << " s, atmosphere "
       << fixed(o.limits.atmosphere_km, 0) << " km, high-latitude 5 deg mask "
-      << (o.mask.high_latitude_allowance ? "on" : "off") << '\n';
+      << (o.mask.high_latitude_allowance ? "on" : "off");
+  if (o.mask.min_elevation_rad) {
+    out << ", ground mask override: one minimum elevation of "
+        << fixed(*o.mask.min_elevation_rad * 180.0 / std::numbers::pi, 3)
+        << " deg replaces the FCC masks";
+  }
+  if (o.mask.max_ground_range_km) {
+    out << ", ground mask override: any satellite within " << fixed(*o.mask.max_ground_range_km, 3)
+        << " km, no elevation test";
+  }
+  out << '\n';
   out << "  element files: gp.json " << run.standard_file.records_loaded << " records ("
       << run.standard_file.record_errors.size() << " errors), supgp.json "
       << run.supplemental_file.records_loaded << " records ("
@@ -671,7 +703,8 @@ void write_summary(const PreparedRun& run, const RunStatistics& stats, std::ostr
   out << "  propagation failures at the start: " << run.start_propagation_failures
       << ", over the run: " << stats.propagation_failures << " satellite-steps\n";
 
-  out << "  planned laser links: " << run.plan.links.size() << '\n';
+  out << (o.links_file ? "  laser links read from the file: " : "  planned laser links: ")
+      << run.plan.links.size() << '\n';
   const auto kinds = topology::count_links_by_kind(run.plan);
   for (const topology::LinkKind kind : topology::kAllLinkKinds) {
     out << "    " << topology::name_of(kind) << ": " << kinds.at(static_cast<std::size_t>(kind))
@@ -760,6 +793,9 @@ void write_summary(const PreparedRun& run, const RunStatistics& stats, std::ostr
       << k.symmetry << ", shells " << k.shells << ", mask " << k.mask << ", structure "
       << k.structure << '\n';
   out << "  delays below the lower bound (must be 0): " << stats.lower_bound_failures << '\n';
+  if (o.links_out) {
+    out << "  laser links written to " << o.links_out->string() << '\n';
+  }
   out << "  rows written: " << stats.rows_written << '\n';
   out << "  checks: " << (stats.passed() ? "PASSED" : "FAILED") << '\n';
 }
@@ -783,6 +819,12 @@ int run_main(std::span<const std::string_view> args, std::ostream& out, std::ost
     return 1;
   }
   const PreparedRun& run = std::get<PreparedRun>(prepared);
+  if (options.links_out) {
+    if (auto error = topology::write_link_plan_file(run.plan, run.working, *options.links_out)) {
+      err << "topology: --links-out " << *error << '\n';
+      return 1;
+    }
+  }
 
   RunOutcome outcome;
   if (options.out == "-") {

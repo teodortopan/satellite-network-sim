@@ -8,6 +8,7 @@
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
+#include <limits>
 #include <numbers>
 #include <optional>
 #include <utility>
@@ -133,8 +134,9 @@ TEST(ServingSatelliteTest, HighestElevationTiesToLowerCatalogueNumber) {
 
 // The z window and the quick test only skip work: on a full shell, the result equals a plain
 // look_angle over every satellite, for sites at the poles, the equator, on both sides of the
-// 62 deg limit and in between, with and without the allowance; and every result passes the
-// mask check. (Kept small: GCC's ASan makes every Eigen call slow in the Debug build.)
+// 62 deg limit and in between, with and without the allowance and under each override; and
+// every result passes the mask check. (Kept small: GCC's ASan makes every Eigen call slow in the
+// Debug build.)
 TEST(GroundVisibilityTest, SameAsExhaustiveSearch) {
   const std::array<satsim::topology::testing::WalkerShell, 1> shells = {
       satsim::topology::testing::WalkerShell{.planes = 20,
@@ -152,8 +154,12 @@ TEST(GroundVisibilityTest, SameAsExhaustiveSearch) {
       sites.push_back(make_ground_site("site", lat, lon));
     }
   }
-  for (const bool allowance : {false, true}) {
-    const satsim::topology::ElevationMaskSettings settings{.high_latitude_allowance = allowance};
+  // The FCC masks, with the allowance, and the two overrides (Phase 3 spec 4.4).
+  std::vector<satsim::topology::ElevationMaskSettings> all_settings(4);
+  all_settings[1].high_latitude_allowance = true;
+  all_settings[2].min_elevation_rad = 15.0 * kRadPerDeg;
+  all_settings[3].max_ground_range_km = 1500.0;
+  for (const auto& settings : all_settings) {
     const GroundVisibility visibility(sites, ideal.classification, settings);
     const auto visible = visibility.at(positions);
     std::size_t total = 0;
@@ -163,7 +169,8 @@ TEST(GroundVisibilityTest, SameAsExhaustiveSearch) {
           satsim::topology::elevation_mask_rad(470.0, sites[s].latitude_rad, settings);
       std::vector<std::size_t> expected;
       for (std::size_t i = 0; i < ideal.positions_ecef_km.size(); ++i) {
-        if (satsim::topology::look_angle(g, *ideal.positions_ecef_km[i]).elevation_rad >= mask) {
+        if (satsim::topology::ground_link_allowed(
+                satsim::topology::look_angle(g, *ideal.positions_ecef_km[i]), mask, settings)) {
           expected.push_back(i);
         }
       }
@@ -172,6 +179,11 @@ TEST(GroundVisibilityTest, SameAsExhaustiveSearch) {
         actual.push_back(v.satellite);
       }
       EXPECT_EQ(actual, expected) << sites[s].latitude_rad / kRadPerDeg;
+      if (settings.max_ground_range_km) {
+        for (const VisibleSatellite& v : visible[s]) {
+          EXPECT_EQ(v.mask_rad, -std::numbers::pi / 2.0);
+        }
+      }
       total += actual.size();
     }
     EXPECT_GT(total, sites.size());  // The test sees something.
@@ -183,6 +195,240 @@ TEST(GroundVisibilityTest, SameAsExhaustiveSearch) {
                   .total(),
               0U);
   }
+}
+
+using satsim::topology::ElevationMaskSettings;
+using satsim::topology::look_angle;
+using satsim::topology::site_geometry;
+using satsim::topology::time_left_in_view_s;
+using Positions = std::vector<std::optional<Eigen::Vector3d>>;
+
+// One satellite at `point` from `site`, in a one-plane shell at 470 km (FCC mask 20 deg).
+std::vector<std::vector<VisibleSatellite>> visible_with(const GroundSite& site,
+                                                        const Eigen::Vector3d& point,
+                                                        const ElevationMaskSettings& settings) {
+  const Classification c = one_plane(1, 470.0);
+  const std::vector<GroundSite> sites = {site};
+  const GroundVisibility visibility(sites, c, settings);
+  return visibility.at(step_positions(satsim::constellation::testing::utc(kEpoch), {point}));
+}
+
+TEST(MaskSettingsTest, Checks) {
+  EXPECT_EQ(satsim::topology::check_mask_settings({}), std::nullopt);
+  ElevationMaskSettings s;
+  s.min_elevation_rad = 0.0;
+  EXPECT_EQ(satsim::topology::check_mask_settings(s), std::nullopt);
+  s.min_elevation_rad = std::nextafter(std::numbers::pi / 2.0, 0.0);
+  EXPECT_EQ(satsim::topology::check_mask_settings(s), std::nullopt);
+  for (const double bad : {-1e-12, std::numbers::pi / 2.0, std::nan("")}) {
+    s.min_elevation_rad = bad;
+    EXPECT_NE(satsim::topology::check_mask_settings(s), std::nullopt) << bad;
+  }
+  s = {};
+  s.max_ground_range_km = 1089.686;
+  EXPECT_EQ(satsim::topology::check_mask_settings(s), std::nullopt);
+  for (const double bad : {0.0, -5.0, std::numeric_limits<double>::infinity()}) {
+    s.max_ground_range_km = bad;
+    EXPECT_NE(satsim::topology::check_mask_settings(s), std::nullopt) << bad;
+  }
+  s.max_ground_range_km = 1000.0;
+  s.min_elevation_rad = 0.5;
+  EXPECT_NE(satsim::topology::check_mask_settings(s), std::nullopt);
+  s.min_elevation_rad.reset();
+  s.high_latitude_allowance = true;
+  EXPECT_NE(satsim::topology::check_mask_settings(s), std::nullopt);
+}
+
+// One minimum elevation replaces the FCC masks for every height and latitude: a satellite at
+// 15 deg (below the 20 deg FCC mask) is visible with the minimum at its exact elevation and
+// just below it, not just above it.
+TEST(MaskOverrideTest, MinimumElevationAtJustAboveAndJustBelow) {
+  const GroundSite site = make_ground_site("New York", 40.7128, -74.006);
+  const Eigen::Vector3d point = at_elevation(site, 15.0, 1500.0);
+  const double e = look_angle(site_geometry(site), point).elevation_rad;
+  EXPECT_TRUE(visible_with(site, point, {})[0].empty());
+  for (const double height_km : {350.0, 470.0, 550.0}) {
+    EXPECT_EQ(satsim::topology::elevation_mask_rad(height_km, 1.3, {.min_elevation_rad = 0.7}),
+              0.7);
+  }
+  const auto at = visible_with(site, point, {.min_elevation_rad = e});
+  ASSERT_EQ(at[0].size(), 1U);
+  EXPECT_EQ(at[0][0].mask_rad, e);
+  EXPECT_EQ(visible_with(site, point, {.min_elevation_rad = std::nextafter(e, 0.0)})[0].size(), 1U);
+  EXPECT_TRUE(visible_with(site, point, {.min_elevation_rad = std::nextafter(e, 1.0)})[0].empty());
+}
+
+// Hypatia's rule: in range if the slant range is at most the limit, with no elevation test. A
+// satellite at 5 deg (far below any FCC mask) 1000 km away is visible with the limit at its
+// exact slant range and just above it, not just below it; one overhead but 1200 km up is not
+// visible under a 1100 km limit, however high it is.
+TEST(MaskOverrideTest, MaxGroundRangeAtJustAboveAndJustBelow) {
+  const GroundSite site = make_ground_site("New York", 40.7128, -74.006);
+  const Eigen::Vector3d point = at_elevation(site, 5.0, 1000.0);
+  const double range = look_angle(site_geometry(site), point).slant_range_km;
+  EXPECT_NEAR(range, 1000.0, 1e-9);
+  const auto at = visible_with(site, point, {.max_ground_range_km = range});
+  ASSERT_EQ(at[0].size(), 1U);
+  EXPECT_EQ(at[0][0].mask_rad, -std::numbers::pi / 2.0);
+  EXPECT_EQ(at[0][0].slant_range_km, range);
+  EXPECT_EQ(
+      visible_with(site, point, {.max_ground_range_km = std::nextafter(range, 2000.0)})[0].size(),
+      1U);
+  EXPECT_TRUE(
+      visible_with(site, point, {.max_ground_range_km = std::nextafter(range, 0.0)})[0].empty());
+  EXPECT_TRUE(
+      visible_with(site, at_elevation(site, 90.0, 1200.0), {.max_ground_range_km = 1100.0})[0]
+          .empty());
+}
+
+// The physical checks under each override: the elevation against the one minimum, the
+// distance against the range.
+TEST(MaskOverrideTest, PhysicalChecksFollowTheOverride) {
+  const GroundSite site = make_ground_site("New York", 40.7128, -74.006);
+  const Classification c = one_plane(1, 470.0);
+  const std::vector<GroundSite> sites = {site};
+  const auto positions = step_positions(satsim::constellation::testing::utc(kEpoch),
+                                        {at_elevation(site, 5.0, 1000.0)});
+  const std::vector<std::vector<VisibleSatellite>> claimed = {{VisibleSatellite{.satellite = 0}}};
+  satsim::topology::LinkPlan no_lasers;
+  no_lasers.lasers.resize(1);
+  const satsim::topology::StepLinks no_links{.utc = positions.utc, .states = {}};
+  const auto mask_failures = [&](const ElevationMaskSettings& settings) {
+    return satsim::topology::run_physical_checks(c, no_lasers, no_links, positions, {}, sites,
+                                                 claimed, settings)
+        .mask;
+  };
+  EXPECT_EQ(mask_failures({}), 1U);  // 5 deg < 20 deg.
+  EXPECT_EQ(mask_failures({.min_elevation_rad = 4.0 * kRadPerDeg}), 0U);
+  EXPECT_EQ(mask_failures({.min_elevation_rad = 6.0 * kRadPerDeg}), 1U);
+  EXPECT_EQ(mask_failures({.max_ground_range_km = 1000.001}), 0U);
+  EXPECT_EQ(mask_failures({.max_ground_range_km = 999.999}), 1U);
+}
+
+// A satellite on a circular orbit of radius r = 6378.137 + 550 km in the equatorial plane,
+// passing straight over a site on the equator at longitude 0 (the site at R = 6378.137 km on
+// the x axis, its vertical the x axis): at central angle theta from the site its elevation e
+// has tan e = (r cos theta - R) / (r sin theta), and e = m where theta = acos(R cos m / r) - m.
+// For m = 25 deg: R cos m / r = 5780.53 / 6928.137 = 0.834357, acos = 33.4508 deg, so
+// theta_m = 8.4508 deg. With a period of 5739 s (360 / 5739 deg/s) that is 134.72 s from
+// overhead to the mask: steps of 1 s are in view at k = 0..134 and out at 135 (135 s); steps of
+// 10 s in view at k = 0..13 and out at 14 (140 s). Starting 5 deg before overhead it is
+// (8.4508 + 5) / 360 x 5739 = 214.43 s: 215 s at 1 s steps.
+Positions overhead_pass(double start_deg, double step_s, std::size_t count) {
+  constexpr double kRadiusKm = 6378.137 + 550.0;
+  const double rate_rad_s = 2.0 * std::numbers::pi / 5739.0;
+  Positions out;
+  for (std::size_t k = 0; k < count; ++k) {
+    const double theta = (start_deg * kRadPerDeg) + (rate_rad_s * static_cast<double>(k) * step_s);
+    out.emplace_back(
+        Eigen::Vector3d(kRadiusKm * std::cos(theta), kRadiusKm * std::sin(theta), 0.0));
+  }
+  return out;
+}
+
+TEST(TimeLeftInViewTest, OverheadPassMatchesTheGeometry) {
+  const auto site = site_geometry(make_ground_site("equator", 0.0, 0.0));
+  const double m = 25.0 * kRadPerDeg;
+  EXPECT_EQ(satsim::topology::view_steps(1.0), 900U);
+  EXPECT_EQ(time_left_in_view_s(site, m, overhead_pass(0.0, 1.0, 900), 1.0), 135.0);
+  EXPECT_EQ(time_left_in_view_s(site, m, overhead_pass(0.0, 10.0, 90), 10.0), 140.0);
+  EXPECT_EQ(time_left_in_view_s(site, m, overhead_pass(-5.0, 1.0, 900), 1.0), 215.0);
+  // 20 deg before overhead (beyond theta_m) it has not risen: zero.
+  EXPECT_EQ(time_left_in_view_s(site, m, overhead_pass(-20.0, 1.0, 900), 1.0), 0.0);
+}
+
+// In view at step 3 exactly at the mask (its own elevation), below at step 4: 4 steps of 15 s.
+// With the mask the next double up, nothing is in view: 0.
+TEST(TimeLeftInViewTest, AtTheMaskBoundary) {
+  const GroundSite ground_site = make_ground_site("New York", 40.7128, -74.006);
+  const auto site = site_geometry(ground_site);
+  const Eigen::Vector3d high = at_elevation(ground_site, 30.0, 900.0);
+  const Eigen::Vector3d low = at_elevation(ground_site, 10.0, 1800.0);
+  const Positions future = {high, high, high, high, low, high};
+  const double e = look_angle(site, high).elevation_rad;
+  EXPECT_EQ(time_left_in_view_s(site, e, future, 15.0), 60.0);
+  EXPECT_EQ(time_left_in_view_s(site, std::nextafter(e, 1.0), future, 15.0), 0.0);
+  // The range rule the same way, on distance.
+  const double range = look_angle(site, high).slant_range_km;
+  EXPECT_EQ(time_left_in_view_s(site, 0.0, future, 15.0, 900.0, {.max_ground_range_km = range}),
+            60.0);
+  EXPECT_EQ(time_left_in_view_s(site, 0.0, future, 15.0, 900.0,
+                                {.max_ground_range_km = std::nextafter(range, 0.0)}),
+            0.0);
+}
+
+// Still in view at the horizon counts as the horizon. With 7 s steps the horizon of 900 s is
+// read through k = 128 (896 s; view_steps = ceil(900 / 7) = 129): out at k = 128 gives 896 s,
+// in view through k = 128 gives 900 s, not 903.
+TEST(TimeLeftInViewTest, CappedAtTheHorizon) {
+  const GroundSite ground_site = make_ground_site("New York", 40.7128, -74.006);
+  const auto site = site_geometry(ground_site);
+  const Eigen::Vector3d high = at_elevation(ground_site, 60.0, 600.0);
+  const Eigen::Vector3d low = at_elevation(ground_site, 5.0, 2000.0);
+  const double m = 20.0 * kRadPerDeg;
+  EXPECT_EQ(time_left_in_view_s(site, m, Positions(900, high), 1.0), 900.0);
+  EXPECT_EQ(time_left_in_view_s(site, m, Positions(2000, high), 1.0), 900.0);
+  EXPECT_EQ(satsim::topology::view_steps(7.0), 129U);
+  Positions future(130, high);
+  EXPECT_EQ(time_left_in_view_s(site, m, future, 7.0), 900.0);
+  future[129] = low;  // Past the horizon: not read.
+  EXPECT_EQ(time_left_in_view_s(site, m, future, 7.0), 900.0);
+  future[128] = low;
+  EXPECT_EQ(time_left_in_view_s(site, m, future, 7.0), 896.0);
+  // Another horizon.
+  EXPECT_EQ(time_left_in_view_s(site, m, Positions(10, high), 15.0, 60.0), 60.0);
+  // Fewer positions than the horizon needs: the view ends after the last.
+  EXPECT_EQ(time_left_in_view_s(site, m, Positions(3, high), 15.0), 45.0);
+}
+
+TEST(TimeLeftInViewTest, ZeroWhenNotInViewAndEndsAtAFailedPosition) {
+  const GroundSite ground_site = make_ground_site("New York", 40.7128, -74.006);
+  const auto site = site_geometry(ground_site);
+  const Eigen::Vector3d high = at_elevation(ground_site, 60.0, 600.0);
+  const Eigen::Vector3d low = at_elevation(ground_site, 5.0, 2000.0);
+  const double m = 20.0 * kRadPerDeg;
+  Positions future(900, high);
+  future[0] = low;
+  EXPECT_EQ(time_left_in_view_s(site, m, future, 1.0), 0.0);
+  future[0] = high;
+  future[5].reset();
+  EXPECT_EQ(time_left_in_view_s(site, m, future, 1.0), 5.0);
+  future[0].reset();
+  EXPECT_EQ(time_left_in_view_s(site, m, future, 1.0), 0.0);
+  EXPECT_EQ(time_left_in_view_s(site, m, {}, 1.0), 0.0);
+}
+
+// Through GroundVisibility: its own mask for the satellite's shell (20 deg at 470 km), for
+// every satellite at() lists at once. Satellite 0 at 30 deg for 3 steps then 10 deg (3 steps
+// of 15 s: 45 s); 1 at 30 deg throughout (the horizon); 2 excluded (0, overhead or not); 3 at
+// 10 deg (0, and not listed by at()).
+TEST(TimeLeftInViewTest, ForEverySatelliteASiteSees) {
+  const GroundSite ground_site = make_ground_site("New York", 40.7128, -74.006);
+  const std::vector<GroundSite> sites = {ground_site};
+  const Classification c = one_plane(4, 470.0, {2});
+  const GroundVisibility visibility(sites, c);
+  const Eigen::Vector3d high = at_elevation(ground_site, 30.0, 900.0);
+  const Eigen::Vector3d low = at_elevation(ground_site, 10.0, 1800.0);
+  const Eigen::Vector3d overhead = at_elevation(ground_site, 90.0, 500.0);
+  std::vector<satsim::topology::StepPositions> steps;
+  for (std::size_t k = 0; k < satsim::topology::view_steps(15.0); ++k) {
+    steps.push_back(step_positions(satsim::constellation::testing::utc(kEpoch),
+                                   {k < 3 ? high : low, high, overhead, low}));
+  }
+  const auto visible = visibility.at(steps[0]);
+  ASSERT_EQ(visible[0].size(), 2U);
+  EXPECT_EQ(visibility.times_left_in_view_s(0, visible[0], steps, 15.0),
+            (std::vector<double>{45.0, 900.0}));
+  EXPECT_EQ(visibility.time_left_in_view_s(0, 2, Positions(60, overhead), 15.0), 0.0);
+  EXPECT_EQ(visibility.time_left_in_view_s(0, 3, Positions(60, low), 15.0), 0.0);
+  EXPECT_EQ(visibility.time_left_in_view_s(0, 1, Positions(60, high), 15.0), 900.0);
+  EXPECT_EQ(visibility.time_left_in_view_s(0, 99, Positions(60, high), 15.0), 0.0);
+  // Under the range rule the range decides: high is 900 km away, low 1800 km.
+  const GroundVisibility by_range(sites, c, {.max_ground_range_km = 1000.0});
+  const auto in_range = by_range.at(steps[0]);
+  ASSERT_EQ(in_range[0].size(), 2U);
+  EXPECT_EQ(by_range.times_left_in_view_s(0, in_range[0], steps, 15.0),
+            (std::vector<double>{45.0, 900.0}));
 }
 
 }  // namespace

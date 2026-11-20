@@ -3,6 +3,7 @@
 #include <Eigen/Core>
 #include <numbers>
 #include <optional>
+#include <string>
 #include <vector>
 
 #include "satsim/constellation/classification.hpp"
@@ -67,14 +68,26 @@ struct LookAngle {
 [[nodiscard]] LookAngle look_angle(const SiteGeometry& site,
                                    const Eigen::Vector3d& satellite_ecef_km) noexcept;
 
-/// The elevation mask from FCC order DA 26-36 and its option.
+/// The elevation mask from FCC order DA 26-36, its option, and the two overrides for
+/// published setups (Phase 3 spec 4.4, 4.8), each off by default. At most one override is set, and
+/// with an override the high-latitude allowance is off (check_mask_settings).
 struct ElevationMaskSettings {
   /// The older allowance: sites strictly above high_latitude_limit_rad (north or south) use
   /// high_latitude_mask_rad for every satellite. Off by default (spec 4.4).
   bool high_latitude_allowance = false;
   double high_latitude_limit_rad = 62.0 * std::numbers::pi / 180.0;
   double high_latitude_mask_rad = 5.0 * std::numbers::pi / 180.0;
+  /// One mask for every site and shell, replacing the FCC masks (--min-elevation-deg).
+  std::optional<double> min_elevation_rad = std::nullopt;
+  /// Hypatia's rule (--max-ground-range-km): a site may use a satellite whose slant range is
+  /// at most this, km, with no elevation test at all.
+  std::optional<double> max_ground_range_km = std::nullopt;
 };
+
+/// nullopt if usable, else what is wrong: min_elevation_rad finite and in [0, pi/2),
+/// max_ground_range_km finite and > 0, not both set, and neither with the high-latitude
+/// allowance.
+[[nodiscard]] std::optional<std::string> check_mask_settings(const ElevationMaskSettings& settings);
 
 /// The lowest elevation at which a site may use a satellite of a shell whose mean height is
 /// `shell_mean_height_km` (FCC order DA 26-36):
@@ -82,9 +95,17 @@ struct ElevationMaskSettings {
 ///   400 km <= height <= 500 km      20 deg  (both 400 and 500 km belong to this tier)
 ///   height > 500 km                 25 deg
 /// With settings.high_latitude_allowance, a site with |latitude| > the limit (strictly) uses
-/// the allowance's mask instead, whatever the height.
+/// the allowance's mask instead, whatever the height. With settings.min_elevation_rad, that
+/// angle, whatever the height and latitude. Under settings.max_ground_range_km there is no
+/// mask: callers test the range instead (ground_link_allowed).
 [[nodiscard]] double elevation_mask_rad(double shell_mean_height_km, double site_latitude_rad,
                                         const ElevationMaskSettings& settings = {}) noexcept;
+
+/// Whether a site may use a satellite with look angle `look`: under the range rule
+/// (settings.max_ground_range_km) slant range <= the range, else elevation >= `mask_rad` (the
+/// site's elevation_mask_rad for the satellite's shell). Both limits are inclusive.
+[[nodiscard]] bool ground_link_allowed(const LookAngle& look, double mask_rad,
+                                       const ElevationMaskSettings& settings) noexcept;
 
 /// Per shell of `classification`, the mean of its plane members' mean heights
 /// (OrbitGeometry::mean_height_km), km: the height the mask uses. nullopt for a shell with no

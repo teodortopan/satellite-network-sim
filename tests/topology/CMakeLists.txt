@@ -2,7 +2,7 @@
 # for the sanitizer and Valgrind runs); the shells come from tests/support.
 satsim_add_test(satsim_topology_tests
   SOURCES ideal.cpp geometry_test.cpp link_plan_test.cpp link_state_test.cpp
-    ground_links_test.cpp physical_checks_test.cpp
+    ground_links_test.cpp physical_checks_test.cpp link_file_test.cpp
   DEPS satsim::topology satsim::test_support satsim::constellation satsim::ground
     satsim::orbit satsim::frames satsim::time satsim::core)
 
@@ -15,6 +15,19 @@ if(NOT SATSIM_ENABLE_SANITIZERS)
       GTest::gtest_main)
   satsim_set_warnings(satsim_topology_snapshot_check)
   gtest_discover_tests(satsim_topology_snapshot_check
+    WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}"
+    PROPERTIES LABELS snapshot)
+endif()
+
+# The link-file round trip on Hypatia's full shell, outside the sanitizer builds and Valgrind
+# for the same reason (planning 1,584 satellites three times is slow under them).
+if(NOT SATSIM_ENABLE_SANITIZERS)
+  add_executable(satsim_topology_link_file_hypatia_check ideal.cpp link_file_hypatia_check.cpp)
+  target_link_libraries(satsim_topology_link_file_hypatia_check
+    PRIVATE satsim::topology satsim::test_support satsim::constellation satsim::orbit
+      satsim::frames satsim::time GTest::gtest_main)
+  satsim_set_warnings(satsim_topology_link_file_hypatia_check)
+  gtest_discover_tests(satsim_topology_link_file_hypatia_check
     WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}"
     PROPERTIES LABELS snapshot)
 endif()

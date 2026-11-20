@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstddef>
 #include <cstdint>
 #include <filesystem>
 #include <optional>
@@ -52,7 +53,9 @@ struct Options {
   topology::LinkLimits limits{};
   /// Fibre delay over light in a vacuum along the great circle; finite and >= 1.
   double fibre_factor = ground::kDefaultFibreRouteInflation;
-  /// The 5 deg allowance above 62 deg latitude (off by default).
+  /// The 5 deg allowance above 62 deg latitude (off by default), or one of the two overrides
+  /// for published setups: one minimum elevation (--min-elevation-deg) or a longest
+  /// dish-to-satellite distance with no elevation test (--max-ground-range-km).
   topology::ElevationMaskSettings mask{};
   topology::ServingRule serving_rule = topology::ServingRule::kHighestElevation;
   /// Path of the CSV file to write, or "-" for standard output.
@@ -62,6 +65,14 @@ struct Options {
   constellation::ClassificationConfig classification = constellation::default_config();
   /// --shells-file: shell definitions to read (constellation::load_classification_config).
   std::optional<std::filesystem::path> shells_file = std::nullopt;
+  /// --links-file: the laser links to use instead of planning them
+  /// (topology::read_link_plan_file, against the classification of the used shells).
+  std::optional<std::filesystem::path> links_file = std::nullopt;
+  /// --max-lasers: the most links one satellite may have in links_file; nullopt means the
+  /// pattern's laser count. Only with links_file.
+  std::optional<std::size_t> max_lasers = std::nullopt;
+  /// --links-out: where to write the laser links used (topology::write_link_plan_file).
+  std::optional<std::filesystem::path> links_out = std::nullopt;
 };
 
 /// The outcome of parse_arguments: exactly one of options, help or error.
@@ -81,7 +92,10 @@ struct ParsedArguments {
 /// against the file), an empty --shells-file, a range cap
 /// that is not a finite number > 0 km, a Sun exclusion angle not in (0, 180] degrees, a
 /// lock-on time that is not a plain decimal number of seconds, a fibre factor that is not a
-/// finite number >= 1, and a high-latitude setting other than on or off.
+/// finite number >= 1, a high-latitude setting other than on or off, a minimum elevation not
+/// in [0, 90) degrees, a longest ground range that is not a finite number > 0 km, both of
+/// those, either with the high-latitude mask on, an empty --links-file or --links-out, and a
+/// --max-lasers that is not a whole number from 1 to 1000 or is given without --links-file.
 [[nodiscard]] ParsedArguments parse_arguments(std::span<const std::string_view> args);
 
 /// The --help text.

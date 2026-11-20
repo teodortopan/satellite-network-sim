@@ -150,29 +150,7 @@ class Planner {
   }
 
   void find_neighbours(std::size_t shell) {
-    const std::vector<Plane>& planes = classification_->planes[shell];
-    const std::size_t count = planes.size();
-    std::vector<PlaneNeighbours>& neighbours = plan_.neighbours[shell];
-    neighbours.assign(count, PlaneNeighbours{});
-    if (count < 2) {
-      return;
-    }
-    for (std::size_t p = 0; p < count; ++p) {
-      const std::size_t east = (p + 1) % count;
-      neighbours[p].east = east;
-      neighbours[east].west = p;
-    }
-    for (std::size_t p = 0; p < count; ++p) {
-      const std::optional<std::size_t> east = neighbours[p].east;
-      if (!east.has_value()) {
-        continue;
-      }
-      const std::optional<std::size_t> second = neighbours[*east].east;
-      if (second.has_value() && *second != p) {
-        neighbours[p].second_east = second;
-        neighbours[*second].second_west = p;
-      }
-    }
+    plan_.neighbours[shell] = plane_neighbours(classification_->planes[shell]);
   }
 
   // Greedy shortest-first matching of plane `from`'s `side_from` lasers with plane `to`'s
@@ -441,6 +419,35 @@ std::string_view name_of(UnassignedReason reason) noexcept {
       return "no_free_partner";
   }
   return "?";
+}
+
+std::vector<PlaneNeighbours> plane_neighbours(std::span<const Plane> planes) {
+  const std::size_t count = planes.size();
+  std::vector<PlaneNeighbours> neighbours(count, PlaneNeighbours{});
+  if (count < 2) {
+    return neighbours;
+  }
+  for (std::size_t p = 0; p < count; ++p) {
+    const std::size_t east = (p + 1) % count;
+    neighbours[p].east = east;
+    neighbours[east].west = p;
+  }
+  for (std::size_t p = 0; p < count; ++p) {
+    const std::optional<std::size_t> east = neighbours[p].east;
+    if (!east.has_value()) {
+      continue;
+    }
+    const std::optional<std::size_t> second = neighbours[*east].east;
+    if (second.has_value() && *second != p) {
+      neighbours[p].second_east = second;
+      neighbours[*second].second_west = p;
+    }
+  }
+  return neighbours;
+}
+
+std::size_t max_lasers_of(const LinkPlan& plan) noexcept {
+  return plan.max_lasers.value_or(laser_budget(plan.pattern));
 }
 
 LinkPlan plan_laser_links(const Classification& classification,

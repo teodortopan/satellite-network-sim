@@ -258,6 +258,20 @@ Input: snapshot directory, ground-data directory, city file, start, duration, st
 pattern, endpoint model, the shells to use, the limits of 4.5, and optionally a file of
 shell definitions that replaces the built-in ones of section 5.
 
+Options added for Phase 3 (all off by default, which leaves the output unchanged):
+
+| Option | Meaning |
+|---|---|
+| `--links-file <file>` | Read the laser links from a link file (Phase 3 spec 4.9) instead of planning them |
+| `--max-lasers <n>` | With `--links-file`: the most links one satellite may have; default the pattern's count |
+| `--links-out <file>` | Write the laser links used, in the same format |
+| `--min-elevation-deg <deg>` | One elevation mask in [0, 90) for every site, replacing the FCC masks; for published setups only |
+| `--max-ground-range-km <km>` | A site may use any satellite at most this far away, with no elevation test (Hypatia's rule); not with `--min-elevation-deg` |
+
+Neither mask override may be combined with the high-latitude allowance. The summary says when
+the links came from a file and when a mask override is on. A link file that is refused, or a
+`--links-out` file that cannot be written, exits with status 1, like any other bad input file.
+
 Output, one CSV row per city pair, direction and time step: time, the two cities, pattern,
 model, status (a path, or the reason there is none), one-way delay, hops, path length,
 great-circle distance, lower bound, stretch, and for the realistic model the serving

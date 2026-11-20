@@ -6,6 +6,7 @@
 #include <cstddef>
 #include <numbers>
 #include <optional>
+#include <string>
 #include <vector>
 
 #include "satsim/constellation/classification.hpp"
@@ -74,8 +75,42 @@ LookAngle look_angle(const SiteGeometry& site, const Eigen::Vector3d& satellite_
   return LookAngle{.elevation_rad = std::atan2(up, horizontal), .slant_range_km = d.norm()};
 }
 
+std::optional<std::string> check_mask_settings(const ElevationMaskSettings& settings) {
+  if (settings.min_elevation_rad.has_value()) {
+    const double e = *settings.min_elevation_rad;
+    if (!std::isfinite(e) || e < 0.0 || e >= std::numbers::pi / 2.0) {
+      return "the minimum elevation must be finite and in [0, 90) degrees";
+    }
+  }
+  if (settings.max_ground_range_km.has_value()) {
+    const double r = *settings.max_ground_range_km;
+    if (!std::isfinite(r) || r <= 0.0) {
+      return "the longest ground range must be a finite number of kilometres > 0";
+    }
+  }
+  if (settings.min_elevation_rad.has_value() && settings.max_ground_range_km.has_value()) {
+    return "a minimum elevation and a longest ground range cannot both be set";
+  }
+  if (settings.high_latitude_allowance &&
+      (settings.min_elevation_rad.has_value() || settings.max_ground_range_km.has_value())) {
+    return "the high-latitude allowance cannot be combined with a mask override";
+  }
+  return std::nullopt;
+}
+
+bool ground_link_allowed(const LookAngle& look, double mask_rad,
+                         const ElevationMaskSettings& settings) noexcept {
+  if (settings.max_ground_range_km.has_value()) {
+    return look.slant_range_km <= *settings.max_ground_range_km;
+  }
+  return look.elevation_rad >= mask_rad;
+}
+
 double elevation_mask_rad(double shell_mean_height_km, double site_latitude_rad,
                           const ElevationMaskSettings& settings) noexcept {
+  if (settings.min_elevation_rad.has_value()) {
+    return *settings.min_elevation_rad;
+  }
   if (settings.high_latitude_allowance &&
       std::abs(site_latitude_rad) > settings.high_latitude_limit_rad) {
     return settings.high_latitude_mask_rad;

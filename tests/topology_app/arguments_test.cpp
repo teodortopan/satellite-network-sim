@@ -4,7 +4,9 @@
 
 #include <cstddef>
 #include <cstdlib>
+#include <filesystem>
 #include <numbers>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -221,6 +223,67 @@ TEST(TopologyArgumentsTest, ValueRejections) {
   EXPECT_TRUE(parse_with({"--fibre-factor", "1"}).options.has_value());
   EXPECT_TRUE(parse_with({"--lock-on-s", "0"}).options.has_value());
   EXPECT_TRUE(parse_replacing("--duration-s", "0").options.has_value());
+}
+
+TEST(TopologyArgumentsTest, LinkFileAndMaskOverrides) {
+  const ParsedArguments required = parse(kRequired);
+  const auto& defaults = options_of(required);
+  EXPECT_FALSE(defaults.links_file.has_value());
+  EXPECT_FALSE(defaults.links_out.has_value());
+  EXPECT_FALSE(defaults.max_lasers.has_value());
+  EXPECT_FALSE(defaults.mask.min_elevation_rad.has_value());
+  EXPECT_FALSE(defaults.mask.max_ground_range_km.has_value());
+
+  const ParsedArguments files =
+      parse_with({"--links-file", "in.csv", "--max-lasers", "4", "--links-out", "out.csv"});
+  const auto& f = options_of(files);
+  EXPECT_EQ(f.links_file, std::filesystem::path("in.csv"));
+  EXPECT_EQ(f.links_out, std::filesystem::path("out.csv"));
+  EXPECT_EQ(f.max_lasers, std::optional<std::size_t>(4));
+  EXPECT_EQ(options_of(parse_with({"--links-out", "o.csv"})).links_out,
+            std::filesystem::path("o.csv"));
+
+  // 40 deg, divided first as for the Sun exclusion: 40 / 180 * pi.
+  const ParsedArguments angle = parse_with({"--min-elevation-deg", "40"});
+  EXPECT_EQ(options_of(angle).mask.min_elevation_rad,
+            std::optional<double>(40.0 / 180.0 * std::numbers::pi));
+  EXPECT_EQ(options_of(parse_with({"--min-elevation-deg", "0"})).mask.min_elevation_rad,
+            std::optional<double>(0.0));
+  EXPECT_TRUE(parse_with({"--min-elevation-deg", "89.999"}).options.has_value());
+  const ParsedArguments range = parse_with({"--max-ground-range-km", "1089.686"});
+  EXPECT_EQ(options_of(range).mask.max_ground_range_km, std::optional<double>(1089.686));
+  EXPECT_TRUE(parse_with({"--max-ground-range-km", "1000", "--high-latitude-mask", "off"}).options);
+}
+
+TEST(TopologyArgumentsTest, LinkFileAndMaskOverrideRejections) {
+  for (const std::string_view bad : {"-0.001", "90", "91", "nan", "inf", "x", ""}) {
+    EXPECT_EQ(
+        error_of(parse_with({"--min-elevation-deg", bad})),
+        "--min-elevation-deg \"" + std::string(bad) + "\" is not an angle in [0, 90) degrees");
+  }
+  for (const std::string_view bad : {"0", "-1", "inf", "nan", "x", "1e999"}) {
+    EXPECT_EQ(error_of(parse_with({"--max-ground-range-km", bad})),
+              "--max-ground-range-km \"" + std::string(bad) +
+                  "\" is not a finite number of kilometres > 0");
+  }
+  EXPECT_EQ(error_of(parse_with({"--min-elevation-deg", "40", "--max-ground-range-km", "1000"})),
+            "--min-elevation-deg and --max-ground-range-km cannot be combined");
+  EXPECT_EQ(error_of(parse_with({"--min-elevation-deg", "40", "--high-latitude-mask", "on"})),
+            "--min-elevation-deg replaces the masks and cannot be combined with "
+            "--high-latitude-mask on");
+  EXPECT_EQ(error_of(parse_with({"--max-ground-range-km", "9", "--high-latitude-mask", "on"})),
+            "--max-ground-range-km replaces the masks and cannot be combined with "
+            "--high-latitude-mask on");
+  EXPECT_EQ(error_of(parse_with({"--links-file", ""})), "--links-file is empty");
+  EXPECT_EQ(error_of(parse_with({"--links-out", ""})), "--links-out is empty");
+  for (const std::string_view bad : {"0", "-1", "+3", "1001", "3.0", "x", " 3", ""}) {
+    EXPECT_EQ(error_of(parse_with({"--links-file", "f.csv", "--max-lasers", bad})),
+              "--max-lasers \"" + std::string(bad) + "\" is not a whole number from 1 to 1000");
+  }
+  EXPECT_TRUE(parse_with({"--links-file", "f.csv", "--max-lasers", "1000"}).options);
+  EXPECT_TRUE(parse_with({"--links-file", "f.csv", "--max-lasers", "1"}).options);
+  EXPECT_EQ(error_of(parse_with({"--max-lasers", "4"})),
+            "--max-lasers applies only to --links-file");
 }
 
 }  // namespace

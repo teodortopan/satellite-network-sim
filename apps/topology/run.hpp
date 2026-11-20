@@ -133,6 +133,7 @@ struct PreparedRun {
   std::vector<std::optional<orbit::Propagator>> propagators;
   /// Positions failed at the start (the reference time of the plan).
   std::size_t start_propagation_failures = 0;
+  /// Planned at the start, or read from options.links_file.
   topology::LinkPlan plan{};
 
   /// Every city of the city file, in file order, and each one's home PoP.
@@ -203,11 +204,13 @@ struct RunHooks {
 /// shells and excluded groups are read from that file first (PreparedRun::options then holds
 /// them). Fails, with a message naming the file, time or value at fault, if: the shells file
 /// cannot be read or is not a usable configuration, an option is out of range (step, duration,
-/// limits, fibre factor, a shell name), the snapshot directory or one of its files is missing, a
-/// step has no Earth-orientation values, a ground file is missing or has any bad record
-/// (a skipped gateway or city would change the results silently), no pair has the selected
-/// role, or an element file cannot be loaded as a whole. Then classifies the snapshot at the
-/// start, propagates every plane member there and plans the laser links.
+/// limits, ground mask, fibre factor, a shell name), the snapshot directory or one of its files
+/// is missing, a step has no Earth-orientation values, a ground file is missing or has any bad
+/// record (a skipped gateway or city would change the results silently), no pair has the
+/// selected role, an element file cannot be loaded as a whole, or options.links_file is refused
+/// (topology::read_link_plan_file). Then classifies the snapshot at the start, propagates every
+/// plane member there and plans the laser links, or reads them from options.links_file
+/// against `working` with the pattern and options.max_lasers.
 [[nodiscard]] PreparedRunOrError prepare_run(const Options& requested);
 
 /// Steps through the run: positions, laser link states, ground links, the physical checks
@@ -224,7 +227,9 @@ void write_summary(const PreparedRun& run, const RunStatistics& stats, std::ostr
 /// name), prepares, writes the CSV to the --out file or to `out` for "-", and the summary to
 /// `out` (to `err` when the CSV goes to `out`). Messages go to `err`. Returns 0 on success, 1
 /// if the run fails or a physical check (or a lower bound) fails, 2 for invalid arguments. A
-/// file named by --out is only created once the inputs have been checked.
+/// file named by --out is only created once the inputs have been checked; the --links-out file
+/// is written (from PreparedRun::plan, catalogue numbers from `working`) just before it, and a
+/// failure to write it exits 1.
 [[nodiscard]] int run_main(std::span<const std::string_view> args, std::ostream& out,
                            std::ostream& err, const RunHooks& hooks = {});
 

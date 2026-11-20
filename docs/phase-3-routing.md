@@ -141,7 +141,14 @@ no uplink until the next slot.
 
 Time left in view is predicted by stepping the orbit forward at the run's step until the
 satellite is below the mask, up to a horizon of 900 s. A satellite still in view at the
-horizon counts as 900 s.
+horizon counts as 900 s. Precisely: with positions at steps k = 0, 1, ... from now, and k the
+first step at which the dish may not use the satellite (the same test as the dish's ground
+links, so under `--max-ground-range-km` the distance; a failed propagation also ends the
+view), the time left is k × step, capped at 900 s. Only the steps before the horizon are
+looked at (k × step < 900 s). A satellite not in view now has 0 s; one in view now and gone
+at the next step has one step. The caller supplies the future positions
+(`topology::time_left_in_view_s`, or `GroundVisibility::times_left_in_view_s` for every
+satellite a site sees); this code does not propagate.
 
 The serving slot applies to the realistic model only. In the best case the dish may use any
 visible satellite, and the route chooses.
@@ -253,6 +260,31 @@ A link file lists laser links as pairs of catalogue numbers. Reading one gives a
 in planes, no link appears twice, no satellite has a link to itself, and no satellite has
 more links than `--max-lasers` (default: the pattern's count). `--links-out` writes the plan
 in the same format; written then read gives an identical plan.
+
+The format (`topology/link_file.hpp`):
+
+- Plain text, one line per link, fields separated by commas, no quoting, no spaces, no empty
+  lines. A line starting with `#` is a comment and may appear anywhere.
+- The first other line is the header: `norad_cat_id_a,norad_cat_id_b`, or
+  `norad_cat_id_a,norad_cat_id_b,side_a,side_b` when the laser side used at each end is
+  given. Every link line then has two or four fields.
+- A side is `ahead`, `behind`, `east`, `west`, `second_east` or `second_west`, and the two
+  sides of a link are `ahead` and `behind`, `east` and `west`, or `second_east` and
+  `second_west`, in that order.
+- `--links-out` always writes the four columns, after two comment lines.
+
+Reading refuses the whole file, naming the line, for: a malformed line or header, a
+catalogue number that is not in the run or is excluded, a link from a satellite to itself, a
+link given twice (in either order), a satellite with more links than the limit, and a file
+that is missing or has no link. A file is someone else's link set, so the planner's rules
+(4.3 of Phase 2) are not applied: a link may join any two satellites in planes, in any
+planes or shells, and the physical checks then accept links between shells. Without side
+columns, a link inside one plane is labelled ahead to behind and any other east to west;
+the labels change nothing but the summary's counts by kind. Each satellite keeps the
+pattern's lasers, each taken by the first link that uses its side; a link end with no free
+laser on its side gets one more laser. Because the sides are written, a planned plan written
+and read back with the same pattern is equal to the original in every field, so the link
+states and every result are the same.
 
 ## 5. Runs
 

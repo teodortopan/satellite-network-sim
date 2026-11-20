@@ -55,7 +55,8 @@ double max_slant_range_km(double max_radius_km, double min_mask_rad) {
 GroundVisibility::GroundVisibility(std::span<const ground::GroundSite> sites,
                                    const constellation::Classification& classification,
                                    const ElevationMaskSettings& mask_settings)
-    : shell_count_(classification.planes.size()) {
+    : mask_settings_(mask_settings), shell_count_(classification.planes.size()) {
+  const bool range_rule = mask_settings.max_ground_range_km.has_value();
   for (std::size_t i = 0; i < classification.satellites.size(); ++i) {
     const constellation::ClassifiedSatellite& s = classification.satellites[i];
     if (std::holds_alternative<constellation::PlaneAssignment>(s.placement) && s.shell_index) {
@@ -75,7 +76,9 @@ GroundVisibility::GroundVisibility(std::span<const ground::GroundSite> sites,
       if (!height_km.has_value()) {
         continue;
       }
-      const double mask = elevation_mask_rad(*height_km, sites[site].latitude_rad, mask_settings);
+      const double mask =
+          range_rule ? -std::numbers::pi / 2.0
+                     : elevation_mask_rad(*height_km, sites[site].latitude_rad, mask_settings);
       const std::size_t k = (site * shell_count_) + shell;
       masks_rad_[k] = mask;
       const double loose = std::sin(std::max(mask - kQuickTestSlackRad, 0.0));
@@ -117,10 +120,13 @@ std::vector<std::vector<VisibleSatellite>> GroundVisibility::at(
   }
   std::ranges::sort(placed, [](const Placed& a, const Placed& b) { return a.z_km < b.z_km; });
 
+  const std::optional<double>& max_range_km = mask_settings_.max_ground_range_km;
   std::vector<std::vector<VisibleSatellite>> visible(sites_.size());
   for (std::size_t site = 0; site < sites_.size(); ++site) {
     const SiteGeometry& g = sites_[site];
-    const double window_km = max_slant_range_km(max_radius_km, min_mask_rad_[site]);
+    // |dz| <= |d|, so the slant range bounds the window.
+    const double window_km = max_range_km ? *max_range_km + kWindowMarginKm
+                                          : max_slant_range_km(max_radius_km, min_mask_rad_[site]);
     const double z = g.position_ecef_km.z();
     const auto first = std::ranges::lower_bound(placed, z - window_km, {}, &Placed::z_km);
     const auto last = std::ranges::upper_bound(placed, z + window_km, {}, &Placed::z_km);
@@ -130,12 +136,14 @@ std::vector<std::vector<VisibleSatellite>> GroundVisibility::at(
       const std::size_t k = (site * shell_count_) + member.shell_index;
       const Eigen::Vector3d& p = *it->position;
       const Eigen::Vector3d d = p - g.position_ecef_km;
-      const double up = g.up_ecef.dot(d);
-      if (up < 0.0 || up * up < d.squaredNorm() * sin_squared_masks_[k]) {
-        continue;
+      if (!max_range_km) {
+        const double up = g.up_ecef.dot(d);
+        if (up < 0.0 || up * up < d.squaredNorm() * sin_squared_masks_[k]) {
+          continue;
+        }
       }
       const LookAngle look = look_angle(g, p);
-      if (look.elevation_rad >= masks_rad_[k]) {
+      if (ground_link_allowed(look, masks_rad_[k], mask_settings_)) {
         out.push_back(VisibleSatellite{.satellite = member.satellite,
                                        .norad_cat_id = member.norad_cat_id,
                                        .shell_index = member.shell_index,
@@ -149,6 +157,56 @@ std::vector<std::vector<VisibleSatellite>> GroundVisibility::at(
     });
   }
   return visible;
+}
+
+double GroundVisibility::time_left_in_view_s(
+    std::size_t site, std::size_t satellite,
+    std::span<const std::optional<Eigen::Vector3d>> future_ecef_km, double step_s,
+    double horizon_s) const {
+  const auto it = std::ranges::lower_bound(members_, satellite, {}, &Member::satellite);
+  if (site >= sites_.size() || it == members_.end() || it->satellite != satellite) {
+    return 0.0;
+  }
+  const double mask = masks_rad_[(site * shell_count_) + it->shell_index];
+  return topology::time_left_in_view_s(sites_[site], mask, future_ecef_km, step_s, horizon_s,
+                                       mask_settings_);
+}
+
+std::vector<double> GroundVisibility::times_left_in_view_s(
+    std::size_t site, std::span<const VisibleSatellite> visible,
+    std::span<const StepPositions> steps, double step_s, double horizon_s) const {
+  const std::size_t count = std::min(steps.size(), view_steps(step_s, horizon_s));
+  std::vector<std::optional<Eigen::Vector3d>> future(count);
+  std::vector<double> times;
+  times.reserve(visible.size());
+  for (const VisibleSatellite& v : visible) {
+    for (std::size_t k = 0; k < count; ++k) {
+      const auto& positions = steps[k].position_ecef_km;
+      future[k] = v.satellite < positions.size() ? positions[v.satellite] : std::nullopt;
+    }
+    times.push_back(time_left_in_view_s(site, v.satellite, future, step_s, horizon_s));
+  }
+  return times;
+}
+
+std::size_t view_steps(double step_s, double horizon_s) noexcept {
+  return static_cast<std::size_t>(std::ceil(horizon_s / step_s));
+}
+
+double time_left_in_view_s(const SiteGeometry& site, double mask_rad,
+                           std::span<const std::optional<Eigen::Vector3d>> future_ecef_km,
+                           double step_s, double horizon_s, const ElevationMaskSettings& settings) {
+  const std::size_t steps = view_steps(step_s, horizon_s);
+  for (std::size_t k = 0; k < steps; ++k) {
+    const std::optional<Eigen::Vector3d>* position =
+        k < future_ecef_km.size() ? &future_ecef_km[k] : nullptr;
+    const bool in_view = position != nullptr && position->has_value() &&
+                         ground_link_allowed(look_angle(site, **position), mask_rad, settings);
+    if (!in_view) {
+      return std::min(static_cast<double>(k) * step_s, horizon_s);
+    }
+  }
+  return horizon_s;
 }
 
 std::optional<VisibleSatellite> pick_serving_satellite(std::span<const VisibleSatellite> visible,

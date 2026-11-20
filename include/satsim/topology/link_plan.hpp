@@ -166,9 +166,28 @@ struct LinkPlan {
   std::vector<std::vector<Laser>> lasers;
   /// neighbours[s][p]: plane p of shell s.
   std::vector<std::vector<PlaneNeighbours>> neighbours;
+  /// The most links one satellite may have, if not laser_budget(pattern) (max_lasers_of).
+  /// nullopt for every planned plan; set only by read_link_plan for a file read with another
+  /// limit (spec 4.9, --max-lasers).
+  std::optional<std::size_t> max_lasers = std::nullopt;
+  /// Whether a link may join two shells. False for every planned plan (lasers stay within a
+  /// shell, spec 4.3); read_link_plan sets it exactly when the file has such a link, since a
+  /// file is someone else's link set (spec 4.9). The physical checks count a link joining two
+  /// shells only when this is false.
+  bool cross_shell_links = false;
 
   friend bool operator==(const LinkPlan&, const LinkPlan&) = default;
 };
+
+/// The most links one satellite of `plan` may have: plan.max_lasers if set, else
+/// laser_budget(plan.pattern).
+[[nodiscard]] std::size_t max_lasers_of(const LinkPlan& plan) noexcept;
+
+/// The neighbouring planes of every plane of one shell (`planes`, in RAAN order), as
+/// plan_laser_links finds them (below): with P >= 2 planes, plane p's east is p+1 (mod P) and
+/// p+1's west is p; two planes east is p+2 (mod P) unless that is p itself.
+[[nodiscard]] std::vector<PlaneNeighbours> plane_neighbours(
+    std::span<const constellation::Plane> planes);
 
 /// Plans the laser links of every shell of `classification` from positions at the reference
 /// time (`position_ecef_km`, one per classified satellite, all at one instant).
