@@ -2,9 +2,11 @@
 
 #include <algorithm>
 #include <cstddef>
+#include <cstdint>
 #include <functional>
 #include <limits>
 #include <queue>
+#include <span>
 #include <tuple>
 #include <vector>
 
@@ -25,8 +27,14 @@ std::vector<std::size_t> ShortestPaths::path_to(std::size_t node) const {
   return path;
 }
 
-ShortestPaths shortest_paths(const Graph& graph, std::size_t source) {
+namespace {
+
+// Dijkstra with the documented tie rule. `blocked` is empty (no node blocked) or has one entry
+// per node, nonzero for a node that is never entered. Shared by both public functions.
+ShortestPaths dijkstra(const Graph& graph, std::size_t source,
+                       const std::vector<std::uint8_t>& blocked) {
   const std::size_t n = graph.node_count();
+  const bool any_blocked = !blocked.empty();
   ShortestPaths result{
       .source = source,
       .delay_s = std::vector<double>(n, std::numeric_limits<double>::infinity()),
@@ -49,7 +57,7 @@ ShortestPaths shortest_paths(const Graph& graph, std::size_t source) {
     settled[u] = true;
     for (const Edge& edge : graph.edges_from(u)) {
       const std::size_t v = edge.to;
-      if (settled[v]) {
+      if (settled[v] || (any_blocked && blocked[v] != 0)) {
         continue;
       }
       const double candidate_s = delay_s + edge.delay_s;
@@ -72,6 +80,23 @@ ShortestPaths shortest_paths(const Graph& graph, std::size_t source) {
     }
   }
   return result;
+}
+
+}  // namespace
+
+ShortestPaths shortest_paths(const Graph& graph, std::size_t source) {
+  return dijkstra(graph, source, {});
+}
+
+ShortestPaths shortest_paths_avoiding(const Graph& graph, std::size_t source,
+                                      std::span<const std::size_t> blocked) {
+  std::vector<std::uint8_t> mask(graph.node_count(), 0);
+  for (const std::size_t node : blocked) {
+    if (node < mask.size()) {
+      mask[node] = 1;
+    }
+  }
+  return dijkstra(graph, source, mask);
 }
 
 }  // namespace satsim::network

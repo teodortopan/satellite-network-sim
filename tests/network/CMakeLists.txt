@@ -1,3 +1,3 @@
 satsim_add_test(satsim_network_tests
-  SOURCES graph_test.cpp shortest_path_test.cpp
+  SOURCES graph_test.cpp path_test.cpp shortest_path_test.cpp
   DEPS satsim::network)

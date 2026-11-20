@@ -34,6 +34,7 @@ add_subdirectory(src/orbit)
 add_subdirectory(src/constellation)
 add_subdirectory(src/topology)
 add_subdirectory(src/network)
+add_subdirectory(src/routing)
 
 # Programs, and the helpers they share.
 add_subdirectory(apps/common)

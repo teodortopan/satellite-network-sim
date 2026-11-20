@@ -17,6 +17,7 @@ namespace {
 using satsim::network::Graph;
 using satsim::network::kNoNode;
 using satsim::network::shortest_paths;
+using satsim::network::shortest_paths_avoiding;
 using satsim::network::ShortestPaths;
 using Path = std::vector<std::size_t>;
 
@@ -240,6 +241,119 @@ TEST(ShortestPathTest, RandomGraphsAgreeWithASimpleReference) {
       ASSERT_EQ(bad_paths, 0U) << "source " << source;
     }
     EXPECT_GT(reached, kNodes);  // The graphs are connected enough to test something.
+  }
+}
+
+// The graph of HandWorkedGraph:
+//   0 -1- 1 -2- 3
+//   |      \    |
+//   4      2    1
+//   (0-2)   \   |
+//            2 -2- 4
+Graph hand_worked() {
+  Graph g(6);
+  add(g, 0, 1, 1.0);
+  add(g, 0, 2, 4.0);
+  add(g, 1, 2, 2.0);
+  add(g, 1, 3, 2.0);
+  add(g, 3, 4, 1.0);
+  add(g, 2, 4, 2.0);
+  return g;
+}
+
+// Blocking 1 forces the second-best routes: 2 directly (4), 4 through 2 (4 + 2 = 6), 3 through
+// 2 and 4 (6 + 1 = 7). Blocked 1 itself is unreachable.
+TEST(ShortestPathAvoidingTest, BlockingForcesTheSecondBestPath) {
+  const Graph g = hand_worked();
+  const std::vector<std::size_t> blocked{1};
+  const ShortestPaths p = shortest_paths_avoiding(g, 0, blocked);
+  EXPECT_EQ(p.delay_s, (std::vector<double>{0.0, kInf, 4.0, 7.0, 6.0, kInf}));
+  EXPECT_EQ(p.path_to(3), (Path{0, 2, 4, 3}));
+  EXPECT_FALSE(p.reachable(1));
+  EXPECT_TRUE(p.path_to(1).empty());
+  EXPECT_EQ(p.predecessor[1], kNoNode);
+}
+
+// Blocking 1 and 2 cuts 0 off from 3 and 4; blocking the target 4 makes it unreachable while
+// 3 is still reached the usual way (0-1-3, 3).
+TEST(ShortestPathAvoidingTest, BlockingCanMakeTheTargetUnreachable) {
+  const Graph g = hand_worked();
+  const std::vector<std::size_t> cut{1, 2};
+  const ShortestPaths p = shortest_paths_avoiding(g, 0, cut);
+  EXPECT_FALSE(p.reachable(3));
+  EXPECT_FALSE(p.reachable(4));
+  const std::vector<std::size_t> target{4};
+  const ShortestPaths q = shortest_paths_avoiding(g, 0, target);
+  EXPECT_FALSE(q.reachable(4));
+  EXPECT_EQ(q.delay_s[4], kInf);
+  EXPECT_EQ(q.path_to(3), (Path{0, 1, 3}));
+}
+
+// Blocking the source changes nothing; nor do repeated or out-of-range indices, nor an empty
+// list: every case gives exactly shortest_paths.
+TEST(ShortestPathAvoidingTest, ABlockedSourceAndIgnoredIndicesChangeNothing) {
+  const Graph g = hand_worked();
+  const ShortestPaths plain = shortest_paths(g, 0);
+  const std::vector<std::vector<std::size_t>> cases{{}, {0}, {0, 0}, {6, 1000, kNoNode}};
+  for (const std::vector<std::size_t>& blocked : cases) {
+    const ShortestPaths p = shortest_paths_avoiding(g, 0, blocked);
+    EXPECT_EQ(p.delay_s, plain.delay_s);
+    EXPECT_EQ(p.hops, plain.hops);
+    EXPECT_EQ(p.predecessor, plain.predecessor);
+  }
+}
+
+// 0 -> {1, 2, 3} (0.5 each) -> 4 (0.25 each): through 1, the lowest; with 1 blocked, the tie
+// between 2 and 3 goes to 2, whatever the order of `blocked` or of the edges.
+TEST(ShortestPathAvoidingTest, TheTieRuleStillHolds) {
+  for (const bool reversed : {false, true}) {
+    Graph g(5);
+    for (std::size_t i = 0; i < 3; ++i) {
+      const std::size_t via = reversed ? 3 - i : 1 + i;
+      add(g, 0, via, 0.5);
+      add(g, via, 4, 0.25);
+    }
+    EXPECT_EQ(shortest_paths(g, 0).path_to(4), (Path{0, 1, 4}));
+    const std::vector<std::size_t> one{1};
+    EXPECT_EQ(shortest_paths_avoiding(g, 0, one).path_to(4), (Path{0, 2, 4})) << reversed;
+    const std::vector<std::size_t> two{2, 1};
+    EXPECT_EQ(shortest_paths_avoiding(g, 0, two).path_to(4), (Path{0, 3, 4})) << reversed;
+  }
+}
+
+// Random graphs: avoiding a random set equals shortest_paths on a copy of the graph with every
+// edge into a blocked node (other than the source) removed.
+TEST(ShortestPathAvoidingTest, RandomGraphsEqualTheGraphWithoutTheBlockedNodes) {
+  constexpr std::size_t kNodes = 60;
+  constexpr std::size_t kEdges = 180;
+  std::mt19937_64 random(20261120);
+  std::uniform_int_distribution<std::size_t> node(0, kNodes - 1);
+  std::uniform_int_distribution<int> small(0, 3);
+  Graph g(kNodes);
+  for (std::size_t e = 0; e < kEdges; ++e) {
+    add(g, node(random), node(random), small(random));
+  }
+  for (std::size_t source = 0; source < kNodes; source += 6) {
+    std::vector<std::size_t> blocked;
+    std::vector<bool> is_blocked(kNodes, false);
+    for (int i = 0; i < 8; ++i) {
+      const std::size_t b = node(random);
+      blocked.push_back(b);
+      is_blocked[b] = true;
+    }
+    Graph pruned(kNodes);
+    for (std::size_t u = 0; u < kNodes; ++u) {
+      for (const auto& e : g.edges_from(u)) {
+        if (!is_blocked[e.to] || e.to == source) {
+          add_directed(pruned, u, e.to, e.delay_s);
+        }
+      }
+    }
+    const ShortestPaths p = shortest_paths_avoiding(g, source, blocked);
+    const ShortestPaths r = shortest_paths(pruned, source);
+    ASSERT_EQ(p.delay_s, r.delay_s) << "source " << source;
+    ASSERT_EQ(p.hops, r.hops) << "source " << source;
+    ASSERT_EQ(p.predecessor, r.predecessor) << "source " << source;
   }
 }
 

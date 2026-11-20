@@ -3,6 +3,7 @@
 #include <cstddef>
 #include <limits>
 #include <optional>
+#include <span>
 #include <vector>
 
 #include "satsim/network/graph.hpp"
@@ -49,5 +50,20 @@ struct ShortestPaths {
 ///
 /// O((V + E) log V) with a binary heap.
 [[nodiscard]] ShortestPaths shortest_paths(const Graph& graph, std::size_t source);
+
+/// shortest_paths from `source` that never enters a node of `blocked` (spec 4.7: the backup
+/// path; and the middle of a longest-lived route). The same algorithm and the same tie rule,
+/// on the graph with every edge into a blocked node removed; the result is exactly what
+/// shortest_paths gives on that graph.
+///
+/// - A blocked node other than the source is unreachable: delay_s +infinity, predecessor
+///   kNoNode, path_to empty. Blocking the target therefore makes it unreachable.
+/// - Blocking the source has no effect: the search starts there and never re-enters it.
+/// - Indices not below graph.node_count() and repeated indices are ignored; the order of
+///   `blocked` does not matter.
+///
+/// Precondition: source < graph.node_count().
+[[nodiscard]] ShortestPaths shortest_paths_avoiding(const Graph& graph, std::size_t source,
+                                                    std::span<const std::size_t> blocked);
 
 }  // namespace satsim::network
