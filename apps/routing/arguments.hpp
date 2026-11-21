@@ -25,7 +25,7 @@ using app::RoleFilter;
 
 /// What one run of the routing program computes and where it writes it (spec 4.8). Built by
 /// parse_arguments, which has checked every value; tests may also fill one in directly
-/// (prepare_run checks again what it relies on). The members up to max_lasers are those of
+/// (prepare_run checks again what it relies on). The members up to plan_time are those of
 /// app::InputOptions, with the same meaning.
 struct Options {
   std::filesystem::path snapshot_dir;
@@ -44,6 +44,7 @@ struct Options {
   std::optional<std::filesystem::path> shells_file = std::nullopt;
   std::optional<std::filesystem::path> links_file = std::nullopt;
   std::optional<std::size_t> max_lasers = std::nullopt;
+  std::optional<time::UtcTime> plan_time = std::nullopt;
 
   app::EndpointModel model = app::EndpointModel::kRealistic;
   /// --strategies, in the order given (each at most once).

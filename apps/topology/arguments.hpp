@@ -36,7 +36,8 @@ struct Options {
   std::filesystem::path ground_dir;
   /// The cities and pairs (cities.json).
   std::filesystem::path cities_file;
-  /// First time step, and the reference time of the classification and the link plan.
+  /// First time step, and (without plan_time) the reference time of the classification and
+  /// the link plan.
   time::UtcTime start;
   /// Length of the run and spacing of its steps, as in propagate (app::step_count).
   std::int64_t duration_ns = 0;
@@ -72,6 +73,9 @@ struct Options {
   std::optional<std::size_t> max_lasers = std::nullopt;
   /// --links-out: where to write the laser links used (topology::write_link_plan_file).
   std::optional<std::filesystem::path> links_out = std::nullopt;
+  /// --plan-time: the reference time of the classification and the link plan; nullopt means
+  /// `start` (app::InputOptions::plan_time).
+  std::optional<time::UtcTime> plan_time = std::nullopt;
 };
 
 /// The outcome of parse_arguments: exactly one of options, help or error.
@@ -94,7 +98,8 @@ struct ParsedArguments {
 /// finite number >= 1, a high-latitude setting other than on or off, a minimum elevation not
 /// in [0, 90) degrees, a longest ground range that is not a finite number > 0 km, both of
 /// those, either with the high-latitude mask on, an empty --links-file or --links-out, and a
-/// --max-lasers that is not a whole number from 1 to 1000 or is given without --links-file.
+/// --max-lasers that is not a whole number from 1 to 1000 or is given without --links-file, and
+/// a --plan-time that is not YYYY-MM-DDTHH:MM:SS[.fffffffff] or does not exist.
 [[nodiscard]] ParsedArguments parse_arguments(std::span<const std::string_view> args);
 
 /// The --help text.

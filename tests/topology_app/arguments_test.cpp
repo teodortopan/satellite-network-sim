@@ -286,4 +286,19 @@ TEST(TopologyArgumentsTest, LinkFileAndMaskOverrideRejections) {
             "--max-lasers applies only to --links-file");
 }
 
+// --plan-time (shared with the routing program): any existing UTC time, before or after the
+// start; without it, none (the start is the plan time).
+TEST(TopologyArgumentsTest, PlanTime) {
+  EXPECT_FALSE(options_of(parse(kRequired)).plan_time.has_value());
+  const ParsedArguments earlier = parse_with({"--plan-time", "2026-11-18T21:14:00.5"});
+  EXPECT_EQ(options_of(earlier).plan_time,
+            satsim::time::UtcTime::from_civil({2026, 11, 18, 21, 14, 0.5}));
+  EXPECT_TRUE(parse_with({"--plan-time", "2026-11-19T00:00:00"}).options.has_value());
+  EXPECT_EQ(error_of(parse_with({"--plan-time", "yesterday"})),
+            "--plan-time \"yesterday\" is not a UTC time YYYY-MM-DDTHH:MM:SS[.fffffffff]");
+  EXPECT_EQ(error_of(parse_with({"--plan-time", "2026-02-30T00:00:00"})),
+            "--plan-time \"2026-02-30T00:00:00\" is not an existing date and time");
+  EXPECT_NE(satsim::topology_app::usage().find("--plan-time <UTC>"), std::string_view::npos);
+}
+
 }  // namespace

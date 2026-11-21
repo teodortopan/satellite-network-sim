@@ -42,6 +42,7 @@ constexpr std::string_view kUsage =
                [--fibre-factor <x>] [--high-latitude-mask <on|off>]
                [--min-elevation-deg <deg> | --max-ground-range-km <km>]
                [--links-file <file> [--max-lasers <n>]] [--links-out <file>]
+               [--plan-time <UTC>]
 
 Follows the route of every city pair through time (docs/phase-3-routing.md 4.8): at each
 re-plan instant every listed strategy keeps or replaces its route, between plans the route is
@@ -55,7 +56,8 @@ standard error when the routes CSV does. Every step is checked (spec 6.1).
                               assumed_gateways.json (same format as gateways.json)
   --cities <file>             the cities and city pairs (cities.json)
   --start <UTC>               first time, YYYY-MM-DDTHH:MM:SS[.fffffffff], UTC; also the
-                              reference time of the shells, planes and laser plan
+                              reference time of the shells, planes and laser plan unless
+                              --plan-time is given
   --duration-s <s>            length of the run in seconds (decimal, >= 0)
   --step-s <s>                spacing of the times in seconds (decimal, > 0)
   --pattern <name>            laser pattern: three, plus-grid or six
@@ -98,6 +100,8 @@ standard error when the routes CSV does. Every step is checked (spec 6.1).
   --max-lasers <n>            the most links one satellite may have in --links-file
                               (default: the pattern's laser count)
   --links-out <file>          write the laser links used to this file, in the same format
+  --plan-time <UTC>           reference time of the shells, planes and laser plan, same
+                              format as --start, before or after it (default: --start)
   --help, -h                  print this text
 
 Exit status: 0 on success, 1 if any check fails, 2 if the arguments or inputs are invalid

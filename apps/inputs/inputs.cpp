@@ -375,6 +375,14 @@ InputsOrError prepare_inputs(const InputOptions& options_given) {
              " in " + eop_path.string() + " (values are never extrapolated)";
     }
   }
+  // The reference time of the shells, planes and laser plan.
+  const time::UtcTime reference = options.plan_time.value_or(options.start);
+  if (options.plan_time && !run.earth_orientation.at(*options.plan_time)) {
+    return "no Earth-orientation values for the plan time " +
+           app::format_utc_iso(*options.plan_time,
+                               app::fraction_digits_for(*options.plan_time, options.step_ns)) +
+           " in " + eop_path.string() + " (values are never extrapolated)";
+  }
 
   if (auto error = load_ground(options, run)) {
     return std::move(*error);
@@ -394,7 +402,7 @@ InputsOrError prepare_inputs(const InputOptions& options_given) {
     sets.push_back(s.elements);
   }
   constellation::ClassificationOrError classified =
-      constellation::classify_constellation(sets, options.start, options.classification);
+      constellation::classify_constellation(sets, reference, options.classification);
   if (auto* error = std::get_if<std::string>(&classified)) {
     return "classification: " + *error;  // Unreachable: the config was checked.
   }
@@ -411,13 +419,13 @@ InputsOrError prepare_inputs(const InputOptions& options_given) {
   run.working = working_classification(run.classification, run.shell_used);
   run.propagators = topology::plane_member_propagators(run.working, sets);
 
-  const std::optional<time::EarthOrientation> eop_start = run.earth_orientation.at(options.start);
-  if (!eop_start) {
-    return std::string("no Earth-orientation values for the start");  // Checked above.
+  const std::optional<time::EarthOrientation> eop_reference = run.earth_orientation.at(reference);
+  if (!eop_reference) {
+    return std::string("no Earth-orientation values for the plan time");  // Checked above.
   }
-  const topology::StepPositions at_start =
-      topology::positions_at(run.propagators, options.start, *eop_start);
-  run.start_propagation_failures = at_start.failed_count;
+  const topology::StepPositions at_reference =
+      topology::positions_at(run.propagators, reference, *eop_reference);
+  run.start_propagation_failures = at_reference.failed_count;
   if (options.links_file) {
     topology::LinkPlanOrError read = topology::read_link_plan_file(
         *options.links_file, run.working,
@@ -428,7 +436,7 @@ InputsOrError prepare_inputs(const InputOptions& options_given) {
     run.plan = std::move(std::get<topology::LinkPlan>(read));
   } else {
     run.plan = topology::plan_laser_links(
-        run.working, at_start.position_ecef_km,
+        run.working, at_reference.position_ecef_km,
         {.pattern = options.pattern, .atmosphere_km = options.limits.atmosphere_km});
   }
   return run;
@@ -450,6 +458,12 @@ void write_inputs_line(std::ostream& out, const InputOptions& options, const Inp
   out << "  inputs: snapshot " << o.snapshot_dir.string() << ", ground " << o.ground_dir.string()
       << ", cities " << o.cities_file.string() << ", shells "
       << (o.shells_file ? "file " + o.shells_file->string() : std::string("built-in"));
+  if (o.plan_time) {
+    out << ", plan time "
+        << format_utc_iso(*o.plan_time, std::max(run.fraction_digits,
+                                                 fraction_digits_for(*o.plan_time, o.step_ns)))
+        << " UTC";
+  }
   if (o.links_file) {
     out << ", laser links from the file " << o.links_file->string() << " (at most "
         << topology::max_lasers_of(run.plan) << " per satellite)";
