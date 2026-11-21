@@ -252,11 +252,24 @@ is still in it.
   so one backup serves both a dead link and a dead satellite.
 - When a node of the route detects that the next element is dead, it switches to its backup:
   from the detection instant the route is the old route up to that node, then the backup.
-- In the realistic model the sending dish's backup starts at its open dish (Phase 3 spec 4.2),
-  so its repair is a new serving satellite: the first satellite of that backup.
+- In the realistic model a city has one dish, shared by every route that starts there. When
+  the dish detects that its serving satellite is dead it picks again by its serving rule among
+  the satellites it sees, the dead one left out, and every route from that city continues from
+  the new satellite on the shortest path of the last planning graph that avoids the dead one.
 - One repair per route between two plans. A backup that itself meets a dead element is a black
   hole until the planner acts.
 - The repaired route is held until the next plan made by a planner that knows the fact.
+
+Details:
+
+- The node that repairs is the node of the route just before the first dead element along it:
+  the node before a dead satellite or gateway, the near end of a dead link.
+- It repairs at the instant it knows: its detection instant if it is a detector of that
+  element (4.4), otherwise one detection time after the route first passes the dead element.
+  Never before the route passes the dead element.
+- Backups are prepared right after each plan, on that plan's planning graph. The backup of a
+  node avoids the next node of the route and every node of the route before itself, so a
+  repaired route never passes a node twice.
 
 **`flooding`.** There is no planner for failures. Every satellite, dish and gateway keeps its
 own view and its own table.
@@ -309,13 +322,17 @@ same instant, so drops that have nothing to do with the failure cancel out.
 
 ### 4.7 Measures
 
-Per failure, direction and reaction mode:
+Per run, direction and reaction mode. t_f is the run's failure instant: the earliest failure
+that is not old news. A plane or a region is many satellites failing at one instant.
 
 - **Black-hole time and loop time:** seconds in each state from t_f to the end of the run.
 - **Time to restore:** from t_f to the first instant the direction is `delivered` again after
   being interrupted. Zero if it never was interrupted; none if it never came back in the run.
 - **Time to settle:** from t_f to the instant after which the route is the one a planner with
-  full knowledge holds, and stays so.
+  full knowledge holds, and stays so. That planner is run alongside as a reference: its view
+  is the true network at every plan. With a strategy that keeps a route it holds
+  (`keep-until-broken`, `longest-lived`, `threshold`) a mode's route may never equal the
+  reference's again; the time to settle is then none.
 - **Extra delay:** delivered delay minus the baseline's at the same instant, while both are
   delivered; and the same for the route once settled.
 - **Lost time:** seconds the baseline is delivered and this mode is not.
