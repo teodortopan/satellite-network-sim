@@ -485,4 +485,58 @@ TEST(PlannerTest, PlanWithAnEmptyShortestPathHasNoRoute) {
               std::nullopt);
 }
 
+// hold replaces the held route without planning; the next plan treats it as any held route.
+//   two_routes(0.25, 0.5): via 2 = 0.5, via 3 = 1.0.
+//   plan 1 (keep-until-broken): [0, 2, 1].
+//   hold [0, 3, 1]: held, up, delay 1.0.
+//   plan 2: [0, 3, 1] is usable: kept at 1.0, although via 2 is shorter.
+TEST(PlannerTest, HoldReplacesTheHeldRouteAndKeepUntilBrokenKeepsIt) {
+  const Graph g = two_routes(0.25, 0.5);
+  RoutePlanner planner(strategy("keep-until-broken"));
+  expect_plan(planner.plan(g, kSource, kTarget), planner, PlanOutcome::kReplaced, Route{0, 2, 1},
+              0.5);
+  planner.hold(Route{0, 3, 1});
+  EXPECT_EQ(planner.route(), (Route{0, 3, 1}));
+  EXPECT_TRUE(planner.has_route());
+  EXPECT_TRUE(planner.held_route_is_up(g));
+  EXPECT_EQ(planner.held_delay_s(g), std::optional(1.0));
+  expect_plan(planner.plan(g, kSource, kTarget), planner, PlanOutcome::kKept, Route{0, 3, 1}, 1.0);
+}
+
+// A held route that is not up: it is reported down, and the next plan replaces it.
+//   two_routes(0.25, 0) has no edges via 3.
+TEST(PlannerTest, HoldOfARouteThatIsNotUpIsReplacedAtTheNextPlan) {
+  const Graph g = two_routes(0.25, 0.0);
+  RoutePlanner planner(strategy("keep-until-broken"));
+  planner.hold(Route{0, 3, 1});
+  EXPECT_EQ(planner.route(), (Route{0, 3, 1}));
+  EXPECT_FALSE(planner.held_route_is_up(g));
+  EXPECT_EQ(planner.held_delay_s(g), std::nullopt);
+  expect_plan(planner.plan(g, kSource, kTarget), planner, PlanOutcome::kReplaced, Route{0, 2, 1},
+              0.5);
+}
+
+// Holding an empty route means no route; holding the route a plan would choose makes that
+// plan "kept".
+TEST(PlannerTest, HoldEmptyIsNoRouteAndOutcomesCompareAgainstTheHeldRoute) {
+  const Graph g = two_routes(0.25, 0.5);
+  RoutePlanner planner(strategy("keep-until-broken"));
+  expect_plan(planner.plan(g, kSource, kTarget), planner, PlanOutcome::kReplaced, Route{0, 2, 1},
+              0.5);
+  planner.hold({});
+  EXPECT_FALSE(planner.has_route());
+  EXPECT_TRUE(planner.route().empty());
+  EXPECT_FALSE(planner.held_route_is_up(g));
+  EXPECT_EQ(planner.held_delay_s(g), std::nullopt);
+  expect_plan(planner.plan(g, kSource, kTarget), planner, PlanOutcome::kReplaced, Route{0, 2, 1},
+              0.5);
+
+  RoutePlanner lowest(strategy("lowest-delay"));
+  lowest.hold(Route{0, 2, 1});
+  expect_plan(lowest.plan(g, kSource, kTarget), lowest, PlanOutcome::kKept, Route{0, 2, 1}, 0.5);
+  lowest.hold(Route{0, 3, 1});
+  expect_plan(lowest.plan(g, kSource, kTarget), lowest, PlanOutcome::kReplaced, Route{0, 2, 1},
+              0.5);
+}
+
 }  // namespace

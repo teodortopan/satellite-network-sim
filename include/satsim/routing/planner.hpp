@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <optional>
 #include <string_view>
+#include <utility>
 #include <vector>
 
 #include "satsim/network/graph.hpp"
@@ -98,6 +99,14 @@ class RoutePlanner {
   PlanResult plan_with_shortest(const network::Graph& graph, std::size_t source, std::size_t target,
                                 const Route& shortest_path,
                                 const AccessCandidates& candidates = {});
+
+  /// Replaces the held route with `route` without planning (Phase 4 spec 4.5: local repair
+  /// hands a direction its repaired route). Empty means no route. Nothing is checked: the
+  /// route need not be up in any graph, nor start or end anywhere in particular. From then on
+  /// it is the held route like any other: route(), held_route_is_up and held_delay_s report
+  /// on it, and the next plan treats it as the route held before that plan (so keep-until-
+  /// broken keeps it if it is usable, and the outcome is kept or replaced against it).
+  void hold(Route route) noexcept { route_ = std::move(route); }
 
   /// The held route; empty when there is none.
   [[nodiscard]] const Route& route() const noexcept { return route_; }
