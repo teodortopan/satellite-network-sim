@@ -90,6 +90,15 @@ class RoutePlanner {
   PlanResult plan(const network::Graph& graph, std::size_t source, std::size_t target,
                   const AccessCandidates& candidates = {});
 
+  /// plan, with the shortest path from source to target in `graph` given by the caller, so
+  /// that one search serves every direction and strategy that plans from the same source.
+  /// `shortest_path` must be network::shortest_paths(graph, source).path_to(target) (empty
+  /// when the target is unreachable); the result and the held route are then exactly those of
+  /// plan(graph, source, target, candidates). Longest-lived does not read it.
+  PlanResult plan_with_shortest(const network::Graph& graph, std::size_t source, std::size_t target,
+                                const Route& shortest_path,
+                                const AccessCandidates& candidates = {});
+
   /// The held route; empty when there is none.
   [[nodiscard]] const Route& route() const noexcept { return route_; }
 
@@ -103,6 +112,9 @@ class RoutePlanner {
   [[nodiscard]] std::optional<double> held_delay_s(const network::Graph& step_graph) const noexcept;
 
  private:
+  PlanResult plan_from(const network::Graph& graph, std::size_t source, std::size_t target,
+                       const Route* shortest_path, const AccessCandidates& candidates);
+
   Strategy strategy_;
   Route route_;
 };

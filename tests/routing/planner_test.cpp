@@ -10,6 +10,7 @@
 #include <vector>
 
 #include "satsim/network/graph.hpp"
+#include "satsim/network/shortest_path.hpp"
 #include "satsim/routing/strategy.hpp"
 
 namespace {
@@ -426,6 +427,62 @@ TEST(PlannerTest, LowestDelayIsNeverAboveAnyOtherStrategyAtAPlan) {
   }
   EXPECT_EQ(worse, 0U);
   EXPECT_GT(compared, 500U);  // Enough plans had routes to test something.
+}
+
+// plan_with_shortest, given the shortest path, gives exactly what plan gives (outcome, delay
+// and held route), for every strategy, on the same random graphs changing at every plan.
+TEST(PlannerTest, PlanWithAGivenShortestPathEqualsPlan) {
+  constexpr std::size_t kNodes = 12;
+  constexpr int kPlans = 100;
+  std::mt19937_64 random(20261121);
+  std::uniform_real_distribution<double> delay(0.001, 0.02);
+  std::bernoulli_distribution ground_up(0.3);
+  std::bernoulli_distribution laser_up(0.25);
+  std::vector<RoutePlanner> searching;
+  std::vector<RoutePlanner> given;
+  for (const std::string_view name :
+       {"lowest-delay", "keep-until-broken", "longest-lived", "threshold:1ms", "threshold:2%"}) {
+    searching.emplace_back(strategy(name));
+    given.emplace_back(strategy(name));
+  }
+  std::size_t routes = 0;
+  for (int k = 0; k < kPlans; ++k) {
+    Graph g(kNodes);
+    AccessCandidates candidates;
+    for (std::size_t s = 2; s < kNodes; ++s) {
+      if (ground_up(random)) {
+        ground(g, kSource, s, delay(random));
+        candidates.heads.push_back({kSource, s});
+      }
+      if (ground_up(random)) {
+        ground(g, s, kTarget, delay(random));
+        candidates.tails.push_back({s, kTarget});
+      }
+      for (std::size_t t = s + 1; t < kNodes; ++t) {
+        if (laser_up(random)) {
+          laser(g, s, t, delay(random));
+        }
+      }
+    }
+    const Route shortest = satsim::network::shortest_paths(g, kSource).path_to(kTarget);
+    for (std::size_t i = 0; i < searching.size(); ++i) {
+      const PlanResult a = searching[i].plan(g, kSource, kTarget, candidates);
+      const PlanResult b = given[i].plan_with_shortest(g, kSource, kTarget, shortest, candidates);
+      EXPECT_EQ(name_of(a.outcome), name_of(b.outcome));
+      EXPECT_EQ(a.delay_s, b.delay_s);
+      EXPECT_EQ(searching[i].route(), given[i].route());
+      routes += given[i].has_route() ? 1U : 0U;
+    }
+  }
+  EXPECT_GT(routes, 150U);
+}
+
+// An empty given path means the target is unreachable: lowest-delay then holds no route.
+TEST(PlannerTest, PlanWithAnEmptyShortestPathHasNoRoute) {
+  const Graph g = two_routes(0.25, 0.5);
+  RoutePlanner planner(Strategy{.kind = StrategyKind::kLowestDelay});
+  expect_plan(planner.plan_with_shortest(g, kSource, kTarget, {}), planner, PlanOutcome::kNone, {},
+              std::nullopt);
 }
 
 }  // namespace

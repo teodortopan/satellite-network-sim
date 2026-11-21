@@ -9,6 +9,7 @@
 #include <string_view>
 #include <vector>
 
+#include "inputs/inputs.hpp"
 #include "satsim/ground/distance.hpp"
 #include "satsim/ground/sites.hpp"
 #include "satsim/network/graph.hpp"
@@ -27,19 +28,10 @@
 
 namespace satsim::topology_app {
 
-/// Which endpoint model a run uses (spec 4.6).
-enum class EndpointModel : std::uint8_t {
-  /// "Starlink as an ISP": A's dish, its one serving satellite, lasers, a satellite a gateway
-  /// sees, the gateway, fibre to A's home PoP, fibre to B.
-  kRealistic,
-  /// "Starlink as a backbone": dishes at both cities, each free to use any satellite at or
-  /// above its mask, through space only.
-  kBestCase,
-};
-
-/// "realistic", "best-case".
-[[nodiscard]] std::string_view name_of(EndpointModel model) noexcept;
-[[nodiscard]] std::optional<EndpointModel> parse_endpoint_model(std::string_view name) noexcept;
+/// Which endpoint model a run uses (spec 4.6); shared with the routing program.
+using app::EndpointModel;
+using app::name_of;
+using app::parse_endpoint_model;
 
 /// The outcome of one direction at one step.
 enum class PathStatus : std::uint8_t {
@@ -63,18 +55,9 @@ inline constexpr std::array<PathStatus, 5> kAllPathStatuses = {
 /// "ok", "no_service", "no_coverage", "no_gateway", "no_path".
 [[nodiscard]] std::string_view name_of(PathStatus status) noexcept;
 
-/// Where a gateway comes from: the community list (gateways.json) or a file of gateways
-/// assumed to exist where that list has none (assumed_gateways.json).
-enum class GatewaySource : std::uint8_t { kReal, kAssumed };
-
-/// "real", "assumed".
-[[nodiscard]] std::string_view name_of(GatewaySource source) noexcept;
-
-/// An operational gateway the realistic model may use.
-struct GatewaySite {
-  ground::GroundSite site;
-  GatewaySource source = GatewaySource::kReal;
-};
+/// Where a gateway comes from, and an operational gateway (shared with the routing program).
+using app::GatewaySite;
+using app::GatewaySource;
 
 /// One direction of a city pair: from (the Starlink customer in the realistic model) to.
 /// Indices into the evaluator's cities.

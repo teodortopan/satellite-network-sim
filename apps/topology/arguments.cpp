@@ -13,10 +13,12 @@
 #include <string_view>
 #include <system_error>
 #include <utility>
+#include <variant>
 #include <vector>
 
 #include "common/arguments.hpp"
-#include "common/steps.hpp"
+#include "inputs/input_arguments.hpp"
+#include "inputs/inputs.hpp"
 #include "satsim/constellation/classification.hpp"
 #include "satsim/time/civil_time.hpp"
 #include "satsim/time/utc_time.hpp"
@@ -29,10 +31,6 @@ namespace satsim::topology_app {
 namespace {
 
 using app::quote;
-
-// The largest --max-lasers accepted: far above any terminal count, small enough to be a typo
-// guard.
-constexpr std::size_t kMaxLasersLimit = 1000;
 
 constexpr std::string_view kUsage =
     R"(usage: topology --snapshot <dir> --ground <dir> --cities <file> --start <UTC>
@@ -160,67 +158,7 @@ constexpr std::array<std::string_view, kOptionCount> kOptionNames = {"--snapshot
                                                                      "--max-lasers",
                                                                      "--links-out"};
 
-std::optional<RoleFilter> parse_roles(std::string_view text) noexcept {
-  for (const RoleFilter roles : {RoleFilter::kStudy, RoleFilter::kValidation, RoleFilter::kAll}) {
-    if (text == name_of(roles)) {
-      return roles;
-    }
-  }
-  return std::nullopt;
-}
-
-// "53deg,43deg": shell names, each at most once, in the order given. With `config`, every
-// name must be one of its shells; without (the shells come from a file read later), the names
-// are checked when the run is prepared.
-std::optional<std::vector<std::string>> parse_shells(
-    std::string_view text, const constellation::ClassificationConfig* config, std::string& error) {
-  std::vector<std::string> shells;
-  std::size_t begin = 0;
-  while (true) {
-    const std::size_t comma = text.find(',', begin);
-    const std::string_view item = text.substr(
-        begin, comma == std::string_view::npos ? std::string_view::npos : comma - begin);
-    if (config == nullptr && item.empty()) {
-      error = "--shells: " + quote(item) + " is not a shell";
-      return std::nullopt;
-    }
-    const bool known =
-        config == nullptr || std::any_of(config->shells.begin(), config->shells.end(),
-                                         [&](const auto& shell) { return shell.name == item; });
-    if (!known) {
-      std::string names;
-      for (const auto& shell : config->shells) {
-        names += (names.empty() ? "" : ", ") + shell.name;
-      }
-      error = "--shells: " + quote(item) + " is not a shell (shells: " + names + ")";
-      return std::nullopt;
-    }
-    if (std::find(shells.begin(), shells.end(), item) != shells.end()) {
-      error = "--shells: " + quote(item) + " is named twice";
-      return std::nullopt;
-    }
-    shells.emplace_back(item);
-    if (comma == std::string_view::npos) {
-      break;
-    }
-    begin = comma + 1;
-  }
-  return shells;
-}
-
 }  // namespace
-
-std::string_view name_of(RoleFilter roles) noexcept {
-  switch (roles) {
-    case RoleFilter::kStudy:
-      return "study";
-    case RoleFilter::kValidation:
-      return "validation";
-    case RoleFilter::kAll:
-      return "all";
-  }
-  return "unknown";
-}
 
 std::string_view usage() noexcept { return kUsage; }
 
@@ -247,6 +185,12 @@ ParsedArguments parse_arguments(std::span<const std::string_view> args) {
     return failure("missing required option(s): " + missing);
   }
   const auto value = [&](Option option) { return values.at(option).value_or(""); };
+  const app::OptionLookup value_of = [&](std::string_view name) -> std::optional<std::string_view> {
+    const auto* const it = std::find(kOptionNames.begin(), kOptionNames.end(), name);
+    return it == kOptionNames.end()
+               ? std::nullopt
+               : values.at(static_cast<std::size_t>(it - kOptionNames.begin()));
+  };
 
   for (const Option path_option : {kSnapshot, kGround, kCities, kOut}) {
     if (value(path_option).empty()) {
@@ -254,162 +198,33 @@ ParsedArguments parse_arguments(std::span<const std::string_view> args) {
                      (path_option == kOut ? " (use - for standard output)" : ""));
     }
   }
-
-  const std::optional<time::CivilTime> civil = time::parse_iso_civil_time(value(kStart));
-  if (!civil) {
-    return failure("--start " + quote(value(kStart)) +
-                   " is not a UTC time YYYY-MM-DDTHH:MM:SS[.fffffffff]");
+  std::variant<app::InputOptions, std::string> shared = app::parse_input_options(value_of);
+  if (auto* error = std::get_if<std::string>(&shared)) {
+    return failure(std::move(*error));
   }
-  const std::optional<time::UtcTime> start = time::UtcTime::from_civil(*civil);
-  if (!start) {
-    return failure("--start " + quote(value(kStart)) + " is not an existing date and time");
-  }
-  Options options{.snapshot_dir = std::filesystem::path(value(kSnapshot)),
-                  .ground_dir = std::filesystem::path(value(kGround)),
-                  .cities_file = std::filesystem::path(value(kCities)),
-                  .start = *start,
+  const app::InputOptions& inputs = std::get<app::InputOptions>(shared);
+  Options options{.snapshot_dir = inputs.snapshot_dir,
+                  .ground_dir = inputs.ground_dir,
+                  .cities_file = inputs.cities_file,
+                  .start = inputs.start,
                   .shells = {},
                   .out = std::string(value(kOut))};
+  app::assign_input_options(options, inputs);
 
-  const std::optional<std::int64_t> duration_ns = app::parse_seconds_as_ns(value(kDuration));
-  if (!duration_ns) {
-    return failure("--duration-s " + quote(value(kDuration)) +
-                   " is not a number of seconds from 0 to 1000000000 with at most 9 decimals");
-  }
-  const std::optional<std::int64_t> step_ns = app::parse_seconds_as_ns(value(kStep));
-  if (!step_ns || *step_ns == 0) {
-    return failure("--step-s " + quote(value(kStep)) +
-                   " is not a positive number of seconds up to 1000000000 with at most 9 "
-                   "decimals");
-  }
-  options.duration_ns = *duration_ns;
-  options.step_ns = *step_ns;
-
-  const std::optional<topology::LaserPattern> pattern =
-      topology::parse_laser_pattern(value(kPattern));
-  if (!pattern) {
-    return failure("--pattern " + quote(value(kPattern)) + " is not three, plus-grid or six");
-  }
-  options.pattern = *pattern;
   const std::optional<EndpointModel> model = parse_endpoint_model(value(kModel));
   if (!model) {
     return failure("--model " + quote(value(kModel)) + " is not realistic or best-case");
   }
   options.model = *model;
-
-  if (values[kShellsFile]) {
-    if (values[kShellsFile]->empty()) {
-      return failure("--shells-file is empty");
+  if (const std::optional<std::string_view> serving = values[kServing];
+      serving && *serving != "highest-elevation") {
+    return failure("--serving " + quote(*serving) + " is not highest-elevation");
+  }
+  if (const std::optional<std::string_view> links_out = values[kLinksOut]) {
+    if (links_out->empty()) {
+      return failure("--links-out is empty");
     }
-    options.shells_file = std::filesystem::path(*values[kShellsFile]);
-  }
-  if (values[kShells]) {
-    std::string error;
-    auto shells = parse_shells(*values[kShells],
-                               options.shells_file ? nullptr : &options.classification, error);
-    if (!shells) {
-      return failure(std::move(error));
-    }
-    options.shells = std::move(*shells);
-  }
-  if (values[kRoles]) {
-    const std::optional<RoleFilter> roles = parse_roles(*values[kRoles]);
-    if (!roles) {
-      return failure("--roles " + quote(*values[kRoles]) + " is not study, validation or all");
-    }
-    options.roles = *roles;
-  }
-  if (values[kRangeCap]) {
-    const std::optional<double> cap = app::parse_finite_double(*values[kRangeCap]);
-    if (!cap || *cap <= 0.0) {
-      return failure("--range-cap-km " + quote(*values[kRangeCap]) +
-                     " is not a finite number of kilometres > 0");
-    }
-    options.limits.range_cap_km = cap;
-  }
-  if (values[kSunExclusion]) {
-    const std::optional<double> angle = app::parse_finite_double(*values[kSunExclusion]);
-    if (!angle || *angle <= 0.0 || *angle > 180.0) {
-      return failure("--sun-exclusion-deg " + quote(*values[kSunExclusion]) +
-                     " is not an angle in (0, 180] degrees");
-    }
-    // Divided first, so 180 deg is exactly pi.
-    options.limits.sun_exclusion_rad = *angle / 180.0 * std::numbers::pi;
-  }
-  if (values[kLockOn]) {
-    const std::optional<std::int64_t> lock_on_ns = app::parse_seconds_as_ns(*values[kLockOn]);
-    if (!lock_on_ns) {
-      return failure("--lock-on-s " + quote(*values[kLockOn]) +
-                     " is not a number of seconds from 0 to 1000000000 with at most 9 "
-                     "decimals");
-    }
-    options.limits.lock_on_s =
-        static_cast<double>(*lock_on_ns) / static_cast<double>(app::kNanosecondsPerSecond);
-  }
-  if (values[kFibreFactor]) {
-    const std::optional<double> factor = app::parse_finite_double(*values[kFibreFactor]);
-    if (!factor || *factor < 1.0) {
-      return failure("--fibre-factor " + quote(*values[kFibreFactor]) +
-                     " is not a finite number >= 1 (fibre is never faster than light in a "
-                     "vacuum along the great circle)");
-    }
-    options.fibre_factor = *factor;
-  }
-  if (values[kHighLatitude]) {
-    const std::string_view setting = *values[kHighLatitude];
-    if (setting != "on" && setting != "off") {
-      return failure("--high-latitude-mask " + quote(setting) + " is not on or off");
-    }
-    options.mask.high_latitude_allowance = setting == "on";
-  }
-  if (values[kServing] && *values[kServing] != "highest-elevation") {
-    return failure("--serving " + quote(*values[kServing]) + " is not highest-elevation");
-  }
-  if (values[kMinElevation]) {
-    const std::optional<double> angle = app::parse_finite_double(*values[kMinElevation]);
-    if (!angle || *angle < 0.0 || *angle >= 90.0) {
-      return failure("--min-elevation-deg " + quote(*values[kMinElevation]) +
-                     " is not an angle in [0, 90) degrees");
-    }
-    options.mask.min_elevation_rad = *angle / 180.0 * std::numbers::pi;
-  }
-  if (values[kMaxGroundRange]) {
-    const std::optional<double> range = app::parse_finite_double(*values[kMaxGroundRange]);
-    if (!range || *range <= 0.0) {
-      return failure("--max-ground-range-km " + quote(*values[kMaxGroundRange]) +
-                     " is not a finite number of kilometres > 0");
-    }
-    options.mask.max_ground_range_km = range;
-  }
-  if (values[kMinElevation] && values[kMaxGroundRange]) {
-    return failure("--min-elevation-deg and --max-ground-range-km cannot be combined");
-  }
-  if ((values[kMinElevation] || values[kMaxGroundRange]) && options.mask.high_latitude_allowance) {
-    return failure(
-        std::string(values[kMinElevation] ? "--min-elevation-deg" : "--max-ground-range-km") +
-        " replaces the masks and cannot be combined with --high-latitude-mask on");
-  }
-  for (const auto& [option, target] :
-       {std::pair{kLinksFile, &options.links_file}, std::pair{kLinksOut, &options.links_out}}) {
-    if (values[option]) {
-      if (values[option]->empty()) {
-        return failure(std::string(kOptionNames.at(option)) + " is empty");
-      }
-      *target = std::filesystem::path(*values[option]);
-    }
-  }
-  if (values[kMaxLasers]) {
-    const std::string_view text = *values[kMaxLasers];
-    std::size_t count = 0;
-    const auto [end, ec] = std::from_chars(text.data(), text.data() + text.size(), count);
-    if (text.empty() || text.front() < '0' || text.front() > '9' || ec != std::errc() ||
-        end != text.data() + text.size() || count < 1 || count > kMaxLasersLimit) {
-      return failure("--max-lasers " + quote(text) + " is not a whole number from 1 to 1000");
-    }
-    if (!options.links_file) {
-      return failure("--max-lasers applies only to --links-file");
-    }
-    options.max_lasers = count;
+    options.links_out = std::filesystem::path(*links_out);
   }
 
   ParsedArguments result;

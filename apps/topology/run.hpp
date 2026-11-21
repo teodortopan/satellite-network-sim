@@ -13,6 +13,7 @@
 #include <variant>
 #include <vector>
 
+#include "inputs/inputs.hpp"
 #include "satsim/constellation/classification.hpp"
 #include "satsim/ground/home_pop.hpp"
 #include "satsim/ground/sites.hpp"
@@ -28,14 +29,12 @@
 
 namespace satsim::topology_app {
 
-/// The ground-data directory's files (written by python/fetch_ground.py). assumed_gateways.json
-/// is optional: gateways assumed to exist where the community list has none, in the format of
-/// gateways.json.
-inline constexpr std::string_view kGatewaysFileName = "gateways.json";
-inline constexpr std::string_view kAssumedGatewaysFileName = "assumed_gateways.json";
-inline constexpr std::string_view kPopCodesFileName = "pop_codes.json";
-inline constexpr std::string_view kPopBlocksFileName = "starlink_pops.csv";
-inline constexpr std::string_view kGeofeedFileName = "starlink_geofeed.csv";
+/// The ground-data directory's files (shared with the routing program).
+using app::kAssumedGatewaysFileName;
+using app::kGatewaysFileName;
+using app::kGeofeedFileName;
+using app::kPopBlocksFileName;
+using app::kPopCodesFileName;
 
 /// The CSV columns, in order. One row per time step, city pair and direction, ordered by time,
 /// then pair (city-file order), then direction (the file's from-to first). A field is empty
@@ -83,67 +82,17 @@ inline constexpr std::array<std::string_view, 26> kCsvColumns = {
     "last_norad_cat_id",
 };
 
-/// "city", "region", "country", "none".
-[[nodiscard]] std::string_view name_of(ground::HomePopLevel level) noexcept;
+/// "city", "region", "country", "none"; a selected pair's direction and the ground counts
+/// (shared with the routing program).
+using app::GroundCounts;
+using app::name_of;
+using app::PairDirection;
 
-/// One direction of a selected city pair.
-struct PairDirection {
-  std::size_t from = 0;  ///< Index into PreparedRun::cities.
-  std::size_t to = 0;
-  ground::PairRole role = ground::PairRole::kStudy;
-  double great_circle_km = 0.0;  ///< On the mean sphere (ground::great_circle_...).
-  double lower_bound_s = 0.0;    ///< great_circle_km / c.
-};
-
-/// Every count of the ground data that the summary reports.
-struct GroundCounts {
-  std::size_t pairs_in_file = 0;
-  std::size_t real_gateways = 0;  ///< Records of gateways.json, any status.
-  std::size_t real_operational = 0;
-  bool assumed_file = false;  ///< assumed_gateways.json exists.
-  std::size_t assumed_gateways = 0;
-  std::size_t assumed_operational = 0;
-  std::size_t pops = 0;
-  std::size_t pop_blocks = 0;
-  std::size_t geofeed_blocks = 0;
-  ground::PopAssignment assignment;
-};
-
-/// A run whose inputs are loaded and checked: write_rows can no longer fail on them.
-struct PreparedRun {
+/// A run whose inputs are loaded and checked: write_rows can no longer fail on them. The
+/// loaded inputs are app::Inputs's (inputs.hpp); `options` are the run's, with
+/// options.classification replaced by the shells file's when there is one.
+struct PreparedRun : app::Inputs {
   Options options;
-  std::int64_t time_count = 0;  ///< Number of time steps, at least 1.
-  int fraction_digits = 0;      ///< Fraction digits of the utc column.
-  std::string first_time;
-  std::string last_time;
-  time::EarthOrientationTable earth_orientation;  ///< Covers every step.
-
-  orbit::ElementFileLoad standard_file{};
-  orbit::ElementFileLoad supplemental_file{};
-  std::size_t superseded = 0;
-  /// The classification of every satellite at the start, with options.classification.
-  constellation::Classification classification{};
-  /// Per shell of options.classification: whether the run uses it (options.shells).
-  std::vector<bool> shell_used;
-  /// `classification` with the planes of unused shells removed (their satellites then carry
-  /// no traffic: they are given ExclusionReason::kNoPlane here, and only here). Everything
-  /// that steps through time uses this one.
-  constellation::Classification working{};
-  /// One per satellite of `working`: set for the plane members.
-  std::vector<std::optional<orbit::Propagator>> propagators;
-  /// Positions failed at the start (the reference time of the plan).
-  std::size_t start_propagation_failures = 0;
-  /// Planned at the start, or read from options.links_file.
-  topology::LinkPlan plan{};
-
-  /// Every city of the city file, in file order, and each one's home PoP.
-  std::vector<ground::City> cities;
-  std::vector<ground::HomePop> home_pops;
-  /// The operational gateways: gateways.json's in file order, then assumed_gateways.json's.
-  std::vector<GatewaySite> gateways;
-  GroundCounts ground{};
-  /// Two per selected pair: from-to, then to-from.
-  std::vector<PairDirection> directions;
 };
 
 using PreparedRunOrError = std::variant<PreparedRun, std::string>;

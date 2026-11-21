@@ -1,6 +1,7 @@
 # Phase 3: Routing
 
-**Status:** specified 2026-11-20, not yet implemented.
+**Status:** specified 2026-11-20. The `routing` program (4.2 to 4.8, 6.1, 6.2) implemented
+2026-11-20; the independent model and the reproductions of 6.3 and 6.4 not yet.
 
 Sources checked on 2026-11-20:
 [Hypatia](https://github.com/snkas/hypatia) and its
@@ -48,7 +49,10 @@ Phases 1 and 2 define orbits, shells, planes, laser links, masks, gateways and P
   uses, reads reordering as loss and slows down.
 - **Drop.** A step where the pair has no usable route.
 - **Ideal delay.** The lowest delay at one step, recomputed at that step (what Phase 2
-  reports).
+  reports). In the realistic model the sending dish may use any satellite it sees for the
+  ideal, not only its serving satellite: the ideal is then a true lower bound on every route
+  of that step (6.1), which Phase 2's number, held to the highest satellite of that instant,
+  is not once a dish keeps a serving satellite for a slot.
 - **Backup path.** The lowest-delay route that shares no satellite with the current one.
 - **Time left in view.** How long a satellite stays at or above a ground site's mask, from
   now, according to the predicted orbits.
@@ -109,6 +113,22 @@ and its status is `no_service` at every step, as in Phase 2.
 With this graph the realistic model is an ordinary shortest path, so every strategy works on
 both models unchanged. It must give Phase 2's numbers again (6.2).
 
+Details:
+
+- Nodes are numbered satellites first, then for each city its sending dish and its receiving
+  dish, then (realistic) the gateways, the end nodes and the serving dishes
+  (`apps/routing/graph.hpp`). The best case is numbered exactly as the `topology` program's
+  graph, so the two find the same paths with the same ties.
+- In the realistic model each sending city also keeps a dish with an edge to every
+  satellite it sees. Only the ideal (2) and the `with-route` rule (4.4) start from it; the
+  routes start from the serving dish, whose one edge goes to the serving satellite while the
+  city sees it.
+- The end node's edge from a gateway carries `fibre_delay_s` from the gateway to the home PoP
+  plus `fibre_delay_s` from the home PoP to the destination, added in that order, as Phase 2
+  adds them.
+- `--hop-delay-ms` is added to every laser edge and every radio edge (dish to satellite,
+  satellite to receiving dish, satellite to gateway), never to fibre; the ideal includes it.
+
 ### 4.3 Time and the planner
 
 - Steps: `start + k × step`. The main runs use a 1 s step.
@@ -125,6 +145,14 @@ both models unchanged. It must give Phase 2's numbers again (6.2).
 - At every step, the held route is checked against that step's graph. If every edge exists
   the status is `ok` and the delay is the sum of that step's edge delays. If not, the step
   is a drop (4.6) and stays one until a later plan gives a route.
+- Step 0 is always a re-plan instant and a slot start. At a step that is both, the dishes
+  pick their serving satellites first and the plan is made with them.
+- `whole-interval` near a slot boundary: a serving dish's edge is tested only at the steps of
+  the interval that lie in the current slot; which satellite the dish takes in the next slot
+  is not predicted.
+- Predictions run past the run's last step when they need to (the last plan's interval, the
+  time left in view): those steps are propagated like any other, and the Earth-orientation
+  file must cover them.
 
 ### 4.4 Serving satellite (realistic model)
 
@@ -152,6 +180,18 @@ satellite a site sees); this code does not propagate.
 
 The serving slot applies to the realistic model only. In the best case the dish may use any
 visible satellite, and the route chooses.
+
+Details:
+
+- A dish that sees no satellite at its slot start has no serving satellite until the next
+  slot start; its steps are `no_coverage`.
+- `with-route`: the route depends on the strategy and the destination, so under this rule each
+  direction and strategy has a dish of its own. At the slot start the strategy plans, from
+  its own held route, on that step's graph with the dish free to use any satellite it sees;
+  this trial plan does not replace the held route. The serving satellite is the first
+  satellite of the route it finds; if it finds none, the highest-elevation one.
+- `highest-whole-slot` reads the time left in view with the slot as the horizon: a satellite
+  qualifies when it may be used at every step of the slot.
 
 ### 4.5 Strategies
 
@@ -186,6 +226,17 @@ Each direction keeps one held route. At a re-plan instant, with the planning gra
 
 If no route exists at a re-plan instant the direction has none until the next plan.
 
+Details of `longest-lived`:
+
+- A satellite moves north when its Earth-fixed z is larger at the next step than at this one;
+  otherwise (and when either position is missing) it moves south.
+- "Longest time left" ties go to the higher elevation, then the lower catalogue number. Among
+  equal-delay pairs the north head wins, then the north tail.
+- Candidates are taken only among the satellites whose ground edge is in the planning graph
+  (with `whole-interval`, those the site sees for the whole interval).
+- Realistic: with no shortest path at this instant there is no gateway, no candidate and no
+  route (`no_gateway`).
+
 ### 4.6 Drops and their causes
 
 A step with no usable route is a drop. Its cause is the first of these that applies:
@@ -203,6 +254,22 @@ A step with no usable route is a drop. Its cause is the first of these that appl
 Consecutive dropped steps of one direction and strategy with the same cause form one drop
 event, with a start time and a length.
 
+Details:
+
+- The first three causes are tested at the step itself. Then, if a route is held,
+  `ground_link_lost` or `laser_link_down` for its first missing edge, a ground edge before a
+  laser edge (the first in route order of each). A held route whose dish edge is gone because
+  a new slot gave the dish another satellite is `ground_link_lost`, naming the old satellite.
+- If no route is held, the cause is the one the last plan's step had: `no_gateway` or
+  `no_path` as above, or `no_service`, `no_coverage` or `serving_left_view` when that is why
+  the plan found nothing.
+- Responsible: for `no_coverage` the city that sees nothing (the sender first); for
+  `serving_left_view` the satellite and the sending city; for `ground_link_lost` the
+  satellite and the city or gateway of the lost edge; for `laser_link_down` the link and its
+  `LinkDownReason`; for `no_gateway` the serving satellite. A drop event names what was
+  responsible at its first step; a change of responsible satellite or link with the same
+  cause does not start a new event.
+
 ### 4.7 Measures
 
 Per direction and strategy, over the run:
@@ -218,6 +285,12 @@ Per direction and strategy, over the run:
 - **Backup path delay,** computed at each re-plan instant: the shortest path in the planning
   graph with the held route's satellites removed. In the realistic model the serving
   satellite is not removed, because the dish has only one.
+
+Details: rates are per hour of the run, (steps − 1) × step. A route's lifetime is a run of
+consecutive `ok` steps with the same route; runs cut by the start or the end of the run are
+counted, as in Phase 2. The extra delay is taken at `ok` steps. The backup is computed for the
+route held after the plan, its delay and its delay minus the held route's are both in the
+planning graph, and re-plans with no backup are counted.
 
 ### 4.8 The `routing` program
 
@@ -237,6 +310,8 @@ a link file, endpoint model, the limits of Phase 2, and:
 | `--hop-delay-ms` | A fixed delay added to every radio and laser edge (the Bariloche paper adds processing time per hop); default 0 |
 | `--max-lasers` | The most links one satellite may have in a link file; default: the pattern's count |
 | `--links-file`, `--links-out` | Read the laser links from a file instead of planning them; write the links used |
+| `--directions` | `both` (default), or `forward`: only each pair's from-to (Hypatia's one direction per pair) |
+| `--drops-out` | The drops CSV; not written without it |
 
 One run steps through time once and evaluates every listed strategy, since propagating the
 satellites is the expensive part.
@@ -251,7 +326,16 @@ Output:
   satellite, link or site responsible.
 - **Summary:** the Phase 2 counts, the measures of 4.7, and the checks of 6.1.
 
-Exit status: 0, 1 if any check of 6.1 fails, 2 for bad arguments or inputs.
+Exit status: 0, 1 if any check of 6.1 fails, 2 for bad arguments or inputs (also for output
+that cannot be written).
+
+Details: `--replan-s` and `--serving-slot-s` must be whole multiples of the step, the default
+slot of 15 s too when it is not given. The routes CSV (`apps/routing/run.hpp`) has a `status`
+of `ok` or `drop`; the route, its laser hops, first and last satellite and gateway are written
+on `ok` rows, the route as its satellites' catalogue numbers separated by spaces; `plan` says
+what the plan did (`kept`, `replaced` or `none`) at a re-plan instant and is empty otherwise.
+Rows are ordered by time, then direction, then strategy; drop events by start, then
+direction, then strategy.
 
 ### 4.9 Link files
 
@@ -312,6 +396,10 @@ Counted in the summary; any failure gives exit status 1.
 - A route starts at the sending dish and ends at the receiving dish or the end node, with no
   node twice.
 - Phase 2's physical checks on the links (`run_physical_checks`).
+
+The first check is made against the step's link states and ground links themselves, not the
+graph built from them, so that a graph-building error shows. An `ok` step with no ideal counts
+as below the ideal. The route's shape is checked at every step that holds a route.
 
 ### 6.2 Agrees with Phase 2
 

@@ -3,7 +3,7 @@
 # (endpoints.hpp) live here, on top of the generic shortest path (satsim::network).
 satsim_add_library(topology_app
   SOURCES arguments.cpp endpoints.cpp run.cpp
-  DEPS satsim::app_common satsim::topology satsim::network satsim::constellation
+  DEPS satsim::app_inputs satsim::app_common satsim::topology satsim::network satsim::constellation
     satsim::ground satsim::orbit satsim::time)
 # Headers are included as "topology/run.hpp".
 target_include_directories(satsim_topology_app PUBLIC "${PROJECT_SOURCE_DIR}/apps")

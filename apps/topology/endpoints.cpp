@@ -42,25 +42,6 @@ double slant_km(std::span<const topology::VisibleSatellite> visible, std::size_t
 
 }  // namespace
 
-std::string_view name_of(EndpointModel model) noexcept {
-  switch (model) {
-    case EndpointModel::kRealistic:
-      return "realistic";
-    case EndpointModel::kBestCase:
-      return "best-case";
-  }
-  return "unknown";
-}
-
-std::optional<EndpointModel> parse_endpoint_model(std::string_view name) noexcept {
-  for (const EndpointModel model : {EndpointModel::kRealistic, EndpointModel::kBestCase}) {
-    if (name == name_of(model)) {
-      return model;
-    }
-  }
-  return std::nullopt;
-}
-
 std::string_view name_of(PathStatus status) noexcept {
   switch (status) {
     case PathStatus::kOk:
@@ -75,10 +56,6 @@ std::string_view name_of(PathStatus status) noexcept {
       return "no_path";
   }
   return "unknown";
-}
-
-std::string_view name_of(GatewaySource source) noexcept {
-  return source == GatewaySource::kReal ? "real" : "assumed";
 }
 
 StepNetwork::StepNetwork(std::size_t satellite_count, std::size_t city_count)

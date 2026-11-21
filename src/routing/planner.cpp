@@ -33,9 +33,10 @@ struct Candidate {
   double delay_s = 0.0;
 };
 
+// The shortest path from source to target: `given` when the caller has it, else searched.
 std::optional<Candidate> shortest(const network::Graph& graph, std::size_t source,
-                                  std::size_t target) {
-  Route route = network::shortest_paths(graph, source).path_to(target);
+                                  std::size_t target, const Route* given) {
+  Route route = given != nullptr ? *given : network::shortest_paths(graph, source).path_to(target);
   if (route.empty()) {
     return std::nullopt;
   }
@@ -104,6 +105,18 @@ std::optional<Candidate> best_joined(const network::Graph& graph, std::size_t so
 
 PlanResult RoutePlanner::plan(const network::Graph& graph, std::size_t source, std::size_t target,
                               const AccessCandidates& candidates) {
+  return plan_from(graph, source, target, nullptr, candidates);
+}
+
+PlanResult RoutePlanner::plan_with_shortest(const network::Graph& graph, std::size_t source,
+                                            std::size_t target, const Route& shortest_path,
+                                            const AccessCandidates& candidates) {
+  return plan_from(graph, source, target, &shortest_path, candidates);
+}
+
+PlanResult RoutePlanner::plan_from(const network::Graph& graph, std::size_t source,
+                                   std::size_t target, const Route* shortest_path,
+                                   const AccessCandidates& candidates) {
   std::optional<double> held_s;
   if (!route_.empty() && route_.front() == source && route_.back() == target) {
     held_s = network::path_delay_s(graph, route_);
@@ -122,14 +135,14 @@ PlanResult RoutePlanner::plan(const network::Graph& graph, std::size_t source, s
 
   switch (strategy_.kind) {
     case StrategyKind::kLowestDelay:
-      return take(shortest(graph, source, target));
+      return take(shortest(graph, source, target, shortest_path));
     case StrategyKind::kKeepUntilBroken:
       if (held_s.has_value()) {
         return keep();
       }
-      return take(shortest(graph, source, target));
+      return take(shortest(graph, source, target, shortest_path));
     case StrategyKind::kThreshold: {
-      std::optional<Candidate> best = shortest(graph, source, target);
+      std::optional<Candidate> best = shortest(graph, source, target, shortest_path);
       if (held_s.has_value() && best.has_value()) {
         const double limit_s = strategy_.threshold_kind == ThresholdKind::kAbsolute
                                    ? strategy_.threshold_s

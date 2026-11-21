@@ -9,6 +9,7 @@
 #include <string_view>
 #include <vector>
 
+#include "inputs/inputs.hpp"
 #include "satsim/constellation/classification.hpp"
 #include "satsim/ground/distance.hpp"
 #include "satsim/time/utc_time.hpp"
@@ -20,11 +21,9 @@
 
 namespace satsim::topology_app {
 
-/// Which city pairs of the city file a run computes.
-enum class RoleFilter : std::uint8_t { kStudy, kValidation, kAll };
-
-/// "study", "validation", "all".
-[[nodiscard]] std::string_view name_of(RoleFilter roles) noexcept;
+/// Which city pairs of the city file a run computes (shared with the routing program).
+using app::name_of;
+using app::RoleFilter;
 
 /// What one run of the program computes and where it writes it. Built by parse_arguments,
 /// which has checked every value; tests may also fill one in directly (prepare_run checks
