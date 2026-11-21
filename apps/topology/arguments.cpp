@@ -43,6 +43,7 @@ constexpr std::string_view kUsage =
                 [--serving <highest-elevation>]
                 [--min-elevation-deg <deg> | --max-ground-range-km <km>]
                 [--links-file <file> [--max-lasers <n>]] [--links-out <file>]
+                [--plan-time <UTC>]
 
 Builds the Starlink network at each time step of a saved snapshot (shells and planes,
 laser links, ground links) and writes, for every city pair in both directions, the one-way
@@ -56,7 +57,8 @@ for physical possibility (spec 6.1).
                               assumed_gateways.json (same format as gateways.json)
   --cities <file>             the cities and city pairs (cities.json)
   --start <UTC>               first time, YYYY-MM-DDTHH:MM:SS[.fffffffff], UTC; also the
-                              reference time of the shells, planes and laser plan
+                              reference time of the shells, planes and laser plan unless
+                              --plan-time is given
   --duration-s <s>            length of the run in seconds (decimal, >= 0); the end time is
                               included when it lands on a step
   --step-s <s>                spacing of the times in seconds (decimal, > 0)
@@ -91,6 +93,8 @@ for physical possibility (spec 6.1).
   --max-lasers <n>            the most links one satellite may have in --links-file
                               (default: the pattern's laser count)
   --links-out <file>          write the laser links used to this file, in the same format
+  --plan-time <UTC>           reference time of the shells, planes and laser plan, same
+                              format as --start, before or after it (default: --start)
   --help, -h                  print this text
 
 Each satellite uses its supplemental element set if there is one, else its standard one.
@@ -132,6 +136,7 @@ enum Option : std::uint8_t {
   kLinksFile,
   kMaxLasers,
   kLinksOut,
+  kPlanTime,
   kOptionCount
 };
 constexpr std::array<std::string_view, kOptionCount> kOptionNames = {"--snapshot",
@@ -156,7 +161,8 @@ constexpr std::array<std::string_view, kOptionCount> kOptionNames = {"--snapshot
                                                                      "--max-ground-range-km",
                                                                      "--links-file",
                                                                      "--max-lasers",
-                                                                     "--links-out"};
+                                                                     "--links-out",
+                                                                     "--plan-time"};
 
 }  // namespace
 

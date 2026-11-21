@@ -206,6 +206,17 @@ std::variant<InputOptions, std::string> parse_input_options(const OptionLookup& 
     return std::string(min_elevation ? "--min-elevation-deg" : "--max-ground-range-km") +
            " replaces the masks and cannot be combined with --high-latitude-mask on";
   }
+  if (const auto text = value_of("--plan-time")) {
+    const std::optional<time::CivilTime> plan_civil = time::parse_iso_civil_time(*text);
+    if (!plan_civil) {
+      return "--plan-time " + quote(*text) + " is not a UTC time YYYY-MM-DDTHH:MM:SS[.fffffffff]";
+    }
+    const std::optional<time::UtcTime> plan_time = time::UtcTime::from_civil(*plan_civil);
+    if (!plan_time) {
+      return "--plan-time " + quote(*text) + " is not an existing date and time";
+    }
+    options.plan_time = *plan_time;
+  }
   if (const auto path = value_of("--links-file")) {
     if (path->empty()) {
       return std::string("--links-file is empty");

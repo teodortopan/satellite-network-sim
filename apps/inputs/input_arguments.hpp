@@ -22,7 +22,7 @@ inline constexpr std::array<std::string_view, 7> kRequiredInputOptionNames = {
     "--snapshot", "--ground", "--cities", "--start", "--duration-s", "--step-s", "--pattern"};
 
 /// The optional shared options.
-inline constexpr std::array<std::string_view, 12> kOptionalInputOptionNames = {
+inline constexpr std::array<std::string_view, 13> kOptionalInputOptionNames = {
     "--shells",
     "--shells-file",
     "--roles",
@@ -34,7 +34,8 @@ inline constexpr std::array<std::string_view, 12> kOptionalInputOptionNames = {
     "--min-elevation-deg",
     "--max-ground-range-km",
     "--links-file",
-    "--max-lasers"};
+    "--max-lasers",
+    "--plan-time"};
 
 /// The shared options, or why they are rejected. The required ones must all be present (the caller
 /// checks). Rejected: an empty --snapshot, --ground or --cities, a start time that is not
@@ -47,8 +48,10 @@ inline constexpr std::array<std::string_view, 12> kOptionalInputOptionNames = {
 /// factor that is not a finite number >= 1, a high-latitude setting other than on or off, a
 /// minimum elevation not in [0, 90) degrees, a longest ground range that is not a finite
 /// number > 0 km, both of those, either with the high-latitude mask on, an empty --links-file,
-/// and a --max-lasers that is not a whole number from 1 to 1000 or is given without
-/// --links-file.
+/// a --max-lasers that is not a whole number from 1 to 1000 or is given without --links-file,
+/// and a --plan-time that is not YYYY-MM-DDTHH:MM:SS[.fffffffff] or does not exist (it may be
+/// before or after the start: it is only the reference time of the shells, planes and laser
+/// plan).
 [[nodiscard]] std::variant<InputOptions, std::string> parse_input_options(
     const OptionLookup& value_of);
 

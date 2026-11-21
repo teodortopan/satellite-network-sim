@@ -89,7 +89,8 @@ struct InputOptions {
   std::filesystem::path ground_dir;
   /// The cities and pairs (cities.json).
   std::filesystem::path cities_file;
-  /// First time step, and the reference time of the classification and the link plan.
+  /// First time step, and (without plan_time) the reference time of the classification and
+  /// the link plan.
   time::UtcTime start;
   /// Length of the run and spacing of its steps (step_count).
   std::int64_t duration_ns = 0;
@@ -107,6 +108,10 @@ struct InputOptions {
   std::optional<std::filesystem::path> shells_file = std::nullopt;
   std::optional<std::filesystem::path> links_file = std::nullopt;
   std::optional<std::size_t> max_lasers = std::nullopt;
+  /// The reference time of the classification, the positions at it and the laser plan
+  /// (Phase 4 spec 4.10 --plan-time); nullopt means `start`. Any time the Earth-orientation
+  /// table covers, before or after the start. A links file is read the same either way.
+  std::optional<time::UtcTime> plan_time = std::nullopt;
   /// Steps after the last one whose Earth-orientation values must also exist: the look-ahead
   /// of a program that predicts beyond the run (0 for none).
   std::int64_t lookahead_steps = 0;
@@ -131,6 +136,7 @@ template <typename O>
                       .shells_file = o.shells_file,
                       .links_file = o.links_file,
                       .max_lasers = o.max_lasers,
+                      .plan_time = o.plan_time,
                       .lookahead_steps = 0};
 }
 
@@ -153,6 +159,7 @@ void assign_input_options(O& o, const InputOptions& in) {
   o.shells_file = in.shells_file;
   o.links_file = in.links_file;
   o.max_lasers = in.max_lasers;
+  o.plan_time = in.plan_time;
 }
 
 /// One direction of a selected city pair.
@@ -192,7 +199,7 @@ struct Inputs {
   orbit::ElementFileLoad standard_file{};
   orbit::ElementFileLoad supplemental_file{};
   std::size_t superseded = 0;
-  /// The classification of every satellite at the start.
+  /// The classification of every satellite at the plan time (the start by default).
   constellation::Classification classification{};
   /// Per shell of `config`: whether the run uses it.
   std::vector<bool> shell_used;
@@ -202,9 +209,9 @@ struct Inputs {
   constellation::Classification working{};
   /// One per satellite of `working`: set for the plane members.
   std::vector<std::optional<orbit::Propagator>> propagators;
-  /// Positions failed at the start (the reference time of the plan).
+  /// Positions failed at the plan time (the start by default).
   std::size_t start_propagation_failures = 0;
-  /// Planned at the start, or read from the links file.
+  /// Planned at the plan time (the start by default), or read from the links file.
   topology::LinkPlan plan{};
 
   /// Every city of the city file, in file order, and each one's home PoP.
@@ -224,12 +231,13 @@ using InputsOrError = std::variant<Inputs, std::string>;
 /// naming the file, time or value at fault, if: the shells file cannot be read or is not a
 /// usable configuration, an option is out of range (step, duration, limits, ground mask, fibre
 /// factor, max lasers, a shell name), the snapshot directory or one of its files is missing, a
-/// step (or a look-ahead step) has no Earth-orientation values, a ground file is missing or has
-/// any bad record, no pair has the selected role, an element file cannot be loaded as a whole,
-/// or options.links_file is refused (topology::read_link_plan_file). Then classifies the
-/// snapshot at the start, propagates every plane member there and plans the laser links, or
-/// reads them from options.links_file against `working` with the pattern and
-/// options.max_lasers.
+/// step (or a look-ahead step, or the plan time) has no Earth-orientation values, a ground file
+/// is missing or has any bad record, no pair has the selected role, an element file cannot be
+/// loaded as a whole, or options.links_file is refused (topology::read_link_plan_file). Then
+/// classifies the snapshot at the plan time (options.plan_time, else the start), propagates
+/// every plane member there and plans the laser links, or reads them from options.links_file
+/// against `working` with the pattern and options.max_lasers. The steps of the run still start
+/// at options.start.
 [[nodiscard]] InputsOrError prepare_inputs(const InputOptions& options_given);
 
 /// Sums one step's physical-check counts into a run's.
@@ -237,8 +245,8 @@ void add_checks(topology::PhysicalCheckCounts& total, const topology::PhysicalCh
 
 // Summary lines both programs write, each ending in a newline.
 
-/// "  inputs: snapshot ..., ground ..., cities ..., shells ...[, laser links from the file
-/// ...]".
+/// "  inputs: snapshot ..., ground ..., cities ..., shells ...[, plan time ... UTC][, laser
+/// links from the file ...]"; the plan time only when options.plan_time is set.
 void write_inputs_line(std::ostream& out, const InputOptions& options, const Inputs& inputs);
 
 /// "fibre factor 1.980, range cap none, Sun exclusion off, lock-on 0.000 s, atmosphere 80 km,

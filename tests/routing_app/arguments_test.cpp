@@ -236,4 +236,14 @@ TEST(RoutingArgumentsTest, Rejections) {
             std::string::npos);
 }
 
+// --plan-time is the shared option (its rejections are the topology program's tests).
+TEST(RoutingArgumentsTest, PlanTime) {
+  EXPECT_FALSE(options_of(parse_arguments(kRequired)).plan_time.has_value());
+  EXPECT_EQ(options_of(parse_with({"--plan-time", "2026-11-18T21:14:00"})).plan_time,
+            satsim::time::UtcTime::from_civil({2026, 11, 18, 21, 14, 0.0}));
+  EXPECT_EQ(error_of(parse_with({"--plan-time", "x"})),
+            "--plan-time \"x\" is not a UTC time YYYY-MM-DDTHH:MM:SS[.fffffffff]");
+  EXPECT_NE(satsim::routing_app::usage().find("--plan-time <UTC>"), std::string_view::npos);
+}
+
 }  // namespace

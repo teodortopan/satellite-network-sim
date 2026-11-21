@@ -26,12 +26,14 @@
 #include <vector>
 
 #include "agreement.hpp"
+#include "common/steps.hpp"
 #include "fixture.hpp"
 #include "routing/arguments.hpp"
 #include "routing/engine.hpp"
 #include "routing/settings.hpp"
 #include "satsim/ground/distance.hpp"
 #include "satsim/routing/strategy.hpp"
+#include "satsim/time/utc_time.hpp"
 #include "satsim/topology/link_plan.hpp"
 #include "satsim/topology/link_state.hpp"
 #include "satsim/topology/positions.hpp"
@@ -381,6 +383,70 @@ void ForwardDirectionsOnlyAndTheSummary() {
   EXPECT_EQ(text.find("Beta -> Alpha"), std::string::npos);
   EXPECT_NE(text.find("path changes per hour"), std::string::npos);
   EXPECT_NE(text.find("checks: PASSED"), std::string::npos);
+}
+
+// --plan-time (Phase 4 spec 4.10): a run started 30 s late whose plan time is the fixture's
+// start classifies and plans its lasers on the network of the run that started then, so
+// lowest-delay re-planned every step with a slot of one step gives that run's rows at the same
+// times, in both models. Only the first plan's outcome may differ: the late run holds no route
+// before it, so it is "replaced" where the earlier run may have "kept". The summary names the
+// plan time only when one is given.
+TEST(RoutingRunTest, APlanTimeGivesTheNetworkOfTheRunStartedThen) {
+  const app::PreparedRun& early = routing_run();  // 60 s from the fixture's start.
+  app::Options late_options = options(snapshot().dir.path(), kDurationS - 2 * kStepS, kStepS,
+                                      app::EndpointModel::kRealistic);
+  late_options.plan_time = late_options.start;
+  late_options.start = satsim::app::time_of_step(late_options.start, kStepS * kNs, 2);
+  const app::PreparedRun late = prepare(late_options);
+  // The same laser plan (on this shell, one planned 30 s later differs in some links).
+  EXPECT_TRUE(late.plan.links == early.plan.links) << "the laser plans differ";
+  const std::size_t per_step = early.directions.size();
+  for (const auto model : {app::EndpointModel::kRealistic, app::EndpointModel::kBestCase}) {
+    SCOPED_TRACE(std::string(satsim::app::name_of(model)));
+    app::PreparedRun a = early;
+    app::PreparedRun b = late;
+    a.options.model = model;
+    b.options.model = model;
+    const Written wa = write(a);
+    const Written wb = write(b);
+    EXPECT_TRUE(wb.outcome.statistics.passed());
+    const Rows ra = parse_csv(wa.csv);
+    const Rows rb = parse_csv(wb.csv);
+    ASSERT_EQ(ra.size(), 1 + kSteps * per_step);
+    ASSERT_EQ(rb.size(), 1 + (kSteps - 2) * per_step);
+    for (std::size_t i = 1; i < rb.size(); ++i) {
+      const std::vector<std::string>& got = rb[i];
+      const std::vector<std::string>& want = ra[i + 2 * per_step];
+      ASSERT_EQ(got.size(), want.size());
+      for (std::size_t c = 0; c < got.size(); ++c) {
+        if (c == rc("plan") && i <= per_step) {
+          continue;
+        }
+        EXPECT_EQ(got[c], want[c]) << "row " << i << ", column " << app::kRoutesColumns[c];
+      }
+    }
+    std::ostringstream with;
+    app::write_summary(b, wb.outcome.statistics, with);
+    EXPECT_NE(with.str().find(", plan time 2026-11-18T12:00:00 UTC"), std::string::npos);
+    std::ostringstream without;
+    app::write_summary(a, wa.outcome.statistics, without);
+    EXPECT_EQ(without.str().find("plan time"), std::string::npos);
+  }
+}
+
+// A plan time outside the Earth-orientation table (2026-10-01 to 2026-12-31) is refused,
+// naming it, before anything slow is loaded.
+TEST(RoutingRunTest, APlanTimeWithoutEarthOrientationIsRefused) {
+  app::Options o =
+      options(snapshot().dir.path(), kDurationS, kStepS, app::EndpointModel::kRealistic);
+  o.plan_time = satsim::time::UtcTime::from_civil({2027, 6, 1, 0, 0, 0.0});
+  ASSERT_TRUE(o.plan_time.has_value());
+  const app::PreparedRunOrError prepared = app::prepare_run(o);
+  const auto* error = std::get_if<std::string>(&prepared);
+  ASSERT_NE(error, nullptr);
+  EXPECT_NE(error->find("no Earth-orientation values for the plan time 2027-06-01T00:00:00"),
+            std::string::npos)
+      << *error;
 }
 
 // The program's pieces on one prepared run (one process).
