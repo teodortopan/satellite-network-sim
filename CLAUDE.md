@@ -2,9 +2,11 @@
 
 A simulator of a Starlink-like satellite network on real public orbital data.
 
-Global rules (workflow, commits, review, self-review) load from
-`~/.claude/CLAUDE.md`. Project-specific rules are below. The Phase 1 spec
-(`docs/phase-1-orbits.md`) has a glossary of every orbital term used here.
+On the owner's computer, global rules (workflow, commits, review, self-review)
+load from `~/.claude/CLAUDE.md`. A cloud session never sees that file, so the
+ones this project relies on are repeated under "Working rules" below.
+Project-specific rules follow. The Phase 1 spec (`docs/phase-1-orbits.md`) has a
+glossary of every orbital term used here.
 
 ## Stack
 
@@ -28,8 +30,8 @@ Global rules (workflow, commits, review, self-review) load from
 - `scripts/check.sh <step>` runs one step (`format`, `python-lint`,
   `asan-gcc`, `asan-clang`, `valgrind`, `tidy`, `validate`, `validate-topology`,
   `validate-routing`).
-  The GCC sanitizer step takes about 8 minutes; `asan-clang` runs the same tests in
-  seconds, so prefer it while iterating.
+  The GCC sanitizer step takes 10 to 15 minutes and the full check about 30;
+  `asan-clang` runs the same tests in seconds, so prefer it while iterating.
 - `python/compare_spacex.py` (against SpaceX's trajectory files) and
   `python/plot_phase1.py` (the report's plots) are run by hand; the exact
   commands are in `docs/phase-1-results.md`. The same goes for Phase 2:
@@ -60,19 +62,24 @@ Global rules (workflow, commits, review, self-review) load from
 | `include/satsim/constellation/`, `src/constellation/` | Shells, planes, order in a plane, exclusion reasons, shell definitions from a file |
 | `include/satsim/ground/`, `src/ground/` | Cities, gateways, PoPs, the home-PoP rule, great-circle distance, fibre delay |
 | `include/satsim/topology/`, `src/topology/` | Positions per step, line of sight, elevation and masks, laser patterns, link state, ground links, physical checks |
-| `include/satsim/network/`, `src/network/` | A weighted graph and Dijkstra |
+| `include/satsim/network/`, `src/network/` | A weighted graph, Dijkstra (also avoiding given nodes), whether a path is up and its delay |
+| `include/satsim/routing/`, `src/routing/` | The four routing strategies, the held route of one direction, how a route change is classified |
 | `apps/propagate/` | The `propagate` program: snapshot and time range in, CSV out |
 | `apps/constellation/` | The `constellation` program: each satellite's shell, plane and position, or why it has none |
 | `apps/topology/` | The `topology` program: delay per city pair, direction and time step, under two endpoint models |
-| `apps/common/` | Helpers the three programs share: CSV, statistics, time steps, arguments |
+| `apps/routing/` | The `routing` program: each direction's route over time under several strategies, with the cause of every drop |
+| `apps/inputs/` | What `topology` and `routing` share: loading the snapshot and ground data, city pairs, positions and link states per step |
+| `apps/common/` | Helpers every program shares: CSV, statistics, time steps, arguments |
 | `tests/<module>/` | GoogleTest per module, with small fixtures |
-| `python/` | Snapshot and ground-data download, reference generation, validation, SpaceX comparison, the Phase 2 runs, plots |
+| `python/` | Snapshot and ground-data download, reference generation, validation (three independent models), SpaceX comparison, the Phase 2 runs, the Phase 3 reproductions, plots |
 | `data/starlink/<date>/` | One dated snapshot: element sets, IERS file, trajectory checksums |
-| `data/ground/` | Cities and pairs; per date: SpaceX's PoP and location files, the community gateway list, assumed gateways |
+| `data/ground/` | Cities and pairs; per date: SpaceX's PoP and location files, the community gateway list, assumed gateways; `hypatia/`: Hypatia's 100 cities |
+| `data/lens/<date>/` | Checksums of the LENS dish ping files (the files are not in git) |
+| `docs/` | Per phase: the spec (`phase-N-<name>.md`), the report (`phase-N-results.md`), its data and plots; `ci.md` |
 
 Later modules may depend on earlier ones (core, time, frames, orbit,
-constellation, ground, topology, network), never the reverse. `network` depends
-on nothing else.
+constellation, ground, topology), never the reverse. `network` depends on
+nothing else, and `routing` only on `network`.
 
 ## Conventions
 
@@ -144,7 +151,14 @@ on nothing else.
   Luanda). Hypatia's 15.19 revolutions per day is about 510 km, not 550.
 - Prefer a non-sanitizer check executable for tests that read the full snapshot
   or the real ground files over a sanitizer test, because GCC's sanitizers make
-  them take over a minute each.
+  them take over a minute each. Keep new sanitizer tests on small shells for the
+  same reason: one test on Hypatia's full shell took 11 minutes under GCC.
+- Prefer taking longest-lived's candidate satellites per shell over one pair
+  overall, because lasers never join two shells: candidates in different shells
+  at the two ends gave New York to London a median of 270 ms over 71 hops.
+- Prefer deciding whether a laser link is permanent from the widest angle the
+  two satellites ever reach over the link's state at one instant, because a pair
+  in sight at the reference time can be out of sight half an orbit later.
 - Prefer exact IEEE arithmetic over `-ffast-math`, because it breaks the
   bit-level agreement with the published SGP4 cases and differs between
   arm64 (local) and x86-64 (CI).
@@ -169,6 +183,56 @@ A strategy being tried on this project. Revisit it if it isn't paying off.
   hygienic. Never accept a subagent's report at face value. Read the diff, run
   the check command, and fix or send back anything that is wrong, sloppy,
   untested or out of scope before it is committed.
+
+## Working rules
+
+The rules from the owner's global file that this project relies on.
+
+- **Plan, implement, verify, commit.** For anything non-trivial write a short
+  plan first, then verify by running `scripts/check.sh` for real. Never assume it
+  passes. Cross-cutting plans are kept in `docs/`.
+- **A bug becomes a failing test first.** Reproduce it as a test named after the
+  bug, confirm it fails for the right reason, fix the code without editing that
+  test, then run the full check.
+- **Prove new tests can fail.** After a unit of work, plant bugs one at a time
+  (never committed), run `scripts/check.sh asan-clang`, and confirm a named test
+  fails on each.
+- **Self-review before every commit:** only the intended files changed; every
+  plan item is present; the check ran and is green; edge cases and data-critical
+  arithmetic traced by hand on one example; line numbers, signatures and helpers
+  re-read rather than remembered.
+- **One commit per finished feature,** with a clear subject and the
+  `Co-Authored-By` trailer of the model in use.
+- **Decisions belong to the owner and are put to him in chat,** with the options
+  and a recommendation. No open questions or option lists in specs or other
+  committed files. `DECISIONS.md` holds only decisions he has made, in his words:
+  edit it only when he asks, and commit it only when he says.
+- **Stop and tell the owner** when a result contradicts one of his decisions or a
+  tolerance in a spec. Never tune a result to match a published number.
+- **Explain in simple words,** define each term at first use, and report what
+  failed or was skipped as plainly as what passed.
+- **Never run `/code-review ultra`** (it is billed separately); `high` is the
+  default and the ceiling.
+- **Confirm before destructive git operations:** history rewrites, hard resets,
+  `git clean`, forced anything.
+
+## Pushing, and working in a cloud session
+
+- **On the owner's computer:** local commits only. Never push or open a pull
+  request without his explicit OK, each time.
+- **In a cloud session,** work that is not pushed is lost when the session ends.
+  Work on a branch of its own and push that branch as often as needed. Never
+  push to `main`, never merge into it and never open a pull request without the
+  owner's explicit OK, each time.
+- **Docker in the cloud:** it is installed but the daemon does not start by
+  itself; run `dockerd` in the background (or have the environment's setup script
+  do it) before `scripts/check.sh`. The image is rebuilt in every new session.
+- **Not in git, so not in the cloud:** a snapshot's SpaceX trajectory files
+  (only `python/compare_spacex.py` needs them, and they cannot be downloaded
+  again), the LENS ping files (`python/fetch_lens.py`; only
+  `python/compare_lens.py` needs them), and everything under `results/` (the
+  runners regenerate it). The committed summaries in `docs/phase-N-data/` hold
+  the numbers the reports quote.
 
 ## Repo
 
