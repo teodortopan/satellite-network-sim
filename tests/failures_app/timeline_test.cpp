@@ -9,6 +9,7 @@
 #include <vector>
 
 #include "failure/fixture.hpp"
+#include "failures/reports.hpp"
 #include "inputs/inputs.hpp"
 #include "satsim/failure/schedule.hpp"
 #include "satsim/topology/link_state.hpp"
@@ -345,6 +346,62 @@ TEST(TimelineTest, OldFailureEndingDuringTheRunReturns) {
   EXPECT_EQ(t.force_at(50.0)[0], LinkForce::kAcquiring);
   EXPECT_EQ(t.force_at(80.0)[0], LinkForce::kInForce);
   EXPECT_EQ(t.changes, (std::vector<double>{50.0, 80.0}));
+}
+
+// The run ends at its last step's instant, 99 s (100 steps; spec 4.4 Details: nothing is
+// worked out after it). Satellite 1 fails at 99 s, the last step, a step like any other: it is
+// down in the truth and its links are failed from 99 s, and its facts exist with their
+// detectors at 99 + 0.1 s; but those detections fall after the end, so nobody reports: the
+// planner never knows, not even gateway 0's own detection, and no fact has a report.
+TEST(TimelineTest, AFailureAtTheLastStepIsDetectedButNeverReported) {
+  World w;
+  const Timeline t = w.timeline({failure_at(ElementKind::kSatellite, 1, 99.0)});
+  EXPECT_EQ(t.satellite_down_at(99.0)[1], 1);
+  EXPECT_EQ(t.force_at(99.0)[0], LinkForce::kFailed);
+  EXPECT_EQ(t.changes, (std::vector<double>{99.0}));
+  ASSERT_EQ(t.facts.size(), 4U);
+  const double d = 99.0 + 0.1;
+  expect_fact(t.facts[0], satellite(1), true, 99.0, {{kDish0, d}, {kGateway0, d}}, kInf);
+  expect_fact(t.facts[1], link(0), true, 99.0, {{0, d}}, kInf);
+  expect_fact(t.facts[2], link(1), true, 99.0, {{2, d}}, kInf);
+  expect_fact(t.facts[3], link(4), true, 99.0, {{5, d}}, kInf);
+  const auto reports = satsim::failures_app::fact_reports(t, w.settings, w.geometry);
+  ASSERT_EQ(reports.size(), 4U);
+  for (const auto& r : reports) {
+    EXPECT_EQ(r.reports, 0U);
+    EXPECT_FALSE(r.first_hops.has_value());
+    EXPECT_EQ(r.hops_total, 0U);
+  }
+}
+
+// A gateway failing at the last step: its satellites detect after the end; the planner, which
+// would know by itself at (99 + 0.1) + 0, never does.
+TEST(TimelineTest, AGatewayFailureAtTheLastStepIsNeverKnownByThePlanner) {
+  World w;
+  const Timeline t = w.timeline({failure_at(ElementKind::kGateway, 1, 99.0)});
+  ASSERT_EQ(t.facts.size(), 1U);
+  expect_fact(t.facts[0], gateway(1), true, 99.0, {{5, 99.1}, {16, 99.1}}, kInf);
+  EXPECT_EQ(t.gateway_down_at(99.0), (std::vector<char>{0, 1}));
+}
+
+// One step earlier, at 98 s: detected at 98.1 s, within the run, so reported as usual.
+TEST(TimelineTest, AFailureBeforeTheLastStepIsReported) {
+  World w;
+  const Timeline t = w.timeline({failure_at(ElementKind::kSatellite, 1, 98.0)});
+  ASSERT_EQ(t.facts.size(), 4U);
+  const double d = 98.0 + 0.1;
+  expect_fact(t.facts[0], satellite(1), true, 98.0, {{kDish0, d}, {kGateway0, d}}, d);
+  expect_fact(t.facts[3], link(4), true, 98.0, {{5, d}}, d + hop_s(800.0));
+}
+
+// A link out of sight at its failure (10 s) that comes back into sight at the last step: its
+// ends detect at 99 + 0.1 s, after the end: listed, never reported.
+TEST(TimelineTest, ALinkBackInSightAtTheLastStepIsDetectedAfterTheEnd) {
+  World w;
+  w.geometry.down_between(4, 5, 10, 99);
+  const Timeline t = w.timeline({failure_at(ElementKind::kLaserLink, 3, 10.0)});
+  ASSERT_EQ(t.facts.size(), 1U);
+  expect_fact(t.facts[0], link(3), true, 10.0, {{4, 99.1}, {5, 99.1}}, kInf);
 }
 
 // Without re-pointing nothing is ever added to the link list.

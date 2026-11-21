@@ -41,6 +41,7 @@ std::vector<FactReports> fact_reports(const Timeline& timeline, const TimelineSe
     }
     return it->second;
   };
+  const double end_s = static_cast<double>(settings.step_count - 1) * settings.step_s;
   std::vector<FactReports> result;
   result.reserve(timeline.facts.size());
   for (const Fact& fact : timeline.facts) {
@@ -50,13 +51,12 @@ std::vector<FactReports> fact_reports(const Timeline& timeline, const TimelineSe
       for (const Detection& d : fact.detectors) {
         double arrival_s = 0.0;
         std::size_t hops = 0;
+        if (d.t_s > end_s) {
+          continue;  // Detected after the run's end: no report.
+        }
         if (timeline.nodes.is_gateway(d.node)) {
           arrival_s = d.t_s;
         } else {
-          const std::int64_t k = step_of(d.t_s, settings.step_s);
-          if (k < 0 || k >= settings.step_count) {
-            continue;
-          }
           const network::ManySourcePaths& p = paths_at(d.t_s);
           if (!p.reachable(d.node)) {
             continue;

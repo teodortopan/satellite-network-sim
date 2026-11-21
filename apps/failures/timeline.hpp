@@ -38,6 +38,7 @@
 //  - detection of a failed satellite (gateways, best-case dishes) or gateway (satellites):
 //                                                      t_f + detection_s
 //  - the planner knowing of a failed gateway:          (t_f + detection_s) + planner_processing_s
+//    (never if t_f + detection_s is after the run's end)
 //  - a return (satellite or gateway up, at its end):   t_r = start_s + length_s, known at once;
 //    a returned gateway known by the planner at       t_r + planner_processing_s
 //  - a returned planned link carrying traffic:         t_r + acquisition_s
@@ -198,9 +199,11 @@ struct Timeline {
 ///     that never had a partner is in force from the start (from -infinity), with an old
 ///     "link up" fact at 0 (spec 4.8 Details). An old failure that ends during the run
 ///     ends as in (b).
-/// (e) planner_known_s as in the header comment; +infinity when no detector reports (a
-///     detector whose detection instant is at or after the run's end does not report). Old
-///     facts: 0. Gateway facts: (a) and (b).
+/// (e) planner_known_s as in the header comment; +infinity when no detector reports. The run
+///     ends at its last step's instant, (step_count - 1) * step_s (spec 4.4 Details): a
+///     detector whose detection instant is after it is still listed but sends no report, and
+///     the planner never knows a gateway fact detected after it. Old facts: 0. Gateway facts:
+///     (a) and (b).
 [[nodiscard]] Timeline build_timeline(const constellation::Classification& classification,
                                       const topology::LinkPlan& plan,
                                       const failure::FailureSchedule& schedule,

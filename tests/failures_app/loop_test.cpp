@@ -20,10 +20,8 @@
 #include <cstddef>
 #include <cstdint>
 #include <limits>
-#include <map>
 #include <memory>
 #include <optional>
-#include <span>
 #include <string>
 #include <utility>
 #include <vector>
@@ -42,6 +40,7 @@
 #include "satsim/routing/strategy.hpp"
 #include "satsim/topology/ground_links.hpp"
 #include "satsim/topology/link_state.hpp"
+#include "step_world.hpp"
 
 namespace {
 
@@ -59,8 +58,6 @@ using satsim::failures_app::LoopHooks;
 using satsim::failures_app::LoopSettings;
 using satsim::failures_app::Reaction;
 using satsim::failures_app::Status;
-using satsim::failures_app::StepGeometry;
-using satsim::failures_app::StepWorld;
 using satsim::failures_app::Subject;
 using satsim::failures_app::SubjectKind;
 using satsim::failures_app::Timeline;
@@ -68,7 +65,6 @@ using satsim::failures_app::TimelineSettings;
 using satsim::failures_app::testing::FakeGeometry;
 using satsim::failures_app::testing::seen;
 using satsim::routing_app::DropCause;
-using satsim::topology::VisibleSatellite;
 using Route = std::vector<std::size_t>;
 
 constexpr double kC = satsim::kSpeedOfLightVacuumKmPerS;
@@ -76,39 +72,7 @@ constexpr double kHop = 0.001;
 constexpr std::int64_t kSteps = 40;
 constexpr double kEnd = 39.0;
 
-// The StepWorld of a FakeGeometry: offset j is step k + j.
-class FakeWorld final : public StepWorld {
- public:
-  FakeWorld(FakeGeometry& geometry, const Timeline& timeline)
-      : geometry_(&geometry), timeline_(&timeline) {}
-  void at(std::int64_t k) { k_ = k; }
-  [[nodiscard]] std::size_t known_steps() const override { return 1; }
-  [[nodiscard]] const StepGeometry& geometry(std::size_t offset) const override {
-    return geometry_->at(k_ + static_cast<std::int64_t>(offset));
-  }
-  [[nodiscard]] const satsim::topology::StepLinks& geometric(std::size_t offset) const override {
-    const std::int64_t k = k_ + static_cast<std::int64_t>(offset);
-    auto it = cache_.find(k);
-    if (it == cache_.end()) {
-      it =
-          cache_.emplace(k, satsim::failures_app::geometric_states(*geometry_, timeline_->links, k))
-              .first;
-    }
-    return it->second;
-  }
-  [[nodiscard]] std::vector<double> times_left_in_view_s(std::size_t,
-                                                         std::span<const VisibleSatellite> visible,
-                                                         double horizon_s) const override {
-    return std::vector<double>(visible.size(), horizon_s);
-  }
-  [[nodiscard]] bool moving_north(std::size_t) const override { return false; }
-
- private:
-  FakeGeometry* geometry_;
-  const Timeline* timeline_;
-  std::int64_t k_ = 0;
-  mutable std::map<std::int64_t, satsim::topology::StepLinks> cache_;
-};
+using FakeWorld = satsim::failures_app::testing::GeometryWorld;
 
 struct Scene {
   FakeGeometry geometry;
@@ -367,6 +331,40 @@ TEST(LoopTest, StalePlanChoosesTheDeadElementAndRepairIsKept) {
   EXPECT_EQ(scene.rows.at(10)[2].row.plan, satsim::routing::PlanOutcome::kKept);
   EXPECT_EQ(scene.rows.at(10)[3].row.plan, satsim::routing::PlanOutcome::kKept);
   EXPECT_EQ(scene.rows.at(10)[3].row.route, kA045B);
+  EXPECT_EQ(scene.loop->checks().total(), 0U);
+}
+
+// A lane handed a route through an element its node already knows is dead repairs at once.
+// Link 1-5 is 3000 km long at steps 0 to 9 (A 0 1 5 B 5000 km, so the plan of 0 s takes
+// A 0 1 2 B, 3500 km) and 1000 km from step 10 on. It fails at 2 s, unused; satellites 1 and 5
+// detect at 2.1 s. The planner hears late (processing 20 s: it knows at about 22.1 s), so its
+// plan of 10 s hands every lane A 0 1 5 B, through the dead link; the reference knows and keeps
+// A 0 1 2 B. In local repair satellite 1, the near end, has known since 2.1 s: it repairs at
+// 10 s itself onto its backup from 1 avoiding 5 (and A, 0): A 0 1 2 B, so the lane is never a
+// black hole. At 20 s the planning graph still has 1-5 (the dead hop): kept; at 30 s it does
+// not: planned as usual.
+TEST(LoopTest, ARouteHandedThroughAnElementItsNodeKnowsIsDeadRepairsAtOnce) {
+  Scene scene;
+  scene.times.planner_processing_s = 20.0;
+  for (std::int64_t k = 0; k < 10; ++k) {
+    scene.geometry.states[{k, 1, 5}] = satsim::topology::LinkState{.length_km = 3000.0};
+  }
+  scene.run({failure_at(ElementKind::kLaserLink, 4, 2.0)});
+  ASSERT_GT(known(scene.timeline, link(4)), 20.0);
+  ASSERT_LT(known(scene.timeline, link(4)), 30.0);
+  expect_intervals(scene.lane(LaneKind::kPlanner),
+                   {{0.0, 10.0, DirectionState::kDelivered, kA012B},
+                    {10.0, 30.0, DirectionState::kBlackHole, kA015B, link(4)},
+                    {30.0, kEnd, DirectionState::kDelivered, kA012B}});
+  expect_intervals(scene.lane(LaneKind::kReference),
+                   {{0.0, kEnd, DirectionState::kDelivered, kA012B}});
+  expect_intervals(scene.lane(LaneKind::kLocalRepair),
+                   {{0.0, kEnd, DirectionState::kDelivered, kA012B, std::nullopt, k012}});
+  const LaneRow& at10 = scene.rows.at(10)[3];
+  EXPECT_TRUE(at10.row.ok);
+  EXPECT_EQ(at10.row.route, kA012B);
+  EXPECT_EQ(scene.rows.at(20)[3].row.plan, satsim::routing::PlanOutcome::kKept);
+  EXPECT_EQ(scene.loop->repairs(), 1U);
   EXPECT_EQ(scene.loop->checks().total(), 0U);
 }
 

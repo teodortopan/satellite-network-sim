@@ -24,8 +24,9 @@ struct FactReports {
   std::size_t hops_total = 0;
 };
 
-/// Per fact of `timeline`, in order. An old fact has no reports. A satellite or dish detector
-/// reports when its detection instant's step is a step of the run (as build_timeline) and
+/// Per fact of `timeline`, in order. An old fact has no reports, nor has a detector whose
+/// detection instant is after the run's end ((step_count - 1) * step_s, as build_timeline).
+/// A gateway that detects reports with no hops; a satellite or dish detector reports when
 /// network::shortest_paths_from_many from every working gateway (start delay 0, per-hop time
 /// settings.times.hop_processing_s) on the control graph of the truth at that instant reaches
 /// it; its hops are that path's.
