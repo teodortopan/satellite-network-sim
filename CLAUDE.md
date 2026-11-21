@@ -74,9 +74,11 @@ glossary of every orbital term used here.
 | `apps/constellation/` | The `constellation` program: each satellite's shell, plane and position, or why it has none |
 | `apps/topology/` | The `topology` program: delay per city pair, direction and time step, under two endpoint models |
 | `apps/routing/` | The `routing` program: each direction's route over time under several strategies, with the cause of every drop |
+| `apps/failures/` | The `failures` program's core: what a failure schedule causes over time, the truth and each actor's view |
 | `apps/inputs/` | What `topology` and `routing` share: loading the snapshot and ground data, city pairs, positions and link states per step |
 | `apps/common/` | Helpers every program shares: CSV, statistics, time steps, arguments |
 | `tests/<module>/` | GoogleTest per module, with small fixtures |
+| `tests/failures_app/` | The `failures` program's core on hand-made geometry, re-matching on ideal shells, the real geometry against `StepSource` |
 | `python/` | Snapshot and ground-data download, reference generation, validation (three independent models), SpaceX comparison, the Phase 2 runs, the Phase 3 reproductions, plots |
 | `data/starlink/<date>/` | One dated snapshot: element sets, IERS file, trajectory checksums |
 | `data/ground/` | Cities and pairs; per date: SpaceX's PoP and location files, the community gateway list, assumed gateways; `hypatia/`: Hypatia's 100 cities |

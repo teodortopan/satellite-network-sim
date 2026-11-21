@@ -44,6 +44,7 @@ add_subdirectory(apps/constellation)
 add_subdirectory(apps/inputs)
 add_subdirectory(apps/topology)
 add_subdirectory(apps/routing)
+add_subdirectory(apps/failures)
 
 if(SATSIM_BUILD_TESTS)
   enable_testing()
