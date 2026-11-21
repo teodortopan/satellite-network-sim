@@ -19,6 +19,11 @@ scripts/check.sh valgrind   # one step: format, python-lint, asan-gcc, asan-clan
 Build trees go to `build/<step>` (for example `build/asan-clang`), including the GoogleTest
 download.
 
+The tests of the sanitizer and Valgrind steps, the test executables under Valgrind and the
+files under clang-tidy each run side by side, one per core (`nproc`). Nothing is skipped: one
+failing test, executable or file still fails its step. On 4 cores this took the Valgrind step
+from 215 s to 60 s and clang-tidy from 19 minutes to 8.
+
 ## Jobs
 
 | Job | What it catches | Why it exists |

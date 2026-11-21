@@ -39,13 +39,13 @@ run_asan() {
   configure_and_build asan "$dir" "$cc" "$cxx"
   ASAN_OPTIONS=detect_leaks=1:strict_string_checks=1 \
     UBSAN_OPTIONS=print_stacktrace=1:halt_on_error=1 \
-    ctest --test-dir "$dir" --output-on-failure
+    ctest --test-dir "$dir" --output-on-failure -j "$(nproc)"
 }
 
 step_valgrind() {
   local dir=build/valgrind
   configure_and_build valgrind "$dir" gcc g++
-  ctest --test-dir "$dir" --output-on-failure
+  ctest --test-dir "$dir" --output-on-failure -j "$(nproc)"
 
   local tests
   mapfile -t tests < <(find "$dir/tests" -maxdepth 1 -type f -perm -u+x -name '*_tests' | sort)
@@ -56,12 +56,27 @@ step_valgrind() {
   # --trace-children=yes: tests that run a built program (the propagate end-to-end test) get
   # it checked too. Exit code 99 is one no program here uses, so a test that checks a child's
   # exit status sees a Valgrind error in the child as a failure.
+  # The executables run side by side, one per core, each into its own log; the logs are then
+  # printed in order, and one failure fails the step.
+  local logs
+  logs=$(mktemp -d)
+  local status=0
+  printf '%s\n' "${tests[@]}" | xargs -P "$(nproc)" -I{} sh -c '
+    valgrind --error-exitcode=99 --trace-children=yes --leak-check=full \
+      --errors-for-leak-kinds=definite,possible --track-origins=yes "$1" \
+      >"$2/$(basename "$1").log" 2>&1 || touch "$2/$(basename "$1").failed"
+  ' sh {} "$logs" || status=1
   local t
   for t in "${tests[@]}"; do
     echo "valgrind: $t"
-    valgrind --error-exitcode=99 --trace-children=yes --leak-check=full \
-      --errors-for-leak-kinds=definite,possible --track-origins=yes "$t"
+    cat "$logs/$(basename "$t").log"
+    if [[ -e "$logs/$(basename "$t").failed" || ! -e "$logs/$(basename "$t").log" ]]; then
+      echo "valgrind: $t FAILED" >&2
+      status=1
+    fi
   done
+  rm -rf "$logs"
+  return "$status"
 }
 
 step_tidy() {
@@ -71,7 +86,9 @@ step_tidy() {
   mapfile -t files < <(our_sources | grep '\.cpp$')
   clang-tidy --version
   # Headers are checked through the .cpp files that include them (HeaderFilterRegex).
-  clang-tidy -p "$dir" --quiet "${files[@]}"
+  # One clang-tidy per file, as many at once as there are cores; xargs exits non-zero if any
+  # of them does.
+  printf '%s\n' "${files[@]}" | xargs -P "$(nproc)" -n 1 clang-tidy -p "$dir" --quiet
   echo "tidy: ${#files[@]} files OK"
 }
 
