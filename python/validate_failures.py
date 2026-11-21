@@ -46,8 +46,8 @@ What is compared (exit 1 otherwise; spec 6.3, times to 1e-9 s, delays to 1e-9 ms
 interval of the events CSV (state, route, cause, element, start, end, delay), every fact of the
 facts CSV (subject, state, instant, old, detectors and their instants, planner_known_s, reports,
 report_hops, flood_nodes, flood_last_s, messages), every row of the floods CSV, every routes CSV
-row's state, cause, element, route and delay, and the program's per-lane measures where its
-summary prints them in the form `summary_measures` reads.
+row's state, cause, element, route, delay, ideal delay (the lane's own true network) and
+plan, every row of the measures CSV (to 1e-9) and every row of the network CSV.
 
 Not modelled: the realistic endpoint model, gateway failures, the `longest-lived` and
 `threshold` strategies, links between shells.
@@ -70,6 +70,7 @@ import itertools
 import json
 import math
 import random
+import statistics
 import subprocess
 import sys
 import tempfile
@@ -114,8 +115,7 @@ class Settings:
 
     @property
     def end_s(self) -> float:
-        # SPEC-GAP: "the end of the run" is read as the last step's instant, start + duration
-        # (the run "ends 300 s after T_i", spec 5), so the last step adds no time.
+        # 4.4 Details: the run ends at its last step's instant.
         return (self.steps - 1) * self.step_s
 
     def step_of(self, t: float) -> int:
@@ -137,7 +137,8 @@ class Settings:
         """The steps a plan made in step k looks at: [k, k_end)."""
         if self.planner == "start":
             return k, k + 1
-        return k, (k // self.replan_steps + 1) * self.replan_steps
+        # One re-plan interval ahead (Phase 3 4.3; 4.5 Details for a plan on a report).
+        return k, k + self.replan_steps
 
 
 # ---------------------------------------------------------------------------------------
@@ -341,6 +342,7 @@ class World:
     ids: list[int]
     planes: list[list[int]]  # Each plane's satellites in order along the orbit.
     shell_of_plane: list[int]
+    shell_names: list[str]
     lasers: list[tuple[str, ...]]  # Per satellite: the sides of its lasers.
     planned: list[PlannedLink]
     cities: list[str]
@@ -432,6 +434,7 @@ class IdealWorld(World):
         n = ideal.NUM_SATS_PER_ORB
         self.planes = [[o * n + s for s in range(n)] for o in range(ideal.NUM_ORBS)]
         self.shell_of_plane = [0] * ideal.NUM_ORBS
+        self.shell_names = [setup.shell_name]
         if pattern == "three":
             self.lasers = [("ahead", "behind", ideal.cross_side(x)) for x in slots]
         else:
@@ -473,8 +476,8 @@ class IdealWorld(World):
         return float(np.linalg.norm(self.positions[k][pair[1]] - self.positions[k][pair[0]]))
 
     def repair_ok(self, pair: Pair, k: int) -> bool:
-        # SPEC-GAP: "permanent" at a later step (4.8) uses each satellite's mean circle from
-        # the plan time (Phase 2 4.3) and its argument of latitude at that step.
+        # "Permanent" at a later step (4.8): each satellite's mean circle from the plan time
+        # (Phase 2 4.3) and its argument of latitude at that step.
         if self.laser_delay_s(pair, k) is None:
             return False
         if k not in self._u:
@@ -507,6 +510,7 @@ class ToyWorld(World):
         self.ids = [100 + i for i in range(count)]
         self.planes = planes
         self.shell_of_plane = [0] * len(planes)
+        self.shell_names = ["toy-s1"]
         self.lasers = lasers
         self.planned = planned
         self.laser_ms = laser_ms
@@ -690,8 +694,7 @@ class RunLink:
 
 @dataclass
 class Fact:
-    # SPEC-GAP: a fact's t_s is the instant of what happened (the failure, the return, the end
-    # of an acquisition, the drop), not its first detection.
+    # 4.4 Details: t_s is when the thing happened, not its first detection.
     subject: Subject
     state: str  # "down" | "up"
     t_s: float
@@ -771,8 +774,8 @@ class Timeline:
         k = s.step_of(t_f)
         if self.world.laser_delay_s(link.pair, k) is not None:
             return t_f + s.detection_s
-        # 4.4 Details: nothing is worked out on geometry at or after the last step.
-        for j in range(k + 1, s.steps - 1):
+        # 4.4 Details: nothing is worked out after the last step.
+        for j in range(k + 1, s.steps):
             if s.instant(j) >= end_s:
                 break
             if self.world.laser_delay_s(link.pair, j) is not None:
@@ -805,18 +808,14 @@ class Timeline:
         for f in self.schedule.failures:
             if f.kind == "gateway":
                 raise SystemExit("error: gateway failures are not in the independent model")
-            # SPEC-GAP: "one that ended before the run starts is ignored" is read as an end
-            # strictly before 0; a failure ending exactly at 0 returns at the first step.
-            if f.end_s < 0.0:
+            # 4.4 Details: a failure that ended at or before the start is ignored.
+            if f.end_s <= 0.0:
                 continue
             self.push(f.start_s, self.START, f)
             if f.end_s <= s.end_s:
                 self.push(f.end_s, self.END, f)
         if s.repoint:
-            # No matching at the last step (4.4 Details).
-            # SPEC-GAP: except in a one-step run (spec 5's after-recovery runs), whose only
-            # step is both the first, where old failures' lasers are matched, and the last.
-            for k in range(max(1, s.steps - 1)):
+            for k in range(s.steps):
                 self.push(s.instant(k), self.MATCH, k)
         while self._heap:
             t, order, _, _, payload = heapq.heappop(self._heap)
@@ -849,8 +848,7 @@ class Timeline:
             else:
                 fact.detectors.append((("satellite", y), d))
             self.free_laser((y, side), d, t)
-        if not old or f.kind == "laser_link":
-            self.facts.append(fact)
+        self.facts.append(fact)
 
     def start(self, f: Failure, t: float) -> None:
         s = self.settings
@@ -861,8 +859,7 @@ class Timeline:
         if f.kind == "satellite":
             x = f.sats[0]
             fact = Fact(("satellite", x), "down", t, old, failure=f)
-            if not old and t < s.end_s:
-                # 4.4 Details: no ground detectors for a failure at or after the last step.
+            if not old:
                 fact.detectors = self.site_detectors(x, s.step_of(t), t + s.detection_s)
             self.facts.append(fact)
             for i in self.sat_links.get(x, []):
@@ -870,12 +867,8 @@ class Timeline:
                 if link.status(t) not in ("in_force", "acquiring"):
                     continue
                 y, _ = link.other(x)
-                # SPEC-GAP: for an old satellite failure only its "satellite down" fact is
-                # written (every actor knows it, so its view also drops the links).
-                if old:
-                    self.free_laser((y, link.side_of(y)), 0.0, t)
-                else:
-                    self.link_down_fact(link, t, f, [y] if y not in self.down else [])
+                # 4.4 Details: an old failure gives the same facts, all old.
+                self.link_down_fact(link, t, f, [y] if y not in self.down else [])
                 self.laser_use[(x, link.side_of(x))] = None
                 self.eligible[(x, link.side_of(x))] = INF
                 if link.repair:
@@ -891,10 +884,7 @@ class Timeline:
                 ends = [y for y in (link.a, link.b) if y not in self.down]
                 self.link_down_fact(link, t, f, ends)
                 self.take_down(i, t)
-            elif old:
-                self.facts.append(Fact(("link", pair), "down", t, True, failure=f))
-            # SPEC-GAP: a link failure on a link already down for another failure (an end
-            # satellite failed) makes no fact: nobody sees the link go silent.
+            # 4.4 Details: a link already down because a satellite of it is down gives no fact.
             self.failed_links.add(pair)
 
     def end(self, f: Failure, t: float) -> None:
@@ -906,8 +896,7 @@ class Timeline:
             x = f.sats[0]
             self.down.discard(x)
             fact = Fact(("satellite", x), "up", t, False)
-            if t < s.end_s:
-                fact.detectors = self.site_detectors(x, s.step_of(t), t)
+            fact.detectors = self.site_detectors(x, s.step_of(t), t)
             self.facts.append(fact)
             candidates = self.sat_links.get(x, [])
         else:
@@ -932,8 +921,8 @@ class Timeline:
             for side in self.world.lasers[x]:
                 laser = (x, side)
                 if laser not in restored and self.laser_use.get(laser) is None:
-                    # SPEC-GAP: a returned satellite's laser whose original partner is still
-                    # down is free and may be matched from the return.
+                    # 4.8 Details: a returned satellite's laser still without a link may be
+                    # matched from the return.
                     self.eligible[laser] = t
                     self.freed_by[laser] = t
 
@@ -959,8 +948,7 @@ class Timeline:
         if link.repair:
             link.carry_s = t
         fact = Fact(("link", link.pair), "up", t, False)
-        # SPEC-GAP: both ends hold "link up" at the end of the acquisition even if the link's
-        # geometry happens to be down at that step.
+        # Both ends hold "link up" at the end of the acquisition, whatever the geometry.
         fact.detectors = [(("satellite", y), t) for y in (link.a, link.b)]
         self.facts.append(fact)
 
@@ -1051,8 +1039,7 @@ class Timeline:
             # 4.8 Details, old failures: carries from the failure instant plus the acquisition
             # time, or from the first step if that is earlier.
             # 4.8 Details: the later of the two failure instants counts; a laser that never had
-            # a partner does not count.
-            # SPEC-GAP: if neither laser was freed by a failure, the link carries from step 0.
+            # a partner does not count, and a link between two such lasers carries from step 0.
             freed = [
                 self.freed_by.get(laser, -INF) if laser not in self.never_partnered else -INF
                 for laser in ((x, side_x), (y, side_y))
@@ -1190,8 +1177,8 @@ class Model:
     def message_graph(self, t: float) -> tuple[Adjacency, dict[NodeKey, int], set[int]]:
         """Adjacency on node numbers, the numbering, and the gateway numbers.
 
-        SPEC-GAP: the cities are those of the run's directions; a city's dish passes reports
-        and floods on like any node (nothing in 4.4 stops a message crossing a dish)."""
+        The cities are those of the run's directions; a city's dish passes messages on like
+        any node."""
         if t in self._msg_graphs:
             return self._msg_graphs[t]
         s = self.s
@@ -1244,12 +1231,11 @@ class Model:
                 fact.planner_known_s = 0.0
                 continue
             for node, d in fact.detectors:
-                # 4.4 Details: a detection at or after the last step sends no report.
-                if math.isinf(d) or d >= s.end_s:
+                # 4.4 Details: a detection after the last step sends no report.
+                if d > s.end_s:
                     continue
                 if node[0] == "gateway":
-                    # SPEC-GAP: a gateway detector's report "takes no time"; it is counted in
-                    # `reports`, with 0 hops.
+                    # 4.10 Details: a gateway that detects is one report with no hops.
                     r: tuple[float, int] | None = (d, 0)
                 else:
                     r = self.report(node, d)
@@ -1257,25 +1243,22 @@ class Model:
                     fact.reports += 1
                     fact.report_rows.append((node, r[0], r[1]))
             if fact.report_rows:
-                # SPEC-GAP: of reports arriving at the same instant the one with fewer hops is
-                # "the report that arrives first".
+                # 4.10 Details: of reports arriving together the one with fewer hops is first.
                 first, fact.report_hops = min((a, h) for _, a, h in fact.report_rows)
                 fact.planner_known_s = first + s.planner_processing_s
             if not self.flooding:
                 continue
-            # SPEC-GAP: a detection at or after the last step starts no flood either (nothing is
-            # worked out on that geometry).
-            starts = [d for _, d in fact.detectors if d < s.end_s]
+            # 4.4 Details: a detection after the last step starts no flood.
+            starts = [d for _, d in fact.detectors if d <= s.end_s]
             if not starts:
-                # SPEC-GAP: a fact nobody detects in the run floods nowhere: 0 nodes, last
-                # instant never, 0 messages.
+                # 4.10 Details: a fact nobody detects in the run: 0 nodes, never, 0 messages.
                 fact.flood_nodes, fact.flood_last_s, fact.messages = 0, INF, 0
                 continue
             t0 = min(starts)
             adj, numbers, _ = self.message_graph(t0)
             sources: dict[int, float] = {}
             for node, d in fact.detectors:
-                if d < s.end_s and node in numbers:
+                if d <= s.end_s and node in numbers:
                     sources[numbers[node]] = min(d, sources.get(numbers[node], INF))
             learn, first = flood_times(adj, sources)
             fact.learn = {names[u]: t for u, t in learn.items()}
@@ -1310,7 +1293,7 @@ class Model:
         repair_up = up_pairs - self.planned_pairs
         for x, pairs in self.sat_planned.items():
             # A satellite whose every planned laser link is known down is taken as down.
-            # SPEC-GAP: unless a repair link of it is known up (it still has a working laser).
+            # 4.4: and no repair link of it known up.
             if all(p in down_pairs for p in pairs) and not any(x in p for p in repair_up):
                 down.add(x)
         present = {p for p in self.planned_pairs if p not in down_pairs} | repair_up
@@ -1369,6 +1352,14 @@ class Model:
             self._trees[key] = dijkstra(radj, self.recv(dst))
         return self._trees[key]
 
+    def ideal_s(self, lane: Lane, k: int) -> float | None:
+        """4.6 Details: the lowest delay in the lane's own true network at step k (the
+        baseline's has no failures)."""
+        t = self.s.instant(k)
+        view = self.baseline_view() if lane.kind == "baseline" else self.truth_view(t)
+        adj, _ = self.graph(k, k + 1, view)
+        return dijkstra(adj, self.send(lane.src)).delay.get(self.recv(lane.dst))
+
     def covered(self, d: Direction, k: int) -> bool:
         return bool(self.world.ground_s(d.src, k)) and bool(self.world.ground_s(d.dst, k))
 
@@ -1389,16 +1380,16 @@ class Model:
             g = self.world.ground_s(d.dst, k)
             return (g[u] + hop if u in g else None), None, True
         p = pair_of(u, v)
-        # SPEC-GAP: on one laser edge a failed link is "met" before a failed far satellite.
-        if not baseline and self.schedule.link_failed(p, t):
-            return None, ("link", p), False
-        for x in (v, u):
+        # 4.6 Details: a satellite that is down is `failed_satellite` even when the link to it
+        # has failed too; a failed link with both satellites working is `failed_link`.
+        for x in (u, v):
             if sat_down(x):
                 return None, ("satellite", x), False
+        if not baseline and self.schedule.link_failed(p, t):
+            return None, ("link", p), False
         carrying = self.planned_pairs if baseline else self.carrying(t)
         w = self.world.laser_delay_s(p, k) if p in carrying else None
-        # SPEC-GAP: a link acquiring after a return, or a repair link that was dropped, is not
-        # a failed element: a route over it is `no_route` with Phase 3's `laser_link_down`.
+        # 4.6 Details: a link out of sight, acquiring or not in force is not a failure.
         return (None if w is None else w + hop), None, False
 
     def evaluate(self, d: Direction, route: list[int] | None, t: float, lane: Lane) -> Sample:
@@ -1416,11 +1407,11 @@ class Model:
             for w, _, _ in edges:
                 total += w  # type: ignore[operator]
             return Sample("delivered", route=sats, delay_s=total)
-        # SPEC-GAP: the first down edge along the route decides. A failed element there is a
-        # black hole; anything else is Phase 3's cause, unchanged (no_coverage, then a ground
-        # edge anywhere on the route before a laser edge).
-        if down[0][1] is not None:
-            return failure_sample(down[0][1], sats, self.world.ids)
+        # 4.6 Details: a failed element anywhere on the route comes before every other cause
+        # (the first one along it); otherwise Phase 3's causes.
+        failed = [f for _, f, _ in down if f is not None]
+        if failed:
+            return failure_sample(failed[0], sats, self.world.ids)
         if not self.covered(d, k):
             return Sample("no_route", "no_coverage", route=sats)
         ground_missing = any(f is None and g for _, f, g in down)
@@ -1441,11 +1432,9 @@ class Model:
             nxt = tree.pred.get(node)
             if nxt is None or nxt == -1:
                 if node == self.send(d.src):
-                    # SPEC-GAP: a sending dish with no next hop has no route (`no_coverage` or
-                    # `no_path`, as a plan that finds none); any later node is a black hole.
+                    # 4.6 Details: a sending dish with no next hop has no route.
                     cause = "no_path" if self.covered(d, k) else "no_coverage"
                     return Sample("no_route", cause)
-                # SPEC-GAP: a black hole at a node with no next hop has no cause or element.
                 return Sample("black_hole", route=tuple(sats))
             w, failure, ground = self.edge(d, node, nxt, t, False)
             if w is None:
@@ -1459,7 +1448,6 @@ class Model:
             if nxt == end:
                 return Sample("delivered", route=tuple(sats), delay_s=total)
             if nxt in visited:
-                # SPEC-GAP: a loop's route is the walk up to and including the node met twice.
                 return Sample("loop", route=(*sats, nxt))
             visited.add(nxt)
             sats.append(nxt)
@@ -1470,6 +1458,14 @@ class Model:
         k = self.s.step_of(t)
         k0, k1 = self.s.plan_steps(k)
         adj, _ = self.graph(k0, k1, view)
+        if lane.repaired and lane.repair_edge is not None:
+            u, v = lane.repair_edge
+            if any(x == v for x, _ in adj.get(u, ())):
+                # 4.5 Details: the planning graph still has the dead hop: keep the repaired
+                # route, recorded as `kept`; the repair stays used up.
+                if mark:
+                    lane.plan_marks[k] = "kept"
+                return
         old = lane.route
         keep = (
             lane.strategy == "keep-until-broken"
@@ -1495,18 +1491,6 @@ class Model:
             for i in range(len(route) - 1):
                 banned = [*route[:i], route[i + 1]]
                 lane.backups.append(path_to(dijkstra(adj, route[i], banned), self.recv(d.dst)))
-
-    def planner_knows(self, lane: Lane, t: float) -> bool:
-        """SPEC-GAP: "a planner that knows the fact" of a repair: it knows a down fact of the
-        repaired failure about the dead element itself or about the link the route used."""
-        f = lane.repair_failure
-        u, v = lane.repair_edge  # type: ignore[misc]
-        subjects = {f.subject}  # type: ignore[union-attr]
-        if u < self.n and v < self.n:
-            subjects.add(("link", pair_of(u, v)))
-        return any(
-            x.failure is f and x.subject in subjects and x.planner_known_s <= t for x in self.facts
-        )
 
     def first_failure(self, d: Direction, route: list[int], t: float):
         """The first failed element along the route at t: (edge index, failure)."""
@@ -1546,8 +1530,7 @@ class Model:
             return
         backup = lane.backups[i] if i < len(lane.backups) else None
         lane.repair_edge, lane.repair_failure = (j, nxt), f
-        # SPEC-GAP: with no backup at that node the route stays as it is (a black hole) and the
-        # one repair is used up.
+        # 4.5 Details: a node with no backup cannot repair; the one repair is used up.
         if backup is not None:
             lane.route = lane.route[:i] + backup
         lane.repaired = True
@@ -1573,11 +1556,8 @@ class Model:
         return sorted(t for t in out if 0.0 <= t <= s.end_s)
 
     def report_plans(self) -> list[float]:
-        """--replan-on-report: every instant the planner learns a fact.
-
-        SPEC-GAP: such a plan applies to `planner` and `local-repair` only (the `reference`
-        lane plans at the re-plan interval); with `whole-interval` it looks at the steps from
-        its own step up to the next regular re-plan instant."""
+        """--replan-on-report: every instant the planner learns a fact (4.5 Details: plans for
+        `planner` and `local-repair` only)."""
         if not self.s.replan_on_report:
             return []
         return sorted(
@@ -1620,18 +1600,7 @@ class Model:
                         if t not in planner_views:
                             planner_views[t] = self.planner_view(t)
                         view = planner_views[t]
-                    skip = (
-                        lane.kind == "local-repair"
-                        and lane.repaired
-                        and not self.planner_knows(lane, t)
-                    )
-                    if lane.kind != "reference" or regular:
-                        if skip:
-                            if regular:
-                                # SPEC-GAP: a plan skipped by an unaware planner is "kept".
-                                lane.plan_marks[k] = "kept"
-                        else:
-                            self.plan(lane, d, t, view, mark=regular)
+                    self.plan(lane, d, t, view, mark=regular)
                 if lane.kind == "local-repair":
                     self.try_repair(lane, d, t)
                 lane.samples.append((t, self.evaluate(d, lane.route, t, lane)))
@@ -1667,13 +1636,26 @@ def sample_at(intervals: list[Interval], t: float) -> Sample:
 # ---------------------------------------------------------------------------------------
 @dataclass
 class Measures:
-    black_hole_s: float = 0.0
-    loop_s: float = 0.0
+    """One row of the measures CSV (4.10 Details); None is written `none`."""
+
+    failure_s: float | None = None
+    black_hole_s: float | None = None
+    loop_s: float | None = None
+    lost_s: float | None = None
     restore_s: float | None = None
     settle_s: float | None = None
-    lost_s: float = 0.0
-    max_extra_ms: float | None = None
-    settled_extra_ms: float | None = None
+    extra_min_ms: float | None = None
+    extra_median_ms: float | None = None
+    extra_max_ms: float | None = None
+    extra_settled_ms: float | None = None
+    reports: int | None = None
+    messages: int | None = None
+
+
+MEASURE_COLUMNS = (
+    "failure_s", "black_hole_s", "loop_s", "lost_s", "restore_s", "settle_s", "extra_min_ms",
+    "extra_median_ms", "extra_max_ms", "extra_settled_ms", "reports", "messages",
+)  # fmt: skip
 
 
 def failure_instant(failures: list[Failure]) -> float | None:
@@ -1687,14 +1669,18 @@ def measures(
     baseline: list[Interval],
     reference: list[Interval],
     t_f: float | None,
-    end_s: float,
+    settings: Settings,
 ) -> Measures:
-    # SPEC-GAP: with no failure that is not old news, the measures run from the start.
-    t0 = 0.0 if t_f is None else t_f
-    cuts = sorted(
-        {t0, end_s} | {x.start_s for x in lane + baseline + reference if t0 < x.start_s < end_s}
-    )
+    """4.7 for one lane. Without a failure that is not old news, every measure that counts
+    from t_f is none (4.7)."""
     m = Measures()
+    if t_f is None:
+        return m
+    end_s = settings.end_s
+    m.failure_s, m.black_hole_s, m.loop_s, m.lost_s = t_f, 0.0, 0.0, 0.0
+    cuts = sorted(
+        {t_f, end_s} | {x.start_s for x in lane + baseline + reference if t_f < x.start_s < end_s}
+    )
     interrupted = False
     restored_at = None
     last_differ_end = None
@@ -1711,37 +1697,48 @@ def measures(
             interrupted = True
         elif interrupted and restored_at is None:
             restored_at = a
-        if base.state == "delivered" and mine.state == "delivered":
-            extra = (mine.delay_s - base.delay_s) * 1e3  # type: ignore[operator]
-            m.max_extra_ms = extra if m.max_extra_ms is None else max(m.max_extra_ms, extra)
-        # SPEC-GAP: "the route a planner with full knowledge holds" compares the state and
-        # the route with the reference lane's.
+        # Settled: the state and the route are the reference lane's.
         if (mine.state, mine.route) != (ref.state, ref.route):
             last_differ_end = b
     if not interrupted:
         m.restore_s = 0.0
     elif restored_at is not None:
-        m.restore_s = restored_at - t0
+        m.restore_s = restored_at - t_f
     if last_differ_end is None:
         m.settle_s = 0.0
     elif last_differ_end < end_s:
-        m.settle_s = last_differ_end - t0
-    if m.settle_s is not None:
-        settled = t0 + m.settle_s
-        mine, base = sample_at(lane, settled), sample_at(baseline, settled)
+        m.settle_s = last_differ_end - t_f
+
+    def extra_at(k: int) -> float | None:
+        t = settings.instant(k)
+        mine, base = sample_at(lane, t), sample_at(baseline, t)
         if mine.state == "delivered" and base.state == "delivered":
-            m.settled_extra_ms = (mine.delay_s - base.delay_s) * 1e3  # type: ignore[operator]
-    if end_s <= t0:
-        m.restore_s = m.restore_s if m.restore_s is not None else None
+            return (mine.delay_s - base.delay_s) * 1e3  # type: ignore[operator]
+        return None
+
+    # 4.10 Details: at the steps at or after t_f where the lane and the baseline are delivered.
+    first = settings.first_step_at_or_after(t_f)
+    extras = [x for k in range(first, settings.steps) if (x := extra_at(k)) is not None]
+    if extras:
+        m.extra_min_ms, m.extra_max_ms = min(extras), max(extras)
+        m.extra_median_ms = statistics.median(extras)
+    if m.settle_s is not None:
+        k = settings.first_step_at_or_after(t_f + m.settle_s)
+        if k < settings.steps:
+            m.extra_settled_ms = extra_at(k)
     return m
 
 
-def run_messages(facts: list[Fact]) -> tuple[int, int, int]:
-    """4.7 messages: reports sent, their hops, and every flood sending."""
-    reports = sum(f.reports for f in facts)
-    hops = sum(h for f in facts for _, _, h in f.report_rows)
-    floods = sum(f.messages or 0 for f in facts)
-    return reports, hops, floods
+def lane_messages(facts: list[Fact], kind: str) -> tuple[int | None, int]:
+    """4.7 messages: in `planner` and `local-repair` the reports sent and their hops; in
+    `flooding` every sending of every fact on a link.
+
+    SPEC-GAP: the measures CSV's `reports` and `messages` columns are read as: `planner` and
+    `local-repair` write the number of reports (every fact's `reports`) and the sum of those
+    reports' hops; `flooding` writes `none` and the sum of every fact's `messages`."""
+    if kind == "flooding":
+        return None, sum(f.messages or 0 for f in facts)
+    return sum(f.reports for f in facts), sum(h for f in facts for _, _, h in f.report_rows)
 
 
 # ---------------------------------------------------------------------------------------
@@ -1813,8 +1810,8 @@ def route_text(route: tuple[int, ...], ids: list[int]) -> str:
 
 
 def fact_row(f: Fact, ids: list[int], flooding: bool) -> dict[str, str]:
-    # SPEC-GAP: an old fact has no detectors, planner_known_s 0, reports 0, empty report_hops
-    # and empty flood columns.
+    # 4.4 Details: an old fact has no detectors, no reports and no flood; the planner knows
+    # it from the first step (0).
     detectors = ";".join(f"{node_text(n, ids)}@{instant_text(t)}" for n, t in f.detectors)
     flood = flooding and not f.old
     return {
@@ -1962,8 +1959,9 @@ def compare_floods(rows, numbers: dict, ids) -> list[str]:
     return problems
 
 
-def compare_routes(rows, lanes, ids, settings: Settings) -> list[str]:
+def compare_routes(rows, lanes, model: Model) -> list[str]:
     """Routes CSV (4.10 Details): one row per step, direction, strategy and reaction."""
+    ids, settings = model.world.ids, model.s
     problems = []
     seen = 0
     start = None
@@ -1993,6 +1991,11 @@ def compare_routes(rows, lanes, ids, settings: Settings) -> list[str]:
             abs(float(r["one_way_ms"]) - sample.delay_s * 1e3) > DELAY_TOLERANCE_MS
         ):
             problems.append(f"{where}: one-way {r['one_way_ms']}, model {sample.delay_s * 1e3}")
+        ideal_s = model.ideal_s(lane, k)
+        if (r["ideal_ms"] == "") != (ideal_s is None) or (
+            ideal_s is not None and abs(float(r["ideal_ms"]) - ideal_s * 1e3) > DELAY_TOLERANCE_MS
+        ):
+            problems.append(f"{where}: ideal {r['ideal_ms']!r}, model {ideal_s}")
         if r["plan"] != lane.plan_marks.get(k, "") and lane.kind != "flooding":
             problems.append(f"{where}: plan {r['plan']!r}, model {lane.plan_marks.get(k, '')!r}")
     expected = sum(1 for _ in lanes) * settings.steps
@@ -2001,67 +2004,105 @@ def compare_routes(rows, lanes, ids, settings: Settings) -> list[str]:
     return problems[:50]
 
 
-# SPEC-GAP: the spec does not fix how the summary prints the measures of 4.7. This reads lines
-# of the form
-#   "<from> -> <to> <strategy> <reaction>: black_hole_s <x> loop_s <x> restore_s <x|none>
-#    settle_s <x|none> lost_s <x>"
-# when present, and compares nothing otherwise (the events CSV comparison covers the same).
-def summary_measures(summary: str) -> dict[tuple[str, str, str, str], dict[str, str]]:
-    out = {}
-    for line in summary.splitlines():
-        head, sep, tail = line.strip().partition(": black_hole_s ")
-        if not sep:
-            continue
-        left, _, right = head.partition(" -> ")
-        parts = right.split(" ")
-        if len(parts) < 3:
-            continue
-        values = ("black_hole_s " + tail).split(" ")
-        out[(left, " ".join(parts[:-2]), parts[-2], parts[-1])] = dict(
-            zip(values[0::2], values[1::2], strict=False)
-        )
-    return out
+def measure_text(value) -> str:
+    return "none" if value is None else repr(value)
 
 
-def compare_measures(summary: str, lanes, failures, end_s) -> list[str]:
-    reported = summary_measures(summary)
-    if not reported:
-        print("  summary: no measure lines in the form summary_measures reads; not compared")
-        return []
+def compare_measures(rows, lanes, model: Model) -> list[str]:
+    """Measures CSV (4.10 Details), every value to 1e-9 (s or ms)."""
     problems = []
-    t_f = failure_instant(failures)
-    for src, dst, strategy, kind in lanes:
-        if kind in ("baseline", "reference"):
+    t_f = failure_instant(model.schedule.failures)
+    seen = set()
+    for r in rows:
+        key = (r["from"], r["to"], r["strategy"], r["reaction"])
+        if r["reaction"] in ("baseline", "reference"):
+            # SPEC-GAP: whether the measures CSV has rows for the two extra lanes; ignored.
             continue
-        m = model_measures(lanes, src, dst, strategy, kind, t_f, end_s)
-        got = reported.get((src, dst, strategy, kind))
-        if got is None:
-            problems.append(f"summary: no measures for {src} -> {dst} {strategy} {kind}")
+        where = f"measures {' '.join(key)}"
+        if key not in lanes:
+            problems.append(f"{where}: no model lane")
             continue
-        for name, value in (
-            ("black_hole_s", m.black_hole_s),
-            ("loop_s", m.loop_s),
-            ("restore_s", m.restore_s),
-            ("settle_s", m.settle_s),
-            ("lost_s", m.lost_s),
-        ):
-            text = got.get(name)
-            if text is None:
-                continue
-            if (text == "none") != (value is None) or (
-                value is not None and abs(float(text) - value) > TIME_TOLERANCE_S
-            ):
-                problems.append(
-                    f"summary {src} -> {dst} {strategy} {kind}: {name} {text}, model {value}"
-                )
+        seen.add(key)
+        m = model_measures(lanes, *key, t_f, model.s)
+        m.reports, m.messages = lane_messages(model.facts, r["reaction"])
+        for column in MEASURE_COLUMNS:
+            want, got = getattr(m, column), r[column]
+            if (got == "none") != (want is None):
+                problems.append(f"{where}: {column} {got}, model {measure_text(want)}")
+            elif want is not None and abs(float(got) - want) > TIME_TOLERANCE_S:
+                problems.append(f"{where}: {column} {got}, model {want!r}")
+    for key in lanes:
+        if key[3] not in ("baseline", "reference") and key not in seen:
+            problems.append(f"measures: no row for {' '.join(key)}")
     return problems
 
 
-def model_measures(lanes, src, dst, strategy, kind, t_f, end_s) -> Measures:
-    def iv(k: str) -> list[Interval]:
-        return intervals_of(lanes[(src, dst, strategy, k)].samples, end_s)
+@dataclass(frozen=True)
+class NetworkRow:
+    k: int
+    scope: str
+    working: int
+    pieces: int
+    largest: int
+    share: float | None
 
-    return measures(iv(kind), iv("baseline"), iv("reference"), t_f, end_s)
+
+def network_rows(model: Model) -> list[NetworkRow]:
+    """Network CSV (4.10 Details): per step and scope (`all`, then each shell), pieces of the
+    working satellites joined by the true network's laser links that carry traffic."""
+    world, out = model.world, []
+    shell_of = {x: world.shell_of_plane[p] for p, plane in enumerate(world.planes) for x in plane}
+    for k in range(model.s.steps):
+        t = model.s.instant(k)
+        view = model.truth_view(t)
+        working = [x for x in range(world.n) if x not in view.down_sats]
+        up = [p for p in sorted(view.present) if world.laser_delay_s(p, k) is not None]
+        scopes = [("all", working, up)]
+        for shell, name in enumerate(world.shell_names):
+            members = [x for x in working if shell_of[x] == shell]
+            links = [p for p in up if shell_of[p[0]] == shell and shell_of[p[1]] == shell]
+            scopes.append((name, members, links))
+        for name, members, links in scopes:
+            uf = UnionFind(members)
+            for a, b in links:
+                uf.union(a, b)
+            sizes = uf.pieces()
+            largest = sizes[0] if sizes else 0
+            # SPEC-GAP: with no working satellite in a scope the share is written `none`.
+            share = largest / len(members) if members else None
+            out.append(NetworkRow(k, name, len(members), len(sizes), largest, share))
+    return out
+
+
+def compare_network(rows, model: Model) -> list[str]:
+    want = {(x.k, x.scope): x for x in network_rows(model)}
+    problems, start = [], None
+    for r in rows:
+        if start is None:
+            start = st.parse_utc(r["utc"])
+        k = round((st.parse_utc(r["utc"]).unix_ns - start.unix_ns) / (model.s.step_s * 1e9))
+        x = want.pop((k, r["scope"]), None)
+        where = f"network {r['utc']} {r['scope']}"
+        if x is None:
+            problems.append(f"{where}: no model row")
+            continue
+        got = (int(r["working_satellites"]), int(r["pieces"]), int(r["largest_piece"]))
+        if got != (x.working, x.pieces, x.largest):
+            problems.append(f"{where}: {got}, model {(x.working, x.pieces, x.largest)}")
+        share = r["largest_piece_share"]
+        if (share == "none") != (x.share is None) or (
+            x.share is not None and abs(float(share) - x.share) > 1e-12
+        ):
+            problems.append(f"{where}: share {share}, model {x.share}")
+    problems += [f"network: no program row for step {k} {scope}" for k, scope in want]
+    return problems[:50]
+
+
+def model_measures(lanes, src, dst, strategy, kind, t_f, settings: Settings) -> Measures:
+    def iv(k: str) -> list[Interval]:
+        return intervals_of(lanes[(src, dst, strategy, k)].samples, settings.end_s)
+
+    return measures(iv(kind), iv("baseline"), iv("reference"), t_f, settings)
 
 
 # ---------------------------------------------------------------------------------------
@@ -2124,11 +2165,10 @@ def run_failures(
     work: Path,
 ) -> tuple[str, dict[str, list[dict[str, str]]]]:
     """Runs the `failures` program (spec 4.10) with the `routing` options of a Phase 3 case
-    and the new ones; returns its summary and its four CSVs."""
+    and the new ones; returns its summary and its six CSVs."""
     s = case.settings()
-    out = {
-        name: work / f"{case.name}-{name}.csv" for name in ("routes", "events", "facts", "floods")
-    }
+    names = ("routes", "events", "facts", "floods", "measures", "network")
+    out = {name: work / f"{case.name}-{name}.csv" for name in names}
     command = [
         str(exe),
         "--snapshot", str(snapshot),
@@ -2161,6 +2201,8 @@ def run_failures(
         "--events-out", str(out["events"]),
         "--facts-out", str(out["facts"]),
         "--floods-out", str(out["floods"]),
+        "--measures-out", str(out["measures"]),
+        "--network-out", str(out["network"]),
     ]  # fmt: skip
     result = subprocess.run(command, capture_output=True, text=True, check=False)
     if result.returncode != 0:
@@ -2239,12 +2281,12 @@ def describe(case: Case, model: Model, lanes) -> None:
     for (src, dst, strategy, kind), lane in lanes.items():
         if kind in ("baseline", "reference"):
             continue
-        m = model_measures(lanes, src, dst, strategy, kind, t_f, s.end_s)
+        m = model_measures(lanes, src, dst, strategy, kind, t_f, s)
         n = len(intervals_of(lane.samples, s.end_s))
         print(
             f"    {src} -> {dst} {strategy} {kind}: {n} intervals, black hole "
-            f"{m.black_hole_s:.3f} s, loop {m.loop_s:.3f} s, restore {m.restore_s}, settle "
-            f"{m.settle_s}, lost {m.lost_s:.3f} s"
+            f"{m.black_hole_s} s, loop {m.loop_s} s, restore {m.restore_s}, settle "
+            f"{m.settle_s}, lost {m.lost_s} s, extra max {m.extra_max_ms} ms"
         )
 
 
@@ -2311,13 +2353,14 @@ def run_case(case: Case, exe: Path | None, args, work: Path) -> list[str]:
         )
     if exe is None:
         return []
-    summary, out = run_failures(exe, snapshot, args.ground, cities_path, case, failures_path, work)
+    _, out = run_failures(exe, snapshot, args.ground, cities_path, case, failures_path, work)
     problems = compare_events(out["events"], lanes, world.ids, s.end_s)
     fact_problems, numbers = compare_facts(out["facts"], model.facts, world.ids, model.flooding)
     problems += fact_problems
     problems += compare_floods(out["floods"], numbers, world.ids)
-    problems += compare_routes(out["routes"], lanes, world.ids, s)
-    problems += compare_measures(summary, lanes, failures, s.end_s)
+    problems += compare_routes(out["routes"], lanes, model)
+    problems += compare_measures(out["measures"], lanes, model)
+    problems += compare_network(out["network"], model)
     return [f"{case.name}: {p}" for p in problems]
 
 
@@ -2531,9 +2574,15 @@ def test_satellite_three_modes() -> None:
     got = lane_intervals(model, "flooding")
     check(same_intervals(got, flooding), f"flooding intervals {got}")
     lanes = model.run()
-    m = model_measures(lanes, "A", "B", "lowest-delay", "local-repair", 2.0, 12.0)
+    m = model_measures(lanes, "A", "B", "lowest-delay", "local-repair", 2.0, model.s)
     check(near(m.black_hole_s, 0.1) and near(m.restore_s, 0.1) and near(m.lost_s, 0.1), "m")
     check(near(m.settle_s, 3.0), f"local repair settles when the reference re-plans {m}")
+    # Extra delay at steps 2 to 12 against the baseline's 22 ms: 10 ms from step 3 on (at
+    # step 2 the repaired lane is a black hole).
+    check(near(m.extra_min_ms, 10.0) and near(m.extra_max_ms, 10.0), f"extra {m}")
+    check(near(m.extra_settled_ms, 10.0), f"extra once settled {m}")
+    check(lane_messages(model.facts, "planner") == (2, 3), "reports 2, hops 1 + 2")
+    check(lane_messages(model.facts, "flooding") == (None, 14), "flood messages 7 + 7")
 
 
 def test_transient_link() -> None:
@@ -2750,7 +2799,110 @@ def test_ideal_baseline_against_phase3(work: Path) -> None:
                 check(sample.route == row.route, f"{kind} route at {k}")
 
 
+def test_drop_cause_order() -> None:
+    """4.6 Details: a failed element anywhere on the held route comes first, and a down
+    satellite is `failed_satellite` even when the link to it has failed too."""
+    world = toy_diamond(down_steps={(0, 1): {3, 4}})
+    failures = [
+        Failure("laser_link", (1, 3), "", 3.0, None),
+        Failure("satellite", (3,), "", 3.0, None),
+    ]
+    model = Model(world, toy_settings(), failures, [Direction("A", "B", "study")])
+    got = lane_intervals(model, "planner")
+    # At 3 s the hop 0-1 is out of sight (a Phase 3 cause) and 3 is down further on: the
+    # failure wins. The planner hears only of 2-3 (1 is cut off, B reaches no gateway), so its
+    # plans keep 0-1-3: a black hole to the end.
+    check(got[1][:4] == (3.0, 12.0, "black_hole", "satellite:103"), f"cause order {got}")
+
+
+def test_repaired_route_kept() -> None:
+    """With no gateway in reach the planner never hears of satellite 1: its plans still have
+    the dead hop 0 -> 1, so local repair keeps its repaired route, recorded `kept`."""
+    world = toy_diamond()
+    world.ground_ms["G"] = {}
+    model = Model(
+        world,
+        toy_settings(),
+        [Failure("satellite", (1,), "", 2.0, None)],
+        [Direction("A", "B", "study")],
+    )
+    lanes = model.run()
+    lane = lanes[("A", "B", "lowest-delay", "local-repair")]
+    check(lane.plan_marks == {0: "replaced", 5: "kept", 10: "kept"}, f"{lane.plan_marks}")
+    got = [(x.start_s, x.sample.state, x.sample.route) for x in intervals_of(lane.samples, 12.0)]
+    check(
+        got
+        == [
+            (0.0, "delivered", (0, 1, 3)),
+            (2.0, "black_hole", (0, 1, 3)),
+            (2.1, "delivered", (0, 2, 3)),
+        ],
+        f"kept repair {got}",
+    )
+    planner = lanes[("A", "B", "lowest-delay", "planner")]
+    check(intervals_of(planner.samples, 12.0)[-1].sample.state == "black_hole", "never hears")
+
+
+def test_old_facts_and_no_measures() -> None:
+    """An old failure gives its element's fact and one per link, all old; with no fresh failure
+    the measures counting from t_f are none."""
+    world = toy_diamond()
+    model = Model(
+        world,
+        toy_settings(),
+        [Failure("satellite", (1,), "", -60.0, None)],
+        [Direction("A", "B", "study")],
+    )
+    facts = [(f.subject, f.state, f.old, f.detectors, f.planner_known_s) for f in model.facts]
+    check(
+        facts
+        == [
+            (("satellite", 1), "down", True, [], 0.0),
+            (("link", (0, 1)), "down", True, [], 0.0),
+            (("link", (1, 3)), "down", True, [], 0.0),
+        ],
+        f"old facts {facts}",
+    )
+    lanes = model.run()
+    m = model_measures(lanes, "A", "B", "lowest-delay", "planner", None, model.s)
+    check(m.failure_s is None and m.black_hole_s is None and m.settle_s is None, f"{m}")
+    ignored = Model(
+        world,
+        toy_settings(),
+        [Failure("satellite", (1,), "", -60.0, 60.0)],
+        [Direction("A", "B", "study")],
+    )
+    check(ignored.facts == [], "a failure that ended at the start is ignored")
+
+
+def test_network_rows() -> None:
+    world = toy_planes()
+    model = Model(
+        world,
+        toy_settings(steps=2),
+        [Failure("satellite", (1,), "", -60.0, None), Failure("laser_link", (4, 5), "", 1.0, None)],
+        [Direction("A", "B", "x")],
+    )
+    rows = [(x.k, x.scope, x.working, x.pieces, x.largest) for x in network_rows(model)]
+    # Step 0: 9 working, all in one piece (0-3 joins plane 0, 0-5 and 2-7 join plane 1).
+    # Step 1: losing 4-5 leaves plane 1's ring as a path: still one piece.
+    check(
+        rows
+        == [
+            (0, "all", 9, 1, 9),
+            (0, "toy-s1", 9, 1, 9),
+            (1, "all", 9, 1, 9),
+            (1, "toy-s1", 9, 1, 9),
+        ],
+        f"network {rows}",
+    )
+
+
 SELF_TESTS = [
+    test_drop_cause_order,
+    test_repaired_route_kept,
+    test_old_facts_and_no_measures,
+    test_network_rows,
     test_dijkstra_tie_rule,
     test_flood_against_single_sources,
     test_union_find_against_bfs,
