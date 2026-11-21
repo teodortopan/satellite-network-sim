@@ -25,6 +25,11 @@
 // re-planned on a fixed interval, checked at every step, with serving slots (realistic), drop
 // causes, drop events, the measures and the route checks of spec 6.1. Pure: the steps come from
 // a Lookahead (the program's propagated snapshot, or a test's tables).
+//
+// Phase 4 (spec 4.5, 4.6) gives it two: the truth, what works, and a view, what the planner
+// believes. The serving choice and every plan read the view; the step graph, the ideal, whether
+// the held route is up, its delay, its drop cause, the checks and the measures read the truth.
+// With one object for both it is the Phase 3 engine exactly.
 
 namespace satsim::routing_app {
 
@@ -114,6 +119,16 @@ struct Responsible {
   std::optional<SiteRef> site;
 
   friend bool operator==(const Responsible&, const Responsible&) = default;
+};
+
+/// What a lane is at an instant, once planned (Engine::evaluate): up with a delay, or a drop
+/// with its cause (none only for a lane holding no route with no plan failure stored).
+struct LaneState {
+  bool ok = false;
+  /// The held route's delay in the given graph; set exactly when ok.
+  std::optional<double> delay_s = std::nullopt;
+  std::optional<DropCause> cause = std::nullopt;
+  Responsible responsible{};
 };
 
 /// One direction under one strategy at one step.
@@ -213,8 +228,71 @@ class Engine {
 
   /// Step number k (from 0, called in order). Writes one row per direction and strategy into
   /// `rows`, direction-major. Returns an error only if a graph cannot be built.
+  /// step(k, ahead, rows) is step(k, ahead, ahead, rows): the Phase 3 engine.
   [[nodiscard]] std::optional<std::string> step(std::int64_t k, const Lookahead& ahead,
                                                 std::vector<RouteRow>& rows);
+
+  /// step, with the truth and a view apart (Phase 4 spec 4.5). From `view`: at a slot start
+  /// every dish's serving satellite (the rule's choice among what the view's dish sees, and
+  /// with-route's trial plan), and at a re-plan instant everything of the plan (planning
+  /// graph, longest-lived's candidates and times left in view, the cause stored when a plan
+  /// finds no route, the backup). With the start planner the planning graph is the view's
+  /// graph of this step; whole-interval takes the view's look-ahead. From `truth`: the step
+  /// graph, the ideal, whether the held route is up and its delay, the drop cause (evaluate),
+  /// the route checks and the measures. Passing the same object for both is exactly
+  /// step(k, ahead, rows) (the step graph and its shortest-path trees then serve the plan).
+  [[nodiscard]] std::optional<std::string> step(std::int64_t k, const Lookahead& truth,
+                                                const Lookahead& view, std::vector<RouteRow>& rows);
+
+  /// A plan of every lane now, between two regular ones (spec 4.5 --replan-on-report): what
+  /// step does at a re-plan instant, with the serving satellites as they are (no slot start),
+  /// on the view (and, with the same object, as step does). `k` is the step whose geometry
+  /// truth and view hold (the last step at or before now). Rebuilds the step graph from
+  /// `truth` with the dishes' current serving satellites. Writes one row per lane (direction-
+  /// major) holding only direction, strategy, serving, plan, backup_s and the route now held;
+  /// nothing is checked or recorded, except that the plan counts in the measures (plans, kept,
+  /// replaced, none, backup) as every plan does. Returns an error only if a graph cannot be
+  /// built.
+  [[nodiscard]] std::optional<std::string> replan(std::int64_t k, const Lookahead& truth,
+                                                  const Lookahead& view,
+                                                  std::vector<RouteRow>& rows);
+
+  /// The graph the last plan was made on: the view's step graph (the step graph itself when
+  /// truth and view were one object) or the whole-interval graph. Valid until the next call
+  /// of step or replan.
+  [[nodiscard]] const network::Graph& planning_graph() const noexcept;
+
+  /// The route lane (d, s) holds; empty for none.
+  [[nodiscard]] const routing::Route& lane_route(std::size_t d, std::size_t s) const;
+
+  /// Replaces lane (d, s)'s held route without planning (local repair, spec 4.5;
+  /// RoutePlanner::hold). A non-empty route also clears the cause stored by a plan that found
+  /// none. From the next step (or evaluate) on it is the held route like any other.
+  void hold_route(std::size_t d, std::size_t s, routing::Route route);
+
+  /// What step decides for lane (d, s) after planning, against `truth_now` and `truth_graph`
+  /// (built from truth_now with builder()) instead of the engine's own step graph; nothing is
+  /// recorded. Up in the graph: ok with its delay. Otherwise the cause, the first that applies:
+  ///  1. Failures (Phase 4 spec 4.6). Realistic, a direction with a home PoP: the dish's
+  ///     serving satellite marked down is failed_satellite (that satellite). Then the held
+  ///     route in order, node by node and each laser edge after its first node: a satellite
+  ///     marked down, failed_satellite (the satellite); a gateway marked down, failed_gateway
+  ///     (the gateway site); a laser edge whose link is down with LinkDownReason::kFailed and
+  ///     neither end marked down, failed_link (the link, reason kFailed).
+  ///  2. Phase 3 spec 4.6 unchanged: no_service, no_coverage, serving_left_view; for a held
+  ///     route its first missing edge (ground_link_lost, laser_link_down); with no route the
+  ///     cause the last plan stored.
+  [[nodiscard]] LaneState evaluate(std::size_t d, std::size_t s, const StepGround& truth_now,
+                                   const network::Graph& truth_graph) const;
+
+  /// Dish `dish`'s serving satellite (realistic; dish_of numbers them), nullopt for none.
+  [[nodiscard]] std::optional<std::size_t> serving_of(std::size_t dish) const;
+  /// Gives dish `dish` another serving satellite (or none) until the next slot start (local
+  /// repair, spec 4.5). The next step's graph and rows use it.
+  void set_serving(std::size_t dish, std::optional<std::size_t> satellite);
+
+  /// The builder of every graph the engine makes (for graphs built from other grounds).
+  [[nodiscard]] const GraphBuilder& builder() const noexcept { return builder_; }
 
   /// Ends the run: closes the open drop events and route lifetimes.
   void finish();
@@ -265,11 +343,14 @@ class Engine {
     return d * settings_.strategies.size() + s;
   }
 
-  // At a slot start: every dish's serving satellite.
-  [[nodiscard]] std::optional<std::string> choose_serving(const Lookahead& ahead,
-                                                          const StepGround& now);
-  [[nodiscard]] std::optional<std::size_t> pick_by_rule(const Lookahead& ahead,
-                                                        const StepGround& now, std::size_t city);
+  /// Which graph the last plan was made on.
+  enum class PlanGraph : std::uint8_t { kStep, kView, kInterval };
+
+  // At a slot start: every dish's serving satellite, from the view.
+  [[nodiscard]] std::optional<std::string> choose_serving(const Lookahead& view,
+                                                          const StepGround& seen);
+  [[nodiscard]] std::optional<std::size_t> pick_by_rule(const Lookahead& view,
+                                                        const StepGround& seen, std::size_t city);
   // The longest-lived access candidates of a lane in `graph`.
   [[nodiscard]] routing::AccessCandidates candidates(const network::Graph& graph,
                                                      const Lookahead& ahead, const StepGround& now,
@@ -283,16 +364,23 @@ class Engine {
   [[nodiscard]] std::optional<std::pair<DropCause, Responsible>> cause_now(const StepGround& now,
                                                                            std::size_t d,
                                                                            std::size_t s) const;
-  // The first missing edge of a broken route, as a cause.
+  // The first failed element a lane meets (evaluate's rule 1), or nullopt.
+  [[nodiscard]] std::optional<std::pair<DropCause, Responsible>> failure_cause(
+      const StepGround& now, std::size_t d, std::size_t s, const routing::Route& route) const;
+  // The first edge of a broken route missing from `graph`, as a cause.
   [[nodiscard]] std::optional<std::pair<DropCause, Responsible>> broken_edge_cause(
-      const StepGround& now, const routing::Route& route) const;
+      const StepGround& now, const network::Graph& graph, const routing::Route& route) const;
+  // The serving satellite of every dish, in dish order.
+  [[nodiscard]] std::vector<std::optional<std::size_t>> serving_list() const;
   // The shortest path from `source` to `target` in `graph`, sharing one search per source.
   [[nodiscard]] routing::Route shortest(const network::Graph& graph, std::size_t source,
                                         std::size_t target,
                                         std::map<std::size_t, network::ShortestPaths>& cache) const;
   [[nodiscard]] bool route_hops_exist(const StepGround& now, const routing::Route& route,
                                       std::size_t d, std::size_t s) const;
-  void plan_all(std::int64_t k, const Lookahead& ahead, const StepGround& now,
+  // The plan of every lane on the view; `same`: the view is the truth's object (the step
+  // graph and its trees are then the planning graph's).
+  void plan_all(std::int64_t k, const Lookahead& view, const StepGround& seen, bool same,
                 std::vector<RouteRow>& rows);
   void record(std::int64_t k, const StepGround& now, RouteRow& row);
   void close_event(Lane& lane);
@@ -311,7 +399,11 @@ class Engine {
   std::vector<DropEvent> events_;
   RouteChecks checks_;
   network::Graph step_graph_;
+  /// The whole-interval planning graph.
   network::Graph planning_graph_;
+  /// The start planner's graph of the view's step, when the view is not the truth's object.
+  network::Graph view_graph_;
+  PlanGraph plan_graph_ = PlanGraph::kStep;
   network::Graph open_graph_;
   /// Per site: time left in view of its visible satellites at the current step (cache).
   std::map<std::size_t, std::vector<double>> times_left_;

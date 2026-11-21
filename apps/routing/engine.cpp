@@ -37,6 +37,11 @@ bool uses_longest_lived(const EngineSettings& settings) {
       [](const routing::Strategy& s) { return s.kind == routing::StrategyKind::kLongestLived; });
 }
 
+// Whether `marks` marks element i down (an empty or short span marks nothing).
+bool marked(std::span<const char> marks, std::size_t i) noexcept {
+  return i < marks.size() && marks[i] != 0;
+}
+
 bool has_edge(const network::Graph& graph, std::size_t from, std::size_t to) {
   if (from >= graph.node_count()) {
     return false;
@@ -118,6 +123,7 @@ Engine::Engine(EngineNetwork network, EngineSettings settings, BeforeChecks befo
                           settings_.hop_delay_s);
   step_graph_ = network::Graph(layout.node_count());
   planning_graph_ = network::Graph(layout.node_count());
+  view_graph_ = network::Graph(layout.node_count());
   open_graph_ = network::Graph(layout.node_count());
 
   for (std::size_t i = 0; i < network_.plan->links.size(); ++i) {
@@ -168,12 +174,12 @@ const std::vector<double>& Engine::times_left(const Lookahead& ahead, const Step
   return it->second;
 }
 
-std::optional<std::size_t> Engine::pick_by_rule(const Lookahead& ahead, const StepGround& now,
+std::optional<std::size_t> Engine::pick_by_rule(const Lookahead& view, const StepGround& seen,
                                                 std::size_t city) {
-  const std::span<const topology::VisibleSatellite> visible = now.city_visible[city];
+  const std::span<const topology::VisibleSatellite> visible = seen.city_visible[city];
   switch (settings_.serving) {
     case ServingRule::kLongestInView: {
-      const std::vector<double>& time = times_left(ahead, now, city);
+      const std::vector<double>& time = times_left(view, seen, city);
       std::optional<std::size_t> best;
       for (std::size_t i = 0; i < visible.size(); ++i) {
         if (!best || longer_lived(time[i], visible[i], time[*best], visible[*best])) {
@@ -184,7 +190,7 @@ std::optional<std::size_t> Engine::pick_by_rule(const Lookahead& ahead, const St
     }
     case ServingRule::kHighestWholeSlot: {
       const double slot_s = seconds(settings_.slot_ns);
-      const std::vector<double> time = ahead.times_left_in_view_s(city, visible, slot_s);
+      const std::vector<double> time = view.times_left_in_view_s(city, visible, slot_s);
       std::vector<topology::VisibleSatellite> whole;
       for (std::size_t i = 0; i < visible.size(); ++i) {
         if (time[i] >= slot_s) {
@@ -284,7 +290,7 @@ routing::AccessCandidates Engine::candidates(const network::Graph& graph, const 
   return result;
 }
 
-std::optional<std::string> Engine::choose_serving(const Lookahead& ahead, const StepGround& now) {
+std::optional<std::string> Engine::choose_serving(const Lookahead& view, const StepGround& seen) {
   std::vector<bool> used(dishes_.size(), false);
   for (std::size_t d = 0; d < network_.directions.size(); ++d) {
     for (std::size_t s = 0; s < settings_.strategies.size(); ++s) {
@@ -292,7 +298,7 @@ std::optional<std::string> Engine::choose_serving(const Lookahead& ahead, const 
     }
   }
   for (std::size_t i = 0; i < dishes_.size(); ++i) {
-    dishes_[i].serving = used[i] ? pick_by_rule(ahead, now, dishes_[i].city) : std::nullopt;
+    dishes_[i].serving = used[i] ? pick_by_rule(view, seen, dishes_[i].city) : std::nullopt;
   }
   if (settings_.serving != ServingRule::kWithRoute) {
     return std::nullopt;
@@ -300,7 +306,7 @@ std::optional<std::string> Engine::choose_serving(const Lookahead& ahead, const 
   // With-route: the first satellite of the route each lane's strategy would choose if its dish
   // could use any satellite it sees (a copy of the lane's planner plans on the open graph).
   std::vector<std::optional<std::size_t>> serving(dishes_.size());
-  if (auto error = builder_.build(std::span(&now, 1), serving, 1, true, open_graph_)) {
+  if (auto error = builder_.build(std::span(&seen, 1), serving, 1, true, open_graph_)) {
     return error;
   }
   std::map<std::size_t, network::ShortestPaths> cache;
@@ -315,7 +321,7 @@ std::optional<std::string> Engine::choose_serving(const Lookahead& ahead, const 
       const routing::Route sp = shortest(open_graph_, source, target, cache);
       const routing::AccessCandidates c =
           copy.strategy().kind == routing::StrategyKind::kLongestLived
-              ? candidates(open_graph_, ahead, now, d, s, sp, true)
+              ? candidates(open_graph_, view, seen, d, s, sp, true)
               : routing::AccessCandidates{};
       (void)copy.plan_with_shortest(open_graph_, source, target, sp, c);
       if (copy.route().size() >= 2) {
@@ -360,14 +366,62 @@ std::optional<std::pair<DropCause, Responsible>> Engine::cause_now(const StepGro
   return std::nullopt;
 }
 
+std::optional<std::pair<DropCause, Responsible>> Engine::failure_cause(
+    const StepGround& now, std::size_t d, std::size_t s, const routing::Route& route) const {
+  const GraphLayout& l = builder_.layout();
+  if (realistic() && network_.directions[d].has_home_pop) {
+    // The dish's uplink goes to its serving satellite whatever route it holds.
+    if (const std::optional<std::size_t>& serving = dishes_[dish_of(d, s)].serving;
+        serving && marked(now.satellite_down, *serving)) {
+      Responsible r;
+      r.satellite = serving;
+      return std::pair{DropCause::kFailedSatellite, r};
+    }
+  }
+  for (std::size_t i = 0; i < route.size(); ++i) {
+    const std::size_t u = route[i];
+    if (u >= l.node_count()) {
+      return std::nullopt;  // Not a node: no failure to name (a check counts the route).
+    }
+    const NodeMeaning mu = l.meaning(u);
+    if (mu.kind == NodeKind::kSatellite && marked(now.satellite_down, mu.index)) {
+      Responsible r;
+      r.satellite = mu.index;
+      return std::pair{DropCause::kFailedSatellite, r};
+    }
+    if (mu.kind == NodeKind::kGateway && marked(now.gateway_down, mu.index)) {
+      Responsible r;
+      r.site = SiteRef{.gateway = true, .index = mu.index};
+      return std::pair{DropCause::kFailedGateway, r};
+    }
+    if (i + 1 >= route.size() || mu.kind != NodeKind::kSatellite ||
+        route[i + 1] >= l.node_count()) {
+      continue;
+    }
+    const NodeMeaning mv = l.meaning(route[i + 1]);
+    if (mv.kind != NodeKind::kSatellite || marked(now.satellite_down, mv.index)) {
+      continue;  // Not a laser edge, or its far end is the failure (named next).
+    }
+    const auto it = link_index_.find(std::minmax(mu.index, mv.index));
+    if (it != link_index_.end() && now.links != nullptr && it->second < now.links->states.size() &&
+        now.links->states[it->second].down_reason == topology::LinkDownReason::kFailed) {
+      Responsible r;
+      r.link = it->second;
+      r.link_reason = topology::LinkDownReason::kFailed;
+      return std::pair{DropCause::kFailedLink, r};
+    }
+  }
+  return std::nullopt;
+}
+
 std::optional<std::pair<DropCause, Responsible>> Engine::broken_edge_cause(
-    const StepGround& now, const routing::Route& route) const {
+    const StepGround& now, const network::Graph& graph, const routing::Route& route) const {
   const GraphLayout& l = builder_.layout();
   std::optional<std::pair<DropCause, Responsible>> laser;
   for (std::size_t i = 0; i + 1 < route.size(); ++i) {
     const std::size_t u = route[i];
     const std::size_t v = route[i + 1];
-    if (u >= l.node_count() || v >= l.node_count() || has_edge(step_graph_, u, v)) {
+    if (u >= l.node_count() || v >= l.node_count() || has_edge(graph, u, v)) {
       continue;
     }
     const NodeMeaning mu = l.meaning(u);
@@ -457,31 +511,37 @@ bool Engine::route_hops_exist(const StepGround& now, const routing::Route& route
   return true;
 }
 
-void Engine::plan_all(std::int64_t k, const Lookahead& ahead, const StepGround& now,
+void Engine::plan_all(std::int64_t k, const Lookahead& view, const StepGround& seen, bool same,
                       std::vector<RouteRow>& rows) {
-  // The planning graph: this step's, or the edges of the whole interval.
+  // The planning graph: the view's step graph (the step graph itself when the view is the
+  // truth), or the view's edges of the whole interval.
   const network::Graph* graph = &step_graph_;
-  std::map<std::size_t, network::ShortestPaths> interval_trees;
+  std::map<std::size_t, network::ShortestPaths> own_trees;
   std::map<std::size_t, network::ShortestPaths>* trees = &step_trees_;
+  plan_graph_ = PlanGraph::kStep;
   if (settings_.planner == Planner::kWholeInterval) {
-    const std::size_t n = std::min(static_cast<std::size_t>(replan_steps_), ahead.known_steps());
+    const std::size_t n = std::min(static_cast<std::size_t>(replan_steps_), view.known_steps());
     std::vector<StepGround> steps;
     steps.reserve(n);
     for (std::size_t j = 0; j < n; ++j) {
-      steps.push_back(ahead.step(j));
-    }
-    std::vector<std::optional<std::size_t>> serving;
-    serving.reserve(dishes_.size());
-    for (const Dish& dish : dishes_) {
-      serving.push_back(dish.serving);
+      steps.push_back(view.step(j));
     }
     const auto rest_of_slot = static_cast<std::size_t>(slot_steps_ - k % slot_steps_);
-    if (auto error = builder_.build(steps, serving, rest_of_slot, false, planning_graph_)) {
+    if (auto error = builder_.build(steps, serving_list(), rest_of_slot, false, planning_graph_)) {
       plan_error_ = std::move(error);
       return;
     }
     graph = &planning_graph_;
-    trees = &interval_trees;
+    trees = &own_trees;
+    plan_graph_ = PlanGraph::kInterval;
+  } else if (!same) {
+    if (auto error = builder_.build(std::span(&seen, 1), serving_list(), 1, false, view_graph_)) {
+      plan_error_ = std::move(error);
+      return;
+    }
+    graph = &view_graph_;
+    trees = &own_trees;
+    plan_graph_ = PlanGraph::kView;
   }
   std::map<std::pair<std::size_t, routing::Route>, std::optional<double>> backups;
   for (std::size_t d = 0; d < network_.directions.size(); ++d) {
@@ -497,7 +557,7 @@ void Engine::plan_all(std::int64_t k, const Lookahead& ahead, const StepGround& 
           servable ? shortest(*graph, source, target, *trees) : routing::Route{};
       const routing::AccessCandidates c =
           lane.planner.strategy().kind == routing::StrategyKind::kLongestLived
-              ? candidates(*graph, ahead, now, d, s, sp, false)
+              ? candidates(*graph, view, seen, d, s, sp, false)
               : routing::AccessCandidates{};
       const routing::PlanResult result =
           lane.planner.plan_with_shortest(*graph, source, target, sp, c);
@@ -517,7 +577,7 @@ void Engine::plan_all(std::int64_t k, const Lookahead& ahead, const StepGround& 
       lane.plan_failure.reset();
       lane.plan_failure_responsible = {};
       if (result.outcome == routing::PlanOutcome::kNone) {
-        if (auto now_cause = cause_now(now, d, s)) {
+        if (auto now_cause = cause_now(seen, d, s)) {
           lane.plan_failure = now_cause->first;
           lane.plan_failure_responsible = now_cause->second;
         } else if (realistic()) {
@@ -672,23 +732,61 @@ void Engine::record(std::int64_t k, const StepGround& now, RouteRow& row) {
   lane.has_previous = true;
 }
 
-std::optional<std::string> Engine::step(std::int64_t k, const Lookahead& ahead,
-                                        std::vector<RouteRow>& rows) {
-  const StepGround now = ahead.step(0);
-  times_left_.clear();
-  step_trees_.clear();
-  plan_error_.reset();
-  if (realistic() && k % slot_steps_ == 0) {
-    if (auto error = choose_serving(ahead, now)) {
-      return error;
-    }
-  }
+std::vector<std::optional<std::size_t>> Engine::serving_list() const {
   std::vector<std::optional<std::size_t>> serving;
   serving.reserve(dishes_.size());
   for (const Dish& dish : dishes_) {
     serving.push_back(dish.serving);
   }
-  if (auto error = builder_.build(std::span(&now, 1), serving, 1, false, step_graph_)) {
+  return serving;
+}
+
+LaneState Engine::evaluate(std::size_t d, std::size_t s, const StepGround& truth_now,
+                           const network::Graph& truth_graph) const {
+  const Lane& lane = lanes_.at(lane_index(d, s));
+  LaneState state;
+  if (const auto delay_s = lane.planner.held_delay_s(truth_graph)) {
+    state.ok = true;
+    state.delay_s = delay_s;
+    return state;
+  }
+  const routing::Route& route = lane.planner.route();
+  std::optional<std::pair<DropCause, Responsible>> cause = failure_cause(truth_now, d, s, route);
+  if (!cause) {
+    cause = cause_now(truth_now, d, s);
+  }
+  if (!cause && !route.empty()) {
+    cause = broken_edge_cause(truth_now, truth_graph, route);
+  }
+  if (!cause && route.empty() && lane.plan_failure) {
+    cause = std::pair{*lane.plan_failure, lane.plan_failure_responsible};
+  }
+  if (cause) {
+    state.cause = cause->first;
+    state.responsible = cause->second;
+  }
+  return state;
+}
+
+std::optional<std::string> Engine::step(std::int64_t k, const Lookahead& ahead,
+                                        std::vector<RouteRow>& rows) {
+  return step(k, ahead, ahead, rows);
+}
+
+std::optional<std::string> Engine::step(std::int64_t k, const Lookahead& truth,
+                                        const Lookahead& view, std::vector<RouteRow>& rows) {
+  const bool same = &truth == &view;
+  const StepGround now = truth.step(0);
+  const StepGround seen = same ? now : view.step(0);
+  times_left_.clear();
+  step_trees_.clear();
+  plan_error_.reset();
+  if (realistic() && k % slot_steps_ == 0) {
+    if (auto error = choose_serving(view, seen)) {
+      return error;
+    }
+  }
+  if (auto error = builder_.build(std::span(&now, 1), serving_list(), 1, false, step_graph_)) {
     return error;
   }
 
@@ -717,36 +815,93 @@ std::optional<std::string> Engine::step(std::int64_t k, const Lookahead& ahead,
     }
   }
   if (k % replan_steps_ == 0) {
-    plan_all(k, ahead, now, rows);
+    plan_all(k, view, seen, same, rows);
     if (plan_error_) {
       return plan_error_;
     }
   }
   for (std::size_t d = 0; d < network_.directions.size(); ++d) {
     for (std::size_t s = 0; s < k_count; ++s) {
-      Lane& lane = lanes_[lane_index(d, s)];
       RouteRow& row = rows[lane_index(d, s)];
-      row.route = lane.planner.route();
-      if (const auto delay_s = lane.planner.held_delay_s(step_graph_)) {
+      row.route = lanes_[lane_index(d, s)].planner.route();
+      const LaneState state = evaluate(d, s, now, step_graph_);
+      if (state.ok) {
         row.ok = true;
-        row.delay_s = *delay_s;
-      } else {
-        std::optional<std::pair<DropCause, Responsible>> cause = cause_now(now, d, s);
-        if (!cause && !row.route.empty()) {
-          cause = broken_edge_cause(now, row.route);
-        }
-        if (!cause && row.route.empty() && lane.plan_failure) {
-          cause = std::pair{*lane.plan_failure, lane.plan_failure_responsible};
-        }
-        if (cause) {
-          row.cause = cause->first;
-          row.responsible = cause->second;
-        }
+        row.delay_s = state.delay_s.value_or(0.0);
+      } else if (state.cause) {
+        row.cause = state.cause;
+        row.responsible = state.responsible;
       }
       record(k, now, row);
     }
   }
   return std::nullopt;
+}
+
+std::optional<std::string> Engine::replan(std::int64_t k, const Lookahead& truth,
+                                          const Lookahead& view, std::vector<RouteRow>& rows) {
+  const bool same = &truth == &view;
+  const StepGround now = truth.step(0);
+  const StepGround seen = same ? now : view.step(0);
+  times_left_.clear();
+  step_trees_.clear();
+  plan_error_.reset();
+  if (auto error = builder_.build(std::span(&now, 1), serving_list(), 1, false, step_graph_)) {
+    return error;
+  }
+  const std::size_t k_count = settings_.strategies.size();
+  rows.assign(network_.directions.size() * k_count, RouteRow{});
+  for (std::size_t d = 0; d < network_.directions.size(); ++d) {
+    for (std::size_t s = 0; s < k_count; ++s) {
+      RouteRow& row = rows[lane_index(d, s)];
+      row.direction = d;
+      row.strategy = s;
+      if (realistic()) {
+        row.serving = dishes_[dish_of(d, s)].serving;
+      }
+    }
+  }
+  plan_all(k, view, seen, same, rows);
+  if (plan_error_) {
+    return plan_error_;
+  }
+  for (std::size_t i = 0; i < rows.size(); ++i) {
+    rows[i].route = lanes_[i].planner.route();
+  }
+  return std::nullopt;
+}
+
+const network::Graph& Engine::planning_graph() const noexcept {
+  switch (plan_graph_) {
+    case PlanGraph::kView:
+      return view_graph_;
+    case PlanGraph::kInterval:
+      return planning_graph_;
+    case PlanGraph::kStep:
+      break;
+  }
+  return step_graph_;
+}
+
+const routing::Route& Engine::lane_route(std::size_t d, std::size_t s) const {
+  return lanes_.at(lane_index(d, s)).planner.route();
+}
+
+void Engine::hold_route(std::size_t d, std::size_t s, routing::Route route) {
+  Lane& lane = lanes_.at(lane_index(d, s));
+  lane.planner.hold(std::move(route));
+  if (lane.planner.has_route()) {
+    lane.plan_failure.reset();
+    lane.plan_failure_responsible = {};
+  }
+}
+
+std::optional<std::size_t> Engine::serving_of(std::size_t dish) const {
+  return dishes_.at(dish).serving;
+}
+
+void Engine::set_serving(std::size_t dish, std::optional<std::size_t> satellite) {
+  dishes_.at(dish).serving = satellite;
 }
 
 void Engine::finish() {

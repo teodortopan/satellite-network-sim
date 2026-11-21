@@ -416,6 +416,26 @@ TEST(RoutingEngineTest, EveryDropCauseIsProducedAndEveryDropHasOne) {
                       1, {kFibre, std::nan("")});
     collect(e, run(e, FakeWorld(steps, 1.0)));
   }
+  {
+    // The failure causes of Phase 4 spec 4.6 (engine_views_test.cpp has them in detail): link
+    // 0-1 failed at step 1, satellite 1 (with its links) at step 2.
+    const auto plan = plan_of(kSquare);
+    std::vector<FakeStep> steps = repeat(square_step(), 3);
+    steps[1].links[0] = down(topology::LinkDownReason::kFailed);  // failed_link.
+    steps[2].satellite_down = {0, 1, 0, 0};                       // failed_satellite.
+    steps[2].links[0] = down(topology::LinkDownReason::kFailed);
+    steps[2].links[1] = down(topology::LinkDownReason::kFailed);
+    Engine e = engine({.replan_steps = 4}, plan, 4, kOneWay);
+    collect(e, run(e, FakeWorld(steps, 1.0)));
+  }
+  {
+    const auto plan = plan_of(kRealLinks);
+    std::vector<FakeStep> steps = realistic_steps(2);
+    steps[1].gateway_down = {1};  // failed_gateway.
+    steps[1].gateways[0].clear();
+    Engine e = realistic_engine({.replan_steps = 5}, plan);
+    collect(e, run(e, FakeWorld(steps, 1.0)));
+  }
   EXPECT_EQ(causes.size(), satsim::routing_app::kAllDropCauses.size());
   EXPECT_EQ(without, 0U);
 }
