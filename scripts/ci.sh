@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 # CI steps. Runs inside the satsim-ci Docker image, from the repo root.
-# Usage: scripts/ci.sh <format|python-lint|asan-gcc|asan-clang|valgrind|tidy|validate|validate-topology|all>
+# Usage: scripts/ci.sh <format|python-lint|asan-gcc|asan-clang|valgrind|tidy|validate|validate-topology|validate-routing|all>
 set -euo pipefail
 
 usage() {
-  echo "usage: $0 <format|python-lint|asan-gcc|asan-clang|valgrind|tidy|validate|validate-topology|all>" >&2
+  echo "usage: $0 <format|python-lint|asan-gcc|asan-clang|valgrind|tidy|validate|validate-topology|validate-routing|all>" >&2
 }
 
 # Our C++ sources (not third-party code under build/).
@@ -97,6 +97,17 @@ step_validate_topology() {
     --constellation "$dir/bin/constellation"
 }
 
+# The routing program, optimised and without sanitizers, on Hypatia's and the Bariloche
+# paper's shells with their link files (python/make_ideal_shell.py, written into a temporary
+# directory): every row of three short runs (routes, drops, plans, delays) and every change
+# count against an independent Python model (python/validate_routing.py). No network needed.
+step_validate_routing() {
+  local dir=build/validate
+  CC=gcc CXX=g++ cmake --preset valgrind -B "$dir" -DSATSIM_BUILD_TESTS=OFF
+  cmake --build "$dir" --target routing
+  python3 python/validate_routing.py --routing "$dir/bin/routing"
+}
+
 run_step() {
   echo "==> $1"
   case "$1" in
@@ -108,6 +119,7 @@ run_step() {
     tidy) step_tidy ;;
     validate) step_validate ;;
     validate-topology) step_validate_topology ;;
+    validate-routing) step_validate_routing ;;
     *)
       usage
       exit 2
@@ -126,7 +138,8 @@ main() {
     return
   fi
 
-  local steps=(format python-lint asan-gcc asan-clang valgrind tidy validate validate-topology)
+  local steps=(format python-lint asan-gcc asan-clang valgrind tidy validate validate-topology
+    validate-routing)
   local failed=() s
   for s in "${steps[@]}"; do
     # Separate process so one failing step does not stop the others. (A subshell in an

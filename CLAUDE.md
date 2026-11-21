@@ -20,11 +20,14 @@ Global rules (workflow, commits, review, self-review) load from
   image in `docker/Dockerfile` and runs every CI step inside it: C++ format,
   Python lint, ASan + UBSan tests with GCC and with Clang, Valgrind,
   clang-tidy, `validate` (the `propagate` program against Skyfield on the
-  committed snapshot) and `validate-topology` (the `topology` program against an
-  independent Python model on Hypatia's ideal shell). Exit 0 only if all pass. It
-  needs only Docker on the host.
+  committed snapshot), `validate-topology` (the `topology` program against an
+  independent Python model on Hypatia's ideal shell) and `validate-routing` (the
+  `routing` program against an independent Python model on Hypatia's and the
+  Bariloche paper's shells, `python/validate_routing.py`). Exit 0 only if all pass.
+  It needs only Docker on the host.
 - `scripts/check.sh <step>` runs one step (`format`, `python-lint`,
-  `asan-gcc`, `asan-clang`, `valgrind`, `tidy`, `validate`, `validate-topology`).
+  `asan-gcc`, `asan-clang`, `valgrind`, `tidy`, `validate`, `validate-topology`,
+  `validate-routing`).
   The GCC sanitizer step takes about 8 minutes; `asan-clang` runs the same tests in
   seconds, so prefer it while iterating.
 - `python/compare_spacex.py` (against SpaceX's trajectory files) and
@@ -32,8 +35,13 @@ Global rules (workflow, commits, review, self-review) load from
   commands are in `docs/phase-1-results.md`. The same goes for Phase 2:
   `python/run_phase2.py` (the 12-hour runs and their summaries) and
   `python/plot_phase2.py`, with commands in `docs/phase-2-results.md`.
+  Phase 3's published reproductions (`python/reproduce_routing.py hypatia|bariloche`)
+  and the LENS comparison (`python/compare_lens.py`) are run by hand too; usage in
+  each script's docstring.
 - `python/fetch_ground.py` downloads the ground data and
   `python/make_assumed_gateways.py` derives the assumed gateways; both by hand.
+  `python/fetch_lens.py` downloads the LENS ping files (one request each, no
+  retries; the files stay out of git, `data/lens/<date>/metadata.json` is kept).
 - CI (`.github/workflows/ci.yml`) runs the same steps through the same
   `scripts/ci.sh`, so a green local check means a green CI. Prefer adding a
   step to `scripts/ci.sh` over putting logic in the workflow file, because

@@ -13,7 +13,7 @@ Only Docker is needed on the host.
 ```sh
 scripts/check.sh            # every step; exit 0 only if all pass
 scripts/check.sh valgrind   # one step: format, python-lint, asan-gcc, asan-clang, valgrind, tidy,
-                            # validate or validate-topology
+                            # validate, validate-topology or validate-routing
 ```
 
 Build trees go to `build/<step>` (for example `build/asan-clang`), including the GoogleTest
@@ -29,6 +29,7 @@ download.
 | `valgrind` | Memcheck: reads of uninitialised memory, which ASan does not detect, plus invalid accesses and leaks. `--trace-children=yes` also checks the `propagate` program that the end-to-end test starts; `--error-exitcode=99` (a status the program never uses) makes a Valgrind error in it fail that test | Runs on a separate unsanitized `RelWithDebInfo` (`-O2`) build, so tests also run on optimised code where some bugs only appear |
 | `tidy` | clang-tidy `bugprone-*`, `performance-*`, most of `modernize-*` and `cppcoreguidelines-*`, and a set of `readability-*` checks on every `.cpp` in `src/`, `apps/` and `tests/`; any finding is an error | Catches suspicious code patterns the compiler accepts |
 | `validate-topology` | `topology` and `constellation` output on an ideal shell that disagrees with an independent Python model: a satellite in the wrong plane or slot, an element set from the wrong file, a wrong count of satellites, planes or laser links, a laser left without a partner, a different laser grid, elevation mask, ground link or shortest path (any row's status, laser hops, first or last satellite, or a one-way delay more than 1e-6 ms off). Builds both programs optimised without sanitizers and runs `python/validate_topology.py` | The unit tests check each piece of the topology on small hand-made cases; this checks the whole program on a full 1,584-satellite shell against code written separately (positions from python-sgp4 and Skyfield, the +Grid built from plane and slot indices, its own Dijkstra), and checks that model against the round-trip times the Hypatia paper published. Tolerances and measured values: `docs/phase-2-results.md` |
+| `validate-routing` | `routing` output on two ideal published shells that disagrees with an independent Python model: any row's status, drop cause, route (every satellite in order), plan (kept, replaced, none), laser hops, first or last satellite, or a one-way or ideal delay more than 1e-9 ms off; or a summary count of bad changes, delay increases, breaks or recoveries. Covers `lowest-delay`, `keep-until-broken` and `longest-lived`, routes held between plans, link files, `--max-ground-range-km`, `--min-elevation-deg`, `--hop-delay-ms`, sub-second steps and `--directions forward`. Builds `routing` optimised without sanitizers and runs `python/validate_routing.py` | The unit tests check each strategy on small hand-worked graphs; this checks the whole program on full 1,584-satellite shells against a re-plan loop, graph and Dijkstra written separately from the spec (positions from python-sgp4 with its own TEME to ITRF, checked against Skyfield). It is the comparison the published reproductions rest on (`docs/phase-3-routing.md` 6.3) |
 | `validate` | `propagate` output that disagrees with Skyfield on real data: wrong time since epoch, GMST, UT1, polar motion, geodetic conversion or J2000 chain, a wrong element set chosen, a row missing or extra. Builds `propagate` optimised without sanitizers (tests off, so nothing is downloaded) and runs `python/validate_against_reference.py` on a fixed sample of the committed snapshot | The unit tests check each piece against printed references; this checks the whole program against an independent implementation, row by row, on the data it is meant for. Tolerances and measured values: `docs/phase-1-results.md` |
 
 Every build also compiles our code with
@@ -78,6 +79,26 @@ Hypatia's own laser grid, is more than 20% from Hypatia's published Paris to Lua
 times. The program's own values on that shell are printed but not held to Hypatia's: its
 nearest-distance laser matching gives a different grid from Hypatia's on this shell
 (`docs/phase-2-results.md` explains why and by how much).
+
+## The validate-routing step
+
+`python/make_ideal_shell.py` writes two shells with their link files into a temporary
+directory: Hypatia's (as above) and the Bariloche paper's (Walker phase offset 39, 550 km,
+the index shifted by 39 at the wrap from the last plane to the first).
+`python/validate_routing.py` runs `routing` (best case, `start` planner) on three cases and
+recomputes every row:
+
+| Case | Shell, ground rule | Cities | Time | Strategies |
+|---|---|---|---|---|
+| `hypatia` | Hypatia, within 1,089.686 km | `data/ground/cities.json`, both ways | 300 s every 1 s, re-planned every step | the three |
+| `bariloche` | Bariloche, 40 deg mask, 1.012 ms per hop | the same plus Bariloche to Beijing | 600 s every 1 s, re-planned every 5 s | the three |
+| `hypatia-0.1s` | Hypatia, within 1,089.686 km | Hypatia's first 10 cities (`data/ground/hypatia/`), one way | 10 s every 0.1 s | `lowest-delay` |
+
+The model takes positions from python-sgp4 on the elements by construction, with its own
+TEME to ITRF (checked against Skyfield to 1 mm; measured 0.003 mm), and shares no code with the
+program. The routes must be identical and the delays within 1e-9 ms (measured: 1.1e-12 ms at
+most). It takes about 20 seconds after the build, reads only local files (any network
+connection raises) and runs with `--network none` in the GitHub job.
 
 ## Deliberately deferred
 

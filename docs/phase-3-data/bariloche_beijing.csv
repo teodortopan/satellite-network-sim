@@ -1,0 +1,4 @@
+strategy,changes,published_changes,difference,bad,published_bad,median_ms,published_median_ms,drop_steps,changes_min_over_starts,changes_max_over_starts,bad_min_over_starts,bad_max_over_starts
+lowest-delay,170,185,-0.081,89,101,88.073,just under 89,0,170,183,89,100
+keep-until-broken,101,103,-0.019,56,61,88.373,just under 89,0,95,101,56,59
+longest-lived,62,58,+0.069,29,29,89.935,just under 89,0,54,62,29,30

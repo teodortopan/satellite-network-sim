@@ -1,0 +1,24 @@
+{
+ "source": "LENS dataset, github.com/clarkzjw/LENS (Zhao and Pan, MMSys 2024)",
+ "licence": "CC BY-SA 4.0 (https://creativecommons.org/licenses/by-sa/4.0/)",
+ "dish": "victoria",
+ "listing": "https://lens-starlink.jinwei.me/victoria/ping/2026/11/2026-11-18/",
+ "fetched_utc": "2026-11-21T02:35:28Z",
+ "files": [
+  {
+   "file": "victoria/ping-sttlwax1-2605%3A59c8%3A500%3A7804%3A%3A1-10ms-1h-2026-11-18-21-00-00.txt.tar.zst",
+   "url": "https://lens-starlink.jinwei.me/victoria/ping/2026/11/2026-11-18/ping-sttlwax1-2605%3A59c8%3A500%3A7804%3A%3A1-10ms-1h-2026-11-18-21-00-00.txt.tar.zst",
+   "bytes": 4988746,
+   "sha256": "d9b1aa27a7f5bcb4c44aeafb2baf2b5fb4e6a93622f2bd6565e6d5fb1fc28d23",
+   "listing_md5": "ea12efd75a387ad6b88aa0e2077c66bb"
+  },
+  {
+   "file": "victoria/ping-sttlwax1-2605%3A59c8%3A500%3A7804%3A%3A1-10ms-1h-2026-11-18-22-00-00.txt.tar.zst",
+   "url": "https://lens-starlink.jinwei.me/victoria/ping/2026/11/2026-11-18/ping-sttlwax1-2605%3A59c8%3A500%3A7804%3A%3A1-10ms-1h-2026-11-18-22-00-00.txt.tar.zst",
+   "bytes": 4983605,
+   "sha256": "29e2e051f07ea44d49ae3d96b96d83ce46f43123c758043728b8639783d903da",
+   "listing_md5": "c666783a79896b387721d8ad39689757"
+  }
+ ],
+ "note": "The files are not in git (share-alike licence); python/fetch_lens.py."
+}

@@ -428,8 +428,9 @@ change counts as the program on the same inputs, before either is compared with 
   - Ground: a city may use any satellite within 1,089.686 km (`--max-ground-range-km`).
     Hypatia tests distance, not elevation.
   - Cities: Hypatia's 100 cities (MIT licence), all 4,950 pairs, one direction each.
-  - Time: 200 s at 100 ms steps (2,000 instants), `lowest-delay` re-planned every step, best
-    case.
+  - Time: 200 s at 100 ms steps (2,000 instants, 0 to 199.9 s as Hypatia's
+    `range(0, 200 s, 100 ms)`: `--duration-s 199.9`), `lowest-delay` re-planned every step,
+    best case.
   - Counting: Hypatia's rule. A change is any difference in the list of nodes between two
     consecutive steps; losing the route counts as one change and regaining it as another.
   - Published: a median of 4 path changes per pair, and 10% of pairs with 7 or more.
@@ -438,10 +439,20 @@ change counts as the program on the same inputs, before either is compared with 
 - **Bariloche to Beijing** (the Stability-first paper, section IV-B). The setup, as far as
   the paper and its 2022 companion state it:
   - Shell: 72 planes of 22, 53°, 550 km. Plane o is at RAAN o × 5°; its satellite i is at
-    o × 8.864° + i × 16.36° along the orbit (phase offset 39).
+    o × 8.864° + i × 16.36° along the orbit (phase offset 39). The mean motion is the
+    two-body one at 550 km above 6,378.135 km with WGS-72's constant (a 5,739 s period, the
+    paper's orbit); through SGP4 the shell flies 556.7 km above the WGS-84 ellipsoid.
   - Links: ahead and behind in the plane, and the same index in the next plane; from the
-    last plane to the first the index shifts by 39. Read from a link file.
-  - Ground: one mask of 40° (`--min-elevation-deg`), one access satellite at each end.
+    last plane to the first the index shifts by 39: satellite i of plane 71 links to
+    satellite (i + 39) mod 22 of plane 0. Plane 0 is plane 72 one turn of RAAN later, whose
+    satellite i would sit at 72 × 8.864° + i × 16.36° = (i + 39) × 16.36°; this is the only
+    shift that keeps every cross-plane link at the same phase step
+    (`python/make_ideal_shell.py` checks it). Read from a link file.
+  - Ground: one mask of 40° (`--min-elevation-deg`), one access satellite at each end. A
+    best-case route has exactly one first and one last satellite, chosen by the route, so
+    this is the best case; `--serving` belongs to the realistic model and does not apply.
+  - Cities: Bariloche −41.13, −71.31 and Beijing 39.90, 116.41 (city centres; the paper
+    gives none). Their great-circle distance here is 19,349 km.
   - Delay: propagation plus 1.012 ms per hop (`--hop-delay-ms`).
   - Time: one orbit (5,739 s) at 1 s steps, re-planned every step, best case.
   - Strategies: the paper's Dijkstra, Stubborn and Tenacious are `lowest-delay`,
@@ -472,6 +483,18 @@ the measured one: the lowest delay, the size of the jumps, and whether the jumps
 processing, so the model is expected to be a lower bound and the comparison is a plausibility
 check. The files are not kept in git (their licence is share-alike); `metadata.json` holds
 their sha256.
+
+- Files: since November 2025 LENS serves one file per dish and hour,
+  `<dish>/ping/<yyyy>/<mm>/<date>/ping-<router>-<address>-10ms-1h-<date>-<HH>-00-00.txt.tar.zst`
+  at `https://lens-starlink.jinwei.me` (`python/fetch_lens.py`). For the dish `victoria`
+  (Victoria, BC; router `sttlwax1`, PoP `sea`, Seattle) the day 2026-11-18 lists 04:00 to
+  22:00, so the comparison covers 21:00 to 23:00 UTC.
+- Model: the routing program, realistic model, pattern `three`, `highest-elevation` with
+  15 s slots, `lowest-delay` re-planned every second, from Victoria's city centre to an end
+  placed at the Seattle PoP's coordinates, so that the route ends at the PoP with no fibre
+  after it; round trip twice the one-way delay (`python/compare_lens.py`). The program's
+  slots start at the run's start, on the minute; Starlink's are measured at 12, 27, 42 and
+  57 s past it, so the two 15 s grids are compared by the second of the grid.
 
 ### 6.5 Tests
 
