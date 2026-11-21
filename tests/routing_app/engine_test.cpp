@@ -47,6 +47,7 @@ using satsim::routing_app::testing::plan_of;
 using satsim::routing_app::testing::repeat;
 using satsim::routing_app::testing::run;
 using satsim::routing_app::testing::seen;
+using satsim::routing_app::testing::seen_in;
 using satsim::routing_app::testing::up;
 namespace topology = satsim::topology;
 using Rows = std::vector<std::vector<RouteRow>>;
@@ -457,6 +458,49 @@ TEST(RoutingEngineTest, LongestLivedTakesTheLongestLivedCandidatesOfEachDirectio
   EXPECT_EQ(rows[2][0].cause, DropCause::kGroundLinkLost);
   EXPECT_TRUE(rows[3][1].ok);
   EXPECT_EQ(rows[4][1].cause, DropCause::kGroundLinkLost);
+  EXPECT_EQ(e.checks().total(), 0U);
+}
+
+// Longest-lived takes its candidates per shell, because lasers never join two shells. Shell 0:
+// satellites 0 (north, 3 s left) and 1 (south, 5 s) over city 0, 4 (north, 6 s) and 5 (south,
+// 2 s) over city 1. Shell 1: 2 (north, 6 s) and 3 (south, 2 s) over city 0, 6 (north, 3 s) and
+// 7 (south, 5 s) over city 1. Links only within a shell and a direction of travel: 0-4 1000 km,
+// 1-5 1500, 2-6 2000, 3-7 800.
+//  - One candidate per direction overall would give heads 2 (shell 1) and 1 (shell 0), tails 4
+//    (shell 0) and 7 (shell 1): no pair is joined, so no route.
+//  - Per shell: heads 0, 1, 2, 3 and tails 4, 5, 6, 7; the joined pairs are 0-4, 1-5, 2-6 and
+//    3-7, and the lowest delay is 3-7: 600 + 800 + 600 km.
+TEST(RoutingEngineTest, LongestLivedTakesItsCandidatesInEveryShell) {
+  const std::vector<std::pair<std::size_t, std::size_t>> links = {{0, 4}, {1, 5}, {2, 6}, {3, 7}};
+  const auto plan = plan_of(links);
+  std::vector<FakeStep> steps;
+  for (std::size_t k = 0; k < 6; ++k) {
+    FakeStep s{.links = {up(1000.0), up(1500.0), up(2000.0), up(800.0)},
+               .cities = {{}, {}},
+               .gateways = {},
+               .north = {0, 2, 4, 6}};
+    const auto add = [&](std::size_t city, std::size_t shell, std::size_t satellite,
+                         std::size_t steps_in_view) {
+      if (k < steps_in_view) {
+        s.cities[city].push_back(seen_in(shell, satellite, 40.0, 600.0));
+      }
+    };
+    add(0, 0, 0, 3);
+    add(0, 0, 1, 5);
+    add(0, 1, 2, 6);
+    add(0, 1, 3, 2);
+    add(1, 0, 4, 6);
+    add(1, 0, 5, 2);
+    add(1, 1, 6, 3);
+    add(1, 1, 7, 5);
+    steps.push_back(std::move(s));
+  }
+  // Nodes: satellites 0..7, open dish of city 0 = 8, receiving dish of city 1 = 11.
+  Engine e = engine({.strategies = {"longest-lived"}, .replan_steps = 6}, plan, 8, kOneWay);
+  const Rows rows = run(e, FakeWorld(steps, 1.0));
+  EXPECT_TRUE(rows[0][0].ok);
+  EXPECT_EQ(rows[0][0].route, (Route{8, 3, 7, 11}));
+  EXPECT_EQ(rows[0][0].delay_s, sum_s({600.0, 800.0, 600.0}));
   EXPECT_EQ(e.checks().total(), 0U);
 }
 

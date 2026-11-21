@@ -218,25 +218,31 @@ routing::AccessCandidates Engine::candidates(const network::Graph& graph, const 
   const std::size_t target = target_node(d);
   routing::AccessCandidates result;
 
-  // The north-moving and the south-moving satellite of `visible` (seen from `site`) with the
-  // longest time left in view, among those `usable` accepts, north first.
+  // For every shell, the north-moving and the south-moving satellite of `visible` (seen from
+  // `site`) with the longest time left in view, among those `usable` accepts: shells in
+  // increasing index, north before south. Lasers never join two shells, so one candidate of
+  // each direction overall could leave the two ends in shells nothing joins (spec 4.5).
   const auto pick = [&](std::size_t site, std::span<const topology::VisibleSatellite> visible,
                         const auto& usable) {
     const std::vector<double>& time = times_left(ahead, now, site);
-    std::array<std::optional<std::size_t>, 2> best;  // [0] north, [1] south.
+    // shell -> [0] north, [1] south.
+    std::map<std::size_t, std::array<std::optional<std::size_t>, 2>> best;
     for (std::size_t i = 0; i < visible.size(); ++i) {
       if (!usable(visible[i].satellite)) {
         continue;
       }
-      auto& slot = best.at(ahead.moving_north(visible[i].satellite) ? 0 : 1);
+      auto& slot =
+          best[visible[i].shell_index].at(ahead.moving_north(visible[i].satellite) ? 0 : 1);
       if (!slot || longer_lived(time[i], visible[i], time[*slot], visible[*slot])) {
         slot = i;
       }
     }
     std::vector<std::size_t> chosen;
-    for (const auto& b : best) {
-      if (b) {
-        chosen.push_back(visible[*b].satellite);
+    for (const auto& [shell, pair] : best) {
+      for (const auto& b : pair) {
+        if (b) {
+          chosen.push_back(visible[*b].satellite);
+        }
       }
     }
     return chosen;

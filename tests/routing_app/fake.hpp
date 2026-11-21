@@ -27,6 +27,10 @@ namespace satsim::routing_app::testing {
 [[nodiscard]] topology::VisibleSatellite seen(std::size_t satellite, double elevation_deg,
                                               double slant_km);
 
+/// seen, in shell `shell`.
+[[nodiscard]] topology::VisibleSatellite seen_in(std::size_t shell, std::size_t satellite,
+                                                 double elevation_deg, double slant_km);
+
 /// A link state: up with a length, or down for a reason.
 [[nodiscard]] topology::LinkState up(double length_km);
 [[nodiscard]] topology::LinkState down(

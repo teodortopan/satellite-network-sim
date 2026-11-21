@@ -38,6 +38,13 @@ topology::VisibleSatellite seen(std::size_t satellite, double elevation_deg, dou
                                     .mask_rad = 0.0};
 }
 
+topology::VisibleSatellite seen_in(std::size_t shell, std::size_t satellite, double elevation_deg,
+                                   double slant_km) {
+  topology::VisibleSatellite v = seen(satellite, elevation_deg, slant_km);
+  v.shell_index = shell;
+  return v;
+}
+
 topology::LinkState up(double length_km) {
   return topology::LinkState{.length_km = length_km, .down_reason = std::nullopt};
 }

@@ -211,15 +211,21 @@ Each direction keeps one held route. At a re-plan instant, with the planning gra
   Values run: 0.5, 1, 2 and 5 ms; 1%, 2%, 5% and 10%.
 - **Access satellites** are a route's first and last satellite: the ones with a ground link.
 - **Longest-lived, best case.** This follows the "Tenacious" algorithm of the Bariloche
-  paper. At each city take two candidates: among the satellites it sees, the one with the
-  longest time left in view that is moving north, and the one that is moving south. A
-  satellite's two directions of travel form two meshes that are poorly joined, so one
-  candidate of each kind keeps a short route possible. Of the up to four pairs, take the
-  lowest-delay pair that lasers join. The route is the shortest path through that pair.
+  paper. At each city, for every shell the city sees, take two candidates: among that shell's
+  satellites the city sees, the one with the longest time left in view that is moving north,
+  and the one that is moving south. A satellite's two directions of travel form two meshes
+  that are poorly joined, so one candidate of each kind keeps a short route possible; and
+  lasers never join two shells, so one pair of candidates overall could leave the two cities
+  in shells that nothing joins. The paper has one shell, where this is its rule exactly. The
+  candidates are ordered by shell, then north before south. Of all the pairs of a candidate
+  at the sender and one at the receiver, take the lowest-delay pair that lasers join (ties to
+  the earlier sender candidate, then the earlier receiver candidate). The route is the
+  shortest path through that pair. A link file with links between shells needs no special
+  case: the candidates are still per shell, and the pair is whatever lasers join.
 - **Longest-lived, realistic.** The first satellite is the serving satellite (4.4). The
   gateway is the one the shortest path uses at this instant, so fibre is never traded for
   lifetime. The last satellite is chosen among the satellites that gateway sees, with the
-  same two candidates and the same rule.
+  same candidates per shell and the same rule.
 - The paper computes each route at three quarters of the way through the pair's time in
   view. Here the route is computed on the planning graph, like every other strategy. This
   changes delays slightly and does not change when access satellites are switched.
@@ -231,7 +237,8 @@ Details of `longest-lived`:
 - A satellite moves north when its Earth-fixed z is larger at the next step than at this one;
   otherwise (and when either position is missing) it moves south.
 - "Longest time left" ties go to the higher elevation, then the lower catalogue number. Among
-  equal-delay pairs the north head wins, then the north tail.
+  equal-delay pairs the earlier head wins, then the earlier tail, in the candidate order
+  above (shell, then north before south).
 - Candidates are taken only among the satellites whose ground edge is in the planning graph
   (with `whole-interval`, those the site sees for the whole interval).
 - Realistic: with no shortest path at this instant there is no gateway, no candidate and no
