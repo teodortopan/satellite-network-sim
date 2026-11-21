@@ -178,8 +178,18 @@ in continuous time.
 - **A return is detected at once.** When a transient failure ends, a laser link must first
   acquire (4.8); the instant it carries traffic, both ends know. A returned satellite's ground
   links work from the instant it returns.
-- A neighbour cannot tell a dead laser link from a dead satellite. Both look like a link that
-  went silent. What it reports is that link.
+- **What a neighbour learns** depends on the link that went silent:
+  - Over a laser, a satellite cannot tell a dead link from a dead satellite: both look the
+    same. The fact it holds and passes on is "this laser link is down".
+  - Over a ground link, the fact is about the other end: a dish or gateway whose satellite
+    went silent holds "this satellite is down", and a satellite whose gateway went silent
+    holds "this gateway is down". In this model nothing else silences a ground link that is
+    in view.
+- **A view takes a satellite as down** when it holds "this satellite is down", or when it
+  holds "this laser link is down" for every planned laser link of that satellite. A satellite
+  with no working laser can pass nothing on, so the view stops using it for ground links too.
+- A fact about an element is replaced by a later fact about the same element: "up again"
+  after "down", and the other way round.
 
 ### 4.5 The three reaction modes
 
@@ -353,6 +363,10 @@ Input: everything the `routing` program takes (Phase 3 spec 4.8), and:
 
 One run steps through time once and evaluates the baseline and every listed reaction mode.
 `--strategies` applies to `planner` and `local-repair`; `flooding` is `lowest-delay`.
+
+Two options of the `routing` program are refused: `--lock-on-s` other than 0, because
+`--acquisition-s` is this program's lock-on, and `--serving with-route`, because that rule
+gives every strategy a dish of its own and the reaction modes here share one dish per city.
 
 Output:
 
