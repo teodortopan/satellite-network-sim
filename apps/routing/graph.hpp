@@ -98,6 +98,15 @@ struct StepGround {
   /// satellite index (GroundVisibility::at).
   std::span<const std::vector<topology::VisibleSatellite>> city_visible;
   std::span<const std::vector<topology::VisibleSatellite>> gateway_visible;
+  /// What has failed (Phase 4 spec 4.6), by satellite and by gateway index: non-zero = down.
+  /// Empty (the default, and always in Phase 3) or shorter than the count: nothing more is
+  /// down. A failed laser link is one whose state is down with LinkDownReason::kFailed. These
+  /// marks only name a drop's cause (Engine::evaluate); the graph never reads them, so whoever
+  /// builds the step must also take a failed element out of it (its link states failed, a
+  /// failed satellite out of every visible list, a failed gateway's visible list empty).
+  /// Default member initializers so that a designated initializer may leave them out.
+  std::span<const char> satellite_down{};  // NOLINT(readability-redundant-member-init)
+  std::span<const char> gateway_down{};    // NOLINT(readability-redundant-member-init)
 };
 
 /// The visible satellite `satellite` of `visible` (sorted by satellite), or nullptr.

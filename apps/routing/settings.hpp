@@ -31,7 +31,9 @@ enum class ServingRule : std::uint8_t {
 [[nodiscard]] std::string_view name_of(ServingRule rule) noexcept;
 [[nodiscard]] std::optional<ServingRule> parse_serving_rule(std::string_view text) noexcept;
 
-/// Why a step has no usable route (spec 4.6), in the order they are tested.
+/// Why a step has no usable route (spec 4.6), in the order they are tested; then the three
+/// failure causes of Phase 4 spec 4.6, which are tested before all of them (Engine::evaluate)
+/// and occur only when a step's ground marks something failed.
 enum class DropCause : std::uint8_t {
   kNoService,
   kNoCoverage,
@@ -40,15 +42,19 @@ enum class DropCause : std::uint8_t {
   kLaserLinkDown,
   kNoGateway,
   kNoPath,
+  kFailedSatellite,
+  kFailedLink,
+  kFailedGateway,
 };
 
-inline constexpr std::array<DropCause, 7> kAllDropCauses = {
-    DropCause::kNoService,      DropCause::kNoCoverage,    DropCause::kServingLeftView,
-    DropCause::kGroundLinkLost, DropCause::kLaserLinkDown, DropCause::kNoGateway,
-    DropCause::kNoPath};
+inline constexpr std::array<DropCause, 10> kAllDropCauses = {
+    DropCause::kNoService,      DropCause::kNoCoverage,      DropCause::kServingLeftView,
+    DropCause::kGroundLinkLost, DropCause::kLaserLinkDown,   DropCause::kNoGateway,
+    DropCause::kNoPath,         DropCause::kFailedSatellite, DropCause::kFailedLink,
+    DropCause::kFailedGateway};
 
 /// "no_service", "no_coverage", "serving_left_view", "ground_link_lost", "laser_link_down",
-/// "no_gateway", "no_path".
+/// "no_gateway", "no_path", "failed_satellite", "failed_link", "failed_gateway".
 [[nodiscard]] std::string_view name_of(DropCause cause) noexcept;
 
 }  // namespace satsim::routing_app

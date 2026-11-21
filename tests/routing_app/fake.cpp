@@ -76,7 +76,9 @@ StepGround FakeWorld::View::step(std::size_t offset) const {
   const FakeStep& s = world_->steps_.at(k_ + offset);
   return StepGround{.links = &world_->links_.at(k_ + offset),
                     .city_visible = s.cities,
-                    .gateway_visible = s.gateways};
+                    .gateway_visible = s.gateways,
+                    .satellite_down = s.satellite_down,
+                    .gateway_down = s.gateway_down};
 }
 
 std::vector<double> FakeWorld::View::times_left_in_view_s(

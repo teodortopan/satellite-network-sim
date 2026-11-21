@@ -58,6 +58,12 @@ std::string_view name_of(DropCause cause) noexcept {
       return "no_gateway";
     case DropCause::kNoPath:
       return "no_path";
+    case DropCause::kFailedSatellite:
+      return "failed_satellite";
+    case DropCause::kFailedLink:
+      return "failed_link";
+    case DropCause::kFailedGateway:
+      return "failed_gateway";
   }
   return "unknown";
 }

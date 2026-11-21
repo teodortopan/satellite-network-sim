@@ -47,6 +47,10 @@ struct FakeStep {
   std::vector<std::vector<topology::VisibleSatellite>> gateways;
   /// Satellites moving north at this step (all others move south).
   std::vector<std::size_t> north;
+  /// StepGround's failure marks (empty: nothing failed). Default member initializers so that
+  /// the worlds written before them need not name them.
+  std::vector<char> satellite_down{};  // NOLINT(readability-redundant-member-init)
+  std::vector<char> gateway_down{};    // NOLINT(readability-redundant-member-init)
 };
 
 /// The world: steps 0, 1, ... step_s apart. Steps past the last one see nothing.

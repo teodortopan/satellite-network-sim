@@ -4,8 +4,8 @@
 # itself for spec 6.2. The propagate tests' helpers (scratch directories, CSV reader) are
 # shared.
 satsim_add_test(satsim_routing_app_tests
-  SOURCES fake.cpp ../topology_app/fixture.cpp graph_test.cpp engine_test.cpp arguments_test.cpp
-    run_test.cpp
+  SOURCES fake.cpp ../topology_app/fixture.cpp graph_test.cpp engine_test.cpp
+    engine_views_test.cpp arguments_test.cpp run_test.cpp
   DEPS satsim::routing_app satsim::topology_app satsim::test_support satsim::app_inputs
     satsim::routing satsim::network satsim::topology satsim::constellation satsim::ground
     satsim::orbit satsim::time satsim::core)
