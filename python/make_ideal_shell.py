@@ -67,11 +67,45 @@ lasers ahead and behind in the plane and to the same index in the next plane. He
     With that shift every cross-plane link has the same phase step (360 * 39 / 1584 deg),
     which write_links checks. 3,168 links, 4 per satellite.
 
-Deterministic: the same files every run. Standard library only.
+Four-column link files (--four-column-links; docs/phase-3-routing.md 4.9, the form with the
+laser side used at each end), for the Phase 4 model (python/validate_failures.py), which needs
+the sides to re-point freed lasers:
+
+  links-plus-grid-sides.csv  the links of links.csv in the same order, in-plane ones as
+                             (o, s) ahead to (o, s + 1) behind, cross-plane ones as (o, s)
+                             east to its partner west.
+  links-three.csv            a `three` plan of the shell made here, written from
+                             docs/phase-2-topology.md 4.3: the in-plane ring (ahead, behind);
+                             one cross-plane laser per satellite, facing east at an even index
+                             in its plane and west at an odd one; plane o matched with plane
+                             o + 1 (plane 71 with plane 0): the pairs (east-facing in o,
+                             west-facing in o + 1) taken shortest first at the reference time
+                             (ties to the lower catalogue numbers, east end first), accepted
+                             when both lasers are free, the segment clears 80 km above a sphere
+                             of 6378.137 km at the reference time, and the link is permanent:
+                             both satellites on circles of their own mean radius in their own
+                             mean planes (32 samples over one orbit of SGP4's TEME output),
+                             moving at the same rate from their arguments of latitude at the
+                             reference time, keep line of sight at each of 360 equally spaced
+                             points of one orbit. Distances and line of sight are taken in TEME:
+                             TEME to ITRF is a rotation about the Earth's centre, so neither
+                             changes. The reference time is the epoch, where the Phase 4 runs
+                             on this shell start.
+
+  Measured on Hypatia's half-slot shell (three_plan, checked by write_four_column_links): 792
+  cross-plane links, so 2,376 links in all (1,584 in plane) and no laser left without a
+  partner. From an even plane to the next (odd) plane the nearest west-facing satellite is
+  one slot behind (5.2 deg of phase off the nearest point); from an odd plane to the next
+  (even) plane the nearest same-index satellite faces east, so every pair goes one slot ahead
+  (11.2 deg off). Every pair is a few hundred km long and far inside line of sight.
+
+Deterministic: the same files every run. Standard library only, except that the `three`
+plan propagates with python-sgp4 (imported only when the plan is made).
 
 Usage:
 
     python3 python/make_ideal_shell.py --out build/ideal-shell [--setup hypatia|bariloche]
+        [--four-column-links]
 """
 
 from __future__ import annotations
@@ -266,6 +300,254 @@ def write_links(path: Path, setup: Setup) -> None:
             f.write(f"{a.norad_cat_id},{b.norad_cat_id}\n")
 
 
+# ---------------------------------------------------------------------------------------
+# Four-column link files and the `three` plan (module docstring).
+# ---------------------------------------------------------------------------------------
+THREE_LINKS_FILE = "links-three.csv"
+PLUS_GRID_SIDES_FILE = "links-plus-grid-sides.csv"
+LINE_OF_SIGHT_RADIUS_KM = 6378.137 + 80.0  # Phase 2 spec 4.3.
+ORBIT_SAMPLES = 32  # Phase 2 spec 4.2: tilt and RAAN averaged over one orbit.
+PERMANENCE_POINTS = 360  # Phase 2 spec 4.3.
+SGP4_EPOCH_JD = 2433281.5  # 1949 December 31 0h, the zero of sgp4init's epoch argument.
+
+
+@dataclass(frozen=True)
+class SidedLink:
+    """A laser link with the side of the laser used at each end (Phase 3 spec 4.9)."""
+
+    a: int  # Catalogue numbers.
+    b: int
+    side_a: str
+    side_b: str
+
+
+def cross_side(slot: Slot) -> str:
+    """`three`: the one cross-plane laser faces east at an even index, west at an odd one."""
+    return "east" if slot.slot % 2 == 0 else "west"
+
+
+def satrec_of(slot: Slot):
+    """python-sgp4's record of a slot's true elements (as validate_routing.satrecs)."""
+    from sgp4.api import WGS72, Satrec
+
+    deg = math.pi / 180.0
+    epoch = st.parse_utc(EPOCH)
+    satrec = Satrec()
+    satrec.sgp4init(
+        WGS72,
+        "i",
+        1,  # python-sgp4 refuses six-digit numbers; SGP4 never uses it.
+        (epoch.jd_whole - SGP4_EPOCH_JD) + epoch.jd_fraction,
+        0.0,
+        0.0,
+        0.0,
+        ECCENTRICITY,
+        ARG_OF_PERIGEE_DEG * deg,
+        INCLINATION_DEG * deg,
+        slot.mean_anomaly_deg * deg,
+        slot.setup.mean_motion_rev_per_day / 720.0 * math.pi,
+        slot.raan_deg * deg,
+    )
+    satrec.jdsatepoch = epoch.jd_whole
+    satrec.jdsatepochF = epoch.jd_fraction
+    return satrec
+
+
+def teme_state(satrec, t: st.UtcInstant) -> tuple[tuple[float, ...], tuple[float, ...]]:
+    error, r, v = satrec.sgp4(t.jd_whole, t.jd_fraction)
+    if error:
+        raise SystemExit(f"error: SGP4 failed at {t.iso()}")
+    return tuple(r), tuple(v)
+
+
+def _dot(a, b) -> float:
+    return a[0] * b[0] + a[1] * b[1] + a[2] * b[2]
+
+
+def _cross(a, b) -> tuple[float, float, float]:
+    return (a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0])
+
+
+def _unit(a) -> tuple[float, float, float]:
+    n = math.sqrt(_dot(a, a))
+    return (a[0] / n, a[1] / n, a[2] / n)
+
+
+def distance_km(a, b) -> float:
+    d = (b[0] - a[0], b[1] - a[1], b[2] - a[2])
+    return math.sqrt(_dot(d, d))
+
+
+def segment_clears(a, b) -> bool:
+    """The segment a-b stays at least 80 km above the 6378.137 km sphere (Phase 2 spec 4.3)."""
+    d = (b[0] - a[0], b[1] - a[1], b[2] - a[2])
+    t = min(1.0, max(0.0, -_dot(a, d) / _dot(d, d)))
+    p = (a[0] + t * d[0], a[1] + t * d[1], a[2] + t * d[2])
+    return math.sqrt(_dot(p, p)) >= LINE_OF_SIGHT_RADIUS_KM
+
+
+@dataclass(frozen=True)
+class OrbitCircle:
+    """A satellite's mean orbit as a circle (Phase 2 spec 4.3, permanent link), in TEME."""
+
+    radius_km: float
+    node: tuple[float, float, float]  # Unit vector to the ascending node.
+    quarter: tuple[float, float, float]  # Unit vector 90 deg further along the orbit.
+
+    def argument_of_latitude_rad(self, r_teme) -> float:
+        return math.atan2(_dot(r_teme, self.quarter), _dot(r_teme, self.node))
+
+    def point(self, u_rad: float) -> tuple[float, float, float]:
+        c, s = math.cos(u_rad), math.sin(u_rad)
+        return tuple(
+            self.radius_km * (c * n + s * q) for n, q in zip(self.node, self.quarter, strict=True)
+        )  # type: ignore[return-value]
+
+
+def orbit_circle(satrec, setup: Setup, reference: st.UtcInstant) -> OrbitCircle:
+    """Mean radius and mean plane over one orbit from `reference`, ORBIT_SAMPLES samples."""
+    period_ns = round(86400.0 / setup.mean_motion_rev_per_day * st.NS_PER_S)
+    radius, normal = 0.0, [0.0, 0.0, 0.0]
+    for i in range(ORBIT_SAMPLES):
+        r, v = teme_state(satrec, reference.plus_ns(i * period_ns // ORBIT_SAMPLES))
+        radius += math.sqrt(_dot(r, r))
+        h = _unit(_cross(r, v))
+        normal = [normal[j] + h[j] for j in range(3)]
+    n = _unit(normal)
+    node = _unit(_cross((0.0, 0.0, 1.0), n))
+    return OrbitCircle(radius / ORBIT_SAMPLES, node, _cross(n, node))
+
+
+def permanent(ca: OrbitCircle, ua: float, cb: OrbitCircle, ub: float) -> bool:
+    """Line of sight at each of PERMANENCE_POINTS equally spaced points of one orbit, both
+    satellites on their circles at the same rate from arguments of latitude ua and ub."""
+    for i in range(PERMANENCE_POINTS):
+        theta = 2.0 * math.pi * i / PERMANENCE_POINTS
+        if not segment_clears(ca.point(ua + theta), cb.point(ub + theta)):
+            return False
+    return True
+
+
+@dataclass(frozen=True)
+class ThreePlan:
+    links: list[SidedLink]
+    in_plane: int
+    cross_plane: int
+    lasers_without_partner: int  # Cross-plane lasers no link took.
+
+
+def three_plan(setup: Setup = HYPATIA, reference_utc: str = EPOCH) -> ThreePlan:
+    """The `three` plan of the shell at `reference_utc` (module docstring)."""
+    reference = st.parse_utc(reference_utc)
+    slots = all_slots(setup)
+    records = [satrec_of(x) for x in slots]
+    r_ref = [teme_state(s, reference)[0] for s in records]
+    circles = [orbit_circle(s, setup, reference) for s in records]
+    u_ref = [c.argument_of_latitude_rad(r) for c, r in zip(circles, r_ref, strict=True)]
+    n = NUM_SATS_PER_ORB
+    links = [
+        SidedLink(
+            Slot(o, s, setup).norad_cat_id,
+            Slot(o, (s + 1) % n, setup).norad_cat_id,
+            "ahead",
+            "behind",
+        )
+        for o in range(NUM_ORBS)
+        for s in range(n)
+    ]
+    in_plane = len(links)
+    cross = []
+    for o in range(NUM_ORBS):
+        east = (o + 1) % NUM_ORBS
+        candidates = []
+        for s in range(0, n, 2):  # East-facing in plane o.
+            i = o * n + s
+            for t in range(1, n, 2):  # West-facing in the plane to the east.
+                j = east * n + t
+                candidates.append(
+                    (
+                        distance_km(r_ref[i], r_ref[j]),
+                        slots[i].norad_cat_id,
+                        slots[j].norad_cat_id,
+                        i,
+                        j,
+                    )
+                )
+        candidates.sort()
+        taken: set[int] = set()
+        for _, id_a, id_b, i, j in candidates:
+            if i in taken or j in taken:
+                continue
+            if not segment_clears(r_ref[i], r_ref[j]):
+                continue
+            if not permanent(circles[i], u_ref[i], circles[j], u_ref[j]):
+                continue
+            taken.update((i, j))
+            cross.append(SidedLink(id_a, id_b, "east", "west"))
+    cross.sort(key=lambda x: (x.a, x.b))
+    lasers = NUM_ORBS * n  # One cross-plane laser per satellite.
+    return ThreePlan(links + cross, in_plane, len(cross), lasers - 2 * len(cross))
+
+
+def plus_grid_sided(setup: Setup) -> list[SidedLink]:
+    """links(setup) with sides: in-plane ahead to behind, cross-plane east to west."""
+    out = []
+    for a, b in links(setup):
+        sides = ("ahead", "behind") if a.orbit == b.orbit else ("east", "west")
+        out.append(SidedLink(a.norad_cat_id, b.norad_cat_id, *sides))
+    return out
+
+
+def check_sided(name: str, sided: list[SidedLink], max_per_satellite: int) -> None:
+    """Raises SystemExit unless no pair repeats, no laser (satellite and side) is used twice,
+    and no satellite has more than `max_per_satellite` links."""
+    pairs, lasers, degree = set(), set(), {}
+    for x in sided:
+        key = (min(x.a, x.b), max(x.a, x.b))
+        if key in pairs or x.a == x.b:
+            raise SystemExit(f"error: {name}: link {key} repeats or is a loop")
+        pairs.add(key)
+        for laser in ((x.a, x.side_a), (x.b, x.side_b)):
+            if laser in lasers:
+                raise SystemExit(f"error: {name}: laser {laser} used twice")
+            lasers.add(laser)
+        for s in (x.a, x.b):
+            degree[s] = degree.get(s, 0) + 1
+    if max(degree.values()) > max_per_satellite:
+        raise SystemExit(f"error: {name}: a satellite has more than {max_per_satellite} links")
+
+
+def write_sided(path: Path, sided: list[SidedLink], comment: str) -> None:
+    with path.open("w", encoding="utf-8", newline="\n") as f:
+        f.write(f"# {comment}, written by python/make_ideal_shell.py\n")
+        f.write("# four columns: the laser side used at each end (docs/phase-3-routing.md 4.9)\n")
+        f.write("norad_cat_id_a,norad_cat_id_b,side_a,side_b\n")
+        for x in sided:
+            f.write(f"{x.a},{x.b},{x.side_a},{x.side_b}\n")
+
+
+def write_four_column_links(out: Path, setup: Setup = HYPATIA) -> ThreePlan:
+    """Writes PLUS_GRID_SIDES_FILE and THREE_LINKS_FILE into `out`; returns the `three` plan."""
+    grid = plus_grid_sided(setup)
+    check_sided(PLUS_GRID_SIDES_FILE, grid, 4)
+    write_sided(out / PLUS_GRID_SIDES_FILE, grid, f"{setup.shell_name} plus-grid laser links")
+    plan = three_plan(setup)
+    check_sided(THREE_LINKS_FILE, plan.links, 3)
+    for x in plan.links[plan.in_plane :]:
+        a, b = slot_of(x.a, setup), slot_of(x.b, setup)
+        if (cross_side(a), cross_side(b)) != ("east", "west") or b.orbit != (
+            a.orbit + 1
+        ) % NUM_ORBS:
+            raise SystemExit(f"error: {THREE_LINKS_FILE}: {x} breaks the three pattern")
+    write_sided(
+        out / THREE_LINKS_FILE,
+        plan.links,
+        f"{setup.shell_name} three-pattern plan at {EPOCH} ({plan.cross_plane} cross-plane "
+        f"links, {plan.lasers_without_partner} lasers without a partner)",
+    )
+    return plan
+
+
 def omm_record(slot: Slot, epoch: str, raan_deg: float, mean_anomaly_deg: float) -> dict:
     return {
         "OBJECT_NAME": f"{slot.setup.object_prefix}-P{slot.orbit:02d}-S{slot.slot:02d}",
@@ -338,6 +620,11 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
         default=st.DEFAULT_SNAPSHOT / st.EOP_FILE,
         help="IERS finals2000A.all to copy (default: the committed snapshot's)",
     )
+    parser.add_argument(
+        "--four-column-links",
+        action="store_true",
+        help=f"also write {PLUS_GRID_SIDES_FILE} and {THREE_LINKS_FILE} (needs python-sgp4)",
+    )
     return parser.parse_args(argv)
 
 
@@ -354,6 +641,13 @@ def main(argv: list[str]) -> int:
         f"standard: plane 0 and decoys) and {2 * NUM_ORBS * NUM_SATS_PER_ORB} links to "
         f"{LINKS_FILE}"
     )
+    if args.four_column_links:
+        plan = write_four_column_links(args.out, setup)
+        print(
+            f"wrote {PLUS_GRID_SIDES_FILE} and {THREE_LINKS_FILE}: {plan.in_plane} in-plane and "
+            f"{plan.cross_plane} cross-plane links, {plan.lasers_without_partner} lasers without "
+            "a partner"
+        )
     return 0
 
 
