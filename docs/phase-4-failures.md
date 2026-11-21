@@ -214,6 +214,22 @@ Details:
   later; both ends hold "this link is up again" from then.
 - **Old failures** (4.2): one that ended before the run starts is ignored. Otherwise its
   "down" facts are known to every actor from the first step.
+- **Order at one instant:** failures that begin, in the file's order; then failures that end;
+  then links whose acquisition ends, in link order; then one matching of free lasers (4.8). So
+  a link that fails at the instant its acquisition would end never carries traffic.
+- An element that is already down because of another failure gives no new fact when a second
+  failure begins on it, and none when one of the two ends while the other is still in force.
+- A fact's detectors are those working at the instant they would detect. Facts are numbered
+  in the order they arise: at one instant the element's own fact first (a satellite or a
+  gateway), then its link facts in link order.
+- Nothing is worked out on geometry at or after the run's last step: a detection that falls
+  there sends no report, a failure or return there has no ground detectors, and no lasers are
+  matched there.
+- The planner knows a fact at the earliest, over its detectors, of the detector's instant plus
+  its report's travel time, plus the planner's processing time. A gateway's report takes no
+  time. Any other detector's report takes the lowest total, over paths to any working gateway
+  on the messages graph of the true network at the detector's instant, of every link's delay
+  plus the per-hop time. A detector with no such path never reports.
 - **The messages graph.** Reports and floods travel over: every laser link that carries
   traffic, every gateway's links to the satellites it sees (in both endpoint models), and in
   the best case every dish's links to the satellites its city sees. A link's delay is its
@@ -393,10 +409,20 @@ Details:
 - A repair link acquires from the step it is matched and carries traffic one acquisition time
   later; both ends then hold "this link is up". A repair link dropped on a return is down from
   that instant, and both ends know at once.
-- A repair link goes down like any other link when one of its satellites fails.
+- A repair link goes down like any other link when one of its satellites fails. It does not
+  come back when that satellite returns: only planned links do. Its two ends are not matched
+  to each other again.
+- When a satellite returns, each of its lasers that is still without a link may be matched
+  from the instant of the return.
+- Matching runs at a step only if a laser that may be matched there for the first time is
+  still free at that step.
+- A link that is acquiring and fails, or is dropped, stops acquiring: it carries nothing and
+  gives no "up" fact.
 - For an old failure (4.2) the freed lasers are matched on the first step's geometry, and a
   repair link carries traffic from the failure instant plus the acquisition time, or from the
-  first step if that is earlier; in that case every actor knows it from the first step.
+  first step if that is earlier; in that case every actor knows it from the first step. If
+  its two lasers were freed by different old failures, the later failure instant counts; a
+  laser that never had a partner does not count.
 
 The acquisition values run: 2 s, 12 s, 30 s and 100 s. 30 s and 2 s are one vendor's first
 and later acquisitions, 100 s is the SDA standard's limit, and 12 s is the fastest SpaceX is
