@@ -142,6 +142,13 @@ class Builder {
     return static_cast<double>(k) * settings_.step_s;
   }
   [[nodiscard]] bool in_run(std::int64_t k) const { return k >= 0 && k < settings_.step_count; }
+  // The run's end, its last step's instant: nothing detected after it reports.
+  [[nodiscard]] double end_s() const { return step_time(settings_.step_count - 1); }
+  // The planner's knowing instant of a fact a gateway or the planner itself detects at
+  // `detected_s`: never after the run's end.
+  [[nodiscard]] double planner_detects(double detected_s) const {
+    return detected_s > end_s() ? kInfinity : detected_s + settings_.times.planner_processing_s;
+  }
   [[nodiscard]] bool best_case() const { return settings_.model == app::EndpointModel::kBestCase; }
   [[nodiscard]] bool satellite_down_at(std::size_t s, double t) const {
     return failure::satellite_down(*schedule_, s, t);
@@ -371,7 +378,7 @@ class Builder {
                 .t_s = t_f,
                 .old = false,
                 .detectors = gateway_watchers(f.element, k_f, t_f, detected_s),
-                .planner_known_s = detected_s + settings_.times.planner_processing_s,
+                .planner_known_s = planner_detects(detected_s),
                 .cause = index};
       add_fact(std::move(fact));
     }
@@ -449,7 +456,7 @@ class Builder {
                         .t_s = t_r,
                         .old = false,
                         .detectors = gateway_watchers(f.element, k_r, t_r, t_r),
-                        .planner_known_s = t_r + settings_.times.planner_processing_s,
+                        .planner_known_s = planner_detects(t_r),
                         .cause = index});
         }
         return;
@@ -637,9 +644,12 @@ class Builder {
       double best = kInfinity;
       for (const Detection& d : fact.detectors) {
         double report_s = kInfinity;
+        if (d.t_s > end_s()) {
+          continue;  // Detected after the run's end: no report.
+        }
         if (tl_.nodes.is_gateway(d.node)) {
           report_s = 0.0;
-        } else if (in_run(step_of(d.t_s, settings_.step_s))) {
+        } else {
           auto it = paths.find(d.t_s);
           if (it == paths.end()) {
             it = paths.emplace(d.t_s, report_paths(d.t_s)).first;
