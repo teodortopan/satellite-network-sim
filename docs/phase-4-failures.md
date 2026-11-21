@@ -138,9 +138,11 @@ them.
 - The file is plain text with one failure per line, as the link file of Phase 3 (4.9 there):
   comment lines start with `#`, the header is
   `kind,norad_cat_id_a,norad_cat_id_b,gateway,start_utc,length_s`, and unused fields are
-  empty. Reading refuses the whole file, naming the line, for a malformed line, an element
+  empty. The kinds are `satellite`, `laser_link` and `gateway`. A gateway's name may hold a
+  comma ("New York, NY"), so that one field is written in double quotes, with a quote inside
+  it doubled. Reading refuses the whole file, naming the line, for a malformed line, an element
   that is not in the run (an excluded satellite, a link that is not in the laser plan, an
-  unknown gateway), an instant that is neither a step nor before the start, a negative
+  unknown gateway, a name that more than one gateway has), an instant that is neither a step nor before the start, a negative
   length, and the same element failing twice at overlapping times.
 - With an empty schedule the `failures` program gives exactly the `routing` program's routes
   (6.2).
