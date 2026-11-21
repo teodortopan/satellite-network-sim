@@ -186,8 +186,9 @@ in continuous time.
     holds "this gateway is down". In this model nothing else silences a ground link that is
     in view.
 - **A view takes a satellite as down** when it holds "this satellite is down", or when it
-  holds "this laser link is down" for every planned laser link of that satellite. A satellite
-  with no working laser can pass nothing on, so the view stops using it for ground links too.
+  holds "this laser link is down" for every planned laser link of that satellite and "this
+  link is up" for none of its repair links. A satellite with no working laser can pass nothing
+  on, so the view stops using it for ground links too.
 - A fact about an element is replaced by a later fact about the same element: "up again"
   after "down", and the other way round.
 
@@ -212,8 +213,10 @@ Details:
 - When a failure ends, each planned laser link it had taken down, with both ends working and
   no other failure on it, acquires from that instant and carries traffic one acquisition time
   later; both ends hold "this link is up again" from then.
-- **Old failures** (4.2): one that ended before the run starts is ignored. Otherwise its
-  "down" facts are known to every actor from the first step.
+- **Old failures** (4.2): one that ended at or before the run's start is ignored. Otherwise
+  it gives the facts any failure gives (the element's own, and one per laser link it takes
+  down), all of them old news: known to every actor from the first step, with no detectors,
+  no reports and no flood.
 - **Order at one instant:** failures that begin, in the file's order; then failures that end;
   then links whose acquisition ends, in link order; then one matching of free lasers (4.8). So
   a link that fails at the instant its acquisition would end never carries traffic.
@@ -222,9 +225,13 @@ Details:
 - A fact's detectors are those working at the instant they would detect. Facts are numbered
   in the order they arise: at one instant the element's own fact first (a satellite or a
   gateway), then its link facts in link order.
-- Nothing is worked out on geometry at or after the run's last step: a detection that falls
-  there sends no report, a failure or return there has no ground detectors, and no lasers are
-  matched there.
+- The run ends at its last step's instant; the last step is a step like any other. Nothing is
+  worked out after it: a detection that falls later sends no report and starts no flood, and
+  a link that would come back into sight later is never detected.
+- A fact's instant is when the thing happened (the failure, the return, the end of an
+  acquisition, the drop of a repair link), not when someone first detected it.
+- A failure of a laser link that is already down because one of its satellites is down gives
+  no new fact.
 - The planner knows a fact at the earliest, over its detectors, of the detector's instant plus
   its report's travel time, plus the planner's processing time. A gateway's report takes no
   time. Any other detector's report takes the lowest total, over paths to any working gateway
@@ -285,7 +292,15 @@ Details:
   Never before the route passes the dead element.
 - Backups are prepared right after each plan, on that plan's planning graph. The backup of a
   node avoids the next node of the route and every node of the route before itself, so a
-  repaired route never passes a node twice.
+  repaired route never passes a node twice. A node with no backup cannot repair, and the
+  route's one repair is used up.
+- **A repaired route is kept at a plan whose planning graph still has the dead hop** (the
+  edge from the repairing node to the old route's next node): that planner has not heard, and
+  would only choose the dead element again. The plan is recorded as `kept`. At the first plan
+  whose planning graph lacks that hop the route is planned as usual.
+- With `--replan-on-report on`, a plan on a report is made for `planner` and `local-repair`,
+  not for the baseline or the reference. It is a plan like any other, on the geometry of its
+  step; the `whole-interval` planner looks one re-plan interval ahead from that step.
 
 **`flooding`.** There is no planner for failures. Every satellite, dish and gateway keeps its
 own view and its own table.
@@ -328,6 +343,23 @@ A drop caused by a failure names the element: `failed_satellite`, `failed_link` 
 `failed_gateway`, first one met along the route. A plan that finds no route in its view is
 `no_path` or `no_gateway` as in Phase 3.
 
+Details:
+
+- A failed element anywhere on a held route comes before every other cause. Going along the
+  route: a satellite that is down is `failed_satellite`; a gateway that is down is
+  `failed_gateway`; a laser link that has failed while both its satellites work is
+  `failed_link`. A link that is down for another reason (out of sight, still acquiring, a
+  repair link not in force) is not a failure: the step is `no_route` with Phase 3's cause.
+- In the realistic model a dish whose serving satellite is down is `failed_satellite`, whatever
+  route it holds.
+- A `black_hole` or a `loop` shows the route the traffic was given: the held route in
+  `planner` and `local-repair`; in `flooding` the walk up to the node before the dead element
+  or the node with no next hop, or up to and including the node met twice.
+- In `flooding`, a sending dish with no next hop is `no_route` (`no_coverage` or `no_path`); a
+  later node with no next hop is a `black_hole` with no cause and no element.
+- The ideal delay of a lane is the lowest delay in that lane's true network at the step: with
+  the failures for every lane but the baseline.
+
 The state only changes at a step, a plan, a detection, a report's arrival, a node learning or
 starting to use a fact, a return, or the end of an acquisition. Between two such instants it
 is constant, so the program writes it as intervals in continuous time (4.10).
@@ -339,7 +371,8 @@ same instant, so drops that have nothing to do with the failure cancel out.
 ### 4.7 Measures
 
 Per run, direction and reaction mode. t_f is the run's failure instant: the earliest failure
-that is not old news. A plane or a region is many satellites failing at one instant.
+that is not old news. A plane or a region is many satellites failing at one instant. A run
+with no such failure has none of the measures that count from t_f.
 
 - **Black-hole time and loop time:** seconds in each state from t_f to the end of the run.
 - **Time to restore:** from t_f to the first instant the direction is `delivered` again after
@@ -422,7 +455,8 @@ Details:
   repair link carries traffic from the failure instant plus the acquisition time, or from the
   first step if that is earlier; in that case every actor knows it from the first step. If
   its two lasers were freed by different old failures, the later failure instant counts; a
-  laser that never had a partner does not count.
+  laser that never had a partner does not count, and a link between two such lasers carries
+  traffic from the first step.
 
 The acquisition values run: 2 s, 12 s, 30 s and 100 s. 30 s and 2 s are one vendor's first
 and later acquisitions, 100 s is the SDA standard's limit, and 12 s is the fastest SpaceX is
@@ -452,7 +486,7 @@ Input: everything the `routing` program takes (Phase 3 spec 4.8), and:
 | `--repoint` | `on`, `off` (default) |
 | `--detection-s`, `--hop-processing-s`, `--compute-s`, `--planner-processing-s`, `--acquisition-s` | 4.9 |
 | `--plan-time` | The reference time of the shells, planes and laser plan. Default: the run's start. With it a short run uses the same network as a longer one that started earlier |
-| `--events-out`, `--facts-out`, `--floods-out` | The three CSVs below; not written without them |
+| `--events-out`, `--facts-out`, `--floods-out`, `--measures-out`, `--network-out` | The CSVs below; not written without them |
 
 One run steps through time once and evaluates the baseline and every listed reaction mode.
 `--strategies` applies to `planner` and `local-repair`; `flooding` is `lowest-delay`.
@@ -499,8 +533,21 @@ Details:
   joined by `;`. `reports` is the number of detectors whose report can reach a gateway and
   `report_hops` the hops of the report that arrives first. The three flood columns are empty
   unless `flooding` is listed. An instant that never comes is written `never`.
+- A gateway that detects counts as one report with no hops. Of reports that arrive at the
+  same instant the one with fewer hops is the first. A fact that nobody detects in the run has
+  0 flood nodes, 0 messages and a last instant of `never`.
 - **Floods CSV** (with `flooding`): one row per fact and node that learns it: `fact`, `node`
   (written as a detector is), `learn_s`.
+- **Measures CSV:** one row per direction, strategy and reaction mode: `from`, `to`, `role`,
+  `pattern`, `model`, `strategy`, `reaction`, `failure_s` (t_f), `black_hole_s`, `loop_s`,
+  `lost_s`, `restore_s`, `settle_s`, `extra_min_ms`, `extra_median_ms`, `extra_max_ms`,
+  `extra_settled_ms`, `reports`, `messages`. A measure that does not exist is written `none`.
+  The extra delay is taken at the steps at or after t_f where the lane and the baseline are
+  both delivered; `extra_settled_ms` at the first step at or after the settle instant.
+- **Network CSV:** one row per step and scope, the scopes being `all` and each shell:
+  `utc`, `scope`, `working_satellites`, `pieces`, `largest_piece`, `largest_piece_share`,
+  counted on the true network's laser links that carry traffic.
+- The `flooding` rows carry the strategy `lowest-delay`, once, whatever `--strategies` lists.
 - Instants and delays are written with enough digits to read back as the same number.
 
 ## 5. Runs
