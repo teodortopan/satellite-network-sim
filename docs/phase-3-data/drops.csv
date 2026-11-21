@@ -1,0 +1,407 @@
+group,run,pattern,model,replan_s,planner,serving,from,to,strategy,cause,events,total_s,median_event_s,longest_event_s
+main,main-realistic,three,realistic,15,start,highest-elevation,Chicago,New York,longest-lived,no_gateway,1,15,15.0,15
+main,main-realistic,three,realistic,15,start,highest-elevation,Reykjavik,Vladivostok,lowest-delay,ground_link_lost,35,282,7.0,14
+main,main-realistic,three,realistic,15,start,highest-elevation,Reykjavik,Vladivostok,keep-until-broken,ground_link_lost,40,304,7.0,14
+main,main-realistic,three,realistic,15,start,highest-elevation,Reykjavik,Vladivostok,longest-lived,ground_link_lost,3,23,6.0,11
+main,main-realistic,three,realistic,15,start,highest-elevation,Reykjavik,Vladivostok,threshold:0.5ms,ground_link_lost,36,286,7.0,14
+main,main-realistic,three,realistic,15,start,highest-elevation,Reykjavik,Vladivostok,threshold:1ms,ground_link_lost,36,286,7.0,14
+main,main-realistic,three,realistic,15,start,highest-elevation,Reykjavik,Vladivostok,threshold:2ms,ground_link_lost,36,286,7.0,14
+main,main-realistic,three,realistic,15,start,highest-elevation,Reykjavik,Vladivostok,threshold:5ms,ground_link_lost,38,296,7.0,14
+main,main-realistic,three,realistic,15,start,highest-elevation,Reykjavik,Vladivostok,threshold:1%,ground_link_lost,36,286,7.0,14
+main,main-realistic,three,realistic,15,start,highest-elevation,Reykjavik,Vladivostok,threshold:2%,ground_link_lost,38,296,7.0,14
+main,main-realistic,three,realistic,15,start,highest-elevation,Reykjavik,Vladivostok,threshold:5%,ground_link_lost,40,303,7.0,14
+main,main-realistic,three,realistic,15,start,highest-elevation,Reykjavik,Vladivostok,threshold:10%,ground_link_lost,39,292,7.0,14
+main,main-realistic,three,realistic,15,start,highest-elevation,Vladivostok,Reykjavik,lowest-delay,no_service,1,7201,7201.0,7201
+main,main-realistic,three,realistic,15,start,highest-elevation,Vladivostok,Reykjavik,keep-until-broken,no_service,1,7201,7201.0,7201
+main,main-realistic,three,realistic,15,start,highest-elevation,Vladivostok,Reykjavik,longest-lived,no_service,1,7201,7201.0,7201
+main,main-realistic,three,realistic,15,start,highest-elevation,Vladivostok,Reykjavik,threshold:0.5ms,no_service,1,7201,7201.0,7201
+main,main-realistic,three,realistic,15,start,highest-elevation,Vladivostok,Reykjavik,threshold:1ms,no_service,1,7201,7201.0,7201
+main,main-realistic,three,realistic,15,start,highest-elevation,Vladivostok,Reykjavik,threshold:2ms,no_service,1,7201,7201.0,7201
+main,main-realistic,three,realistic,15,start,highest-elevation,Vladivostok,Reykjavik,threshold:5ms,no_service,1,7201,7201.0,7201
+main,main-realistic,three,realistic,15,start,highest-elevation,Vladivostok,Reykjavik,threshold:1%,no_service,1,7201,7201.0,7201
+main,main-realistic,three,realistic,15,start,highest-elevation,Vladivostok,Reykjavik,threshold:2%,no_service,1,7201,7201.0,7201
+main,main-realistic,three,realistic,15,start,highest-elevation,Vladivostok,Reykjavik,threshold:5%,no_service,1,7201,7201.0,7201
+main,main-realistic,three,realistic,15,start,highest-elevation,Vladivostok,Reykjavik,threshold:10%,no_service,1,7201,7201.0,7201
+main,main-best-case,three,best-case,15,start,,New York,London,lowest-delay,ground_link_lost,176,1339,8.0,14
+main,main-best-case,three,best-case,15,start,,New York,London,keep-until-broken,ground_link_lost,150,1176,8.0,14
+main,main-best-case,three,best-case,15,start,,New York,London,longest-lived,ground_link_lost,30,227,8.0,13
+main,main-best-case,three,best-case,15,start,,New York,London,threshold:0.5ms,ground_link_lost,187,1472,8.0,14
+main,main-best-case,three,best-case,15,start,,New York,London,threshold:1ms,ground_link_lost,179,1430,8.0,14
+main,main-best-case,three,best-case,15,start,,New York,London,threshold:2ms,ground_link_lost,153,1205,8.0,14
+main,main-best-case,three,best-case,15,start,,New York,London,threshold:5ms,ground_link_lost,150,1176,8.0,14
+main,main-best-case,three,best-case,15,start,,New York,London,threshold:1%,ground_link_lost,186,1472,8.0,14
+main,main-best-case,three,best-case,15,start,,New York,London,threshold:2%,ground_link_lost,185,1454,8.0,14
+main,main-best-case,three,best-case,15,start,,New York,London,threshold:5%,ground_link_lost,175,1408,8.0,14
+main,main-best-case,three,best-case,15,start,,New York,London,threshold:10%,ground_link_lost,153,1197,8.0,14
+main,main-best-case,three,best-case,15,start,,London,New York,lowest-delay,ground_link_lost,176,1339,8.0,14
+main,main-best-case,three,best-case,15,start,,London,New York,keep-until-broken,ground_link_lost,150,1176,8.0,14
+main,main-best-case,three,best-case,15,start,,London,New York,longest-lived,ground_link_lost,30,227,8.0,13
+main,main-best-case,three,best-case,15,start,,London,New York,threshold:0.5ms,ground_link_lost,187,1472,8.0,14
+main,main-best-case,three,best-case,15,start,,London,New York,threshold:1ms,ground_link_lost,179,1430,8.0,14
+main,main-best-case,three,best-case,15,start,,London,New York,threshold:2ms,ground_link_lost,153,1205,8.0,14
+main,main-best-case,three,best-case,15,start,,London,New York,threshold:5ms,ground_link_lost,150,1176,8.0,14
+main,main-best-case,three,best-case,15,start,,London,New York,threshold:1%,ground_link_lost,186,1472,8.0,14
+main,main-best-case,three,best-case,15,start,,London,New York,threshold:2%,ground_link_lost,185,1454,8.0,14
+main,main-best-case,three,best-case,15,start,,London,New York,threshold:5%,ground_link_lost,175,1408,8.0,14
+main,main-best-case,three,best-case,15,start,,London,New York,threshold:10%,ground_link_lost,153,1197,8.0,14
+main,main-best-case,three,best-case,15,start,,San Francisco,Tokyo,lowest-delay,ground_link_lost,139,1135,9.0,14
+main,main-best-case,three,best-case,15,start,,San Francisco,Tokyo,keep-until-broken,ground_link_lost,130,1051,8.0,14
+main,main-best-case,three,best-case,15,start,,San Francisco,Tokyo,longest-lived,ground_link_lost,36,271,8.0,14
+main,main-best-case,three,best-case,15,start,,San Francisco,Tokyo,threshold:0.5ms,ground_link_lost,143,1173,9.0,14
+main,main-best-case,three,best-case,15,start,,San Francisco,Tokyo,threshold:1ms,ground_link_lost,140,1150,9.0,14
+main,main-best-case,three,best-case,15,start,,San Francisco,Tokyo,threshold:2ms,ground_link_lost,136,1099,8.5,14
+main,main-best-case,three,best-case,15,start,,San Francisco,Tokyo,threshold:5ms,ground_link_lost,130,1051,8.0,14
+main,main-best-case,three,best-case,15,start,,San Francisco,Tokyo,threshold:1%,ground_link_lost,142,1145,9.0,14
+main,main-best-case,three,best-case,15,start,,San Francisco,Tokyo,threshold:2%,ground_link_lost,143,1170,9.0,14
+main,main-best-case,three,best-case,15,start,,San Francisco,Tokyo,threshold:5%,ground_link_lost,137,1095,8.0,14
+main,main-best-case,three,best-case,15,start,,San Francisco,Tokyo,threshold:10%,ground_link_lost,130,1051,8.0,14
+main,main-best-case,three,best-case,15,start,,Tokyo,San Francisco,lowest-delay,ground_link_lost,139,1135,9.0,14
+main,main-best-case,three,best-case,15,start,,Tokyo,San Francisco,keep-until-broken,ground_link_lost,130,1051,8.0,14
+main,main-best-case,three,best-case,15,start,,Tokyo,San Francisco,longest-lived,ground_link_lost,36,271,8.0,14
+main,main-best-case,three,best-case,15,start,,Tokyo,San Francisco,threshold:0.5ms,ground_link_lost,143,1173,9.0,14
+main,main-best-case,three,best-case,15,start,,Tokyo,San Francisco,threshold:1ms,ground_link_lost,140,1150,9.0,14
+main,main-best-case,three,best-case,15,start,,Tokyo,San Francisco,threshold:2ms,ground_link_lost,136,1099,8.5,14
+main,main-best-case,three,best-case,15,start,,Tokyo,San Francisco,threshold:5ms,ground_link_lost,130,1051,8.0,14
+main,main-best-case,three,best-case,15,start,,Tokyo,San Francisco,threshold:1%,ground_link_lost,142,1145,9.0,14
+main,main-best-case,three,best-case,15,start,,Tokyo,San Francisco,threshold:2%,ground_link_lost,143,1170,9.0,14
+main,main-best-case,three,best-case,15,start,,Tokyo,San Francisco,threshold:5%,ground_link_lost,137,1095,8.0,14
+main,main-best-case,three,best-case,15,start,,Tokyo,San Francisco,threshold:10%,ground_link_lost,130,1051,8.0,14
+main,main-best-case,three,best-case,15,start,,Frankfurt,Singapore,lowest-delay,ground_link_lost,130,989,8.0,14
+main,main-best-case,three,best-case,15,start,,Frankfurt,Singapore,keep-until-broken,ground_link_lost,165,1303,8.0,14
+main,main-best-case,three,best-case,15,start,,Frankfurt,Singapore,longest-lived,ground_link_lost,41,302,7.0,14
+main,main-best-case,three,best-case,15,start,,Frankfurt,Singapore,threshold:0.5ms,ground_link_lost,148,1152,8.0,14
+main,main-best-case,three,best-case,15,start,,Frankfurt,Singapore,threshold:1ms,ground_link_lost,159,1258,8.0,14
+main,main-best-case,three,best-case,15,start,,Frankfurt,Singapore,threshold:2ms,ground_link_lost,165,1303,8.0,14
+main,main-best-case,three,best-case,15,start,,Frankfurt,Singapore,threshold:5ms,ground_link_lost,165,1303,8.0,14
+main,main-best-case,three,best-case,15,start,,Frankfurt,Singapore,threshold:1%,ground_link_lost,146,1134,8.0,14
+main,main-best-case,three,best-case,15,start,,Frankfurt,Singapore,threshold:2%,ground_link_lost,153,1200,8.0,14
+main,main-best-case,three,best-case,15,start,,Frankfurt,Singapore,threshold:5%,ground_link_lost,165,1303,8.0,14
+main,main-best-case,three,best-case,15,start,,Frankfurt,Singapore,threshold:10%,ground_link_lost,165,1303,8.0,14
+main,main-best-case,three,best-case,15,start,,Singapore,Frankfurt,lowest-delay,ground_link_lost,130,989,8.0,14
+main,main-best-case,three,best-case,15,start,,Singapore,Frankfurt,keep-until-broken,ground_link_lost,165,1303,8.0,14
+main,main-best-case,three,best-case,15,start,,Singapore,Frankfurt,longest-lived,ground_link_lost,41,302,7.0,14
+main,main-best-case,three,best-case,15,start,,Singapore,Frankfurt,threshold:0.5ms,ground_link_lost,148,1152,8.0,14
+main,main-best-case,three,best-case,15,start,,Singapore,Frankfurt,threshold:1ms,ground_link_lost,159,1258,8.0,14
+main,main-best-case,three,best-case,15,start,,Singapore,Frankfurt,threshold:2ms,ground_link_lost,165,1303,8.0,14
+main,main-best-case,three,best-case,15,start,,Singapore,Frankfurt,threshold:5ms,ground_link_lost,165,1303,8.0,14
+main,main-best-case,three,best-case,15,start,,Singapore,Frankfurt,threshold:1%,ground_link_lost,146,1134,8.0,14
+main,main-best-case,three,best-case,15,start,,Singapore,Frankfurt,threshold:2%,ground_link_lost,153,1200,8.0,14
+main,main-best-case,three,best-case,15,start,,Singapore,Frankfurt,threshold:5%,ground_link_lost,165,1303,8.0,14
+main,main-best-case,three,best-case,15,start,,Singapore,Frankfurt,threshold:10%,ground_link_lost,165,1303,8.0,14
+main,main-best-case,three,best-case,15,start,,Detroit,Buenos Aires,lowest-delay,ground_link_lost,66,461,6.0,14
+main,main-best-case,three,best-case,15,start,,Detroit,Buenos Aires,keep-until-broken,ground_link_lost,84,582,6.0,14
+main,main-best-case,three,best-case,15,start,,Detroit,Buenos Aires,longest-lived,ground_link_lost,52,383,7.0,14
+main,main-best-case,three,best-case,15,start,,Detroit,Buenos Aires,threshold:0.5ms,ground_link_lost,65,451,6.0,14
+main,main-best-case,three,best-case,15,start,,Detroit,Buenos Aires,threshold:1ms,ground_link_lost,68,469,6.0,14
+main,main-best-case,three,best-case,15,start,,Detroit,Buenos Aires,threshold:2ms,ground_link_lost,71,496,6.0,14
+main,main-best-case,three,best-case,15,start,,Detroit,Buenos Aires,threshold:5ms,ground_link_lost,74,539,6.5,14
+main,main-best-case,three,best-case,15,start,,Detroit,Buenos Aires,threshold:1%,ground_link_lost,64,450,6.0,14
+main,main-best-case,three,best-case,15,start,,Detroit,Buenos Aires,threshold:2%,ground_link_lost,65,451,6.0,14
+main,main-best-case,three,best-case,15,start,,Detroit,Buenos Aires,threshold:5%,ground_link_lost,69,471,6.0,14
+main,main-best-case,three,best-case,15,start,,Detroit,Buenos Aires,threshold:10%,ground_link_lost,71,494,6.0,14
+main,main-best-case,three,best-case,15,start,,Buenos Aires,Detroit,lowest-delay,ground_link_lost,66,461,6.0,14
+main,main-best-case,three,best-case,15,start,,Buenos Aires,Detroit,keep-until-broken,ground_link_lost,84,582,6.0,14
+main,main-best-case,three,best-case,15,start,,Buenos Aires,Detroit,longest-lived,ground_link_lost,52,383,7.0,14
+main,main-best-case,three,best-case,15,start,,Buenos Aires,Detroit,threshold:0.5ms,ground_link_lost,65,451,6.0,14
+main,main-best-case,three,best-case,15,start,,Buenos Aires,Detroit,threshold:1ms,ground_link_lost,68,469,6.0,14
+main,main-best-case,three,best-case,15,start,,Buenos Aires,Detroit,threshold:2ms,ground_link_lost,71,496,6.0,14
+main,main-best-case,three,best-case,15,start,,Buenos Aires,Detroit,threshold:5ms,ground_link_lost,74,539,6.5,14
+main,main-best-case,three,best-case,15,start,,Buenos Aires,Detroit,threshold:1%,ground_link_lost,64,450,6.0,14
+main,main-best-case,three,best-case,15,start,,Buenos Aires,Detroit,threshold:2%,ground_link_lost,65,451,6.0,14
+main,main-best-case,three,best-case,15,start,,Buenos Aires,Detroit,threshold:5%,ground_link_lost,69,471,6.0,14
+main,main-best-case,three,best-case,15,start,,Buenos Aires,Detroit,threshold:10%,ground_link_lost,71,494,6.0,14
+main,main-best-case,three,best-case,15,start,,New York,Chicago,keep-until-broken,ground_link_lost,83,601,7.0,14
+main,main-best-case,three,best-case,15,start,,New York,Chicago,longest-lived,ground_link_lost,44,327,8.0,14
+main,main-best-case,three,best-case,15,start,,New York,Chicago,threshold:0.5ms,ground_link_lost,52,330,5.0,14
+main,main-best-case,three,best-case,15,start,,New York,Chicago,threshold:1ms,ground_link_lost,72,538,7.0,14
+main,main-best-case,three,best-case,15,start,,New York,Chicago,threshold:2ms,ground_link_lost,83,601,7.0,14
+main,main-best-case,three,best-case,15,start,,New York,Chicago,threshold:5ms,ground_link_lost,83,601,7.0,14
+main,main-best-case,three,best-case,15,start,,New York,Chicago,threshold:5%,ground_link_lost,9,39,5.0,8
+main,main-best-case,three,best-case,15,start,,New York,Chicago,threshold:10%,ground_link_lost,54,400,7.0,14
+main,main-best-case,three,best-case,15,start,,Chicago,New York,keep-until-broken,ground_link_lost,83,601,7.0,14
+main,main-best-case,three,best-case,15,start,,Chicago,New York,longest-lived,ground_link_lost,44,327,8.0,14
+main,main-best-case,three,best-case,15,start,,Chicago,New York,threshold:0.5ms,ground_link_lost,52,330,5.0,14
+main,main-best-case,three,best-case,15,start,,Chicago,New York,threshold:1ms,ground_link_lost,72,538,7.0,14
+main,main-best-case,three,best-case,15,start,,Chicago,New York,threshold:2ms,ground_link_lost,83,601,7.0,14
+main,main-best-case,three,best-case,15,start,,Chicago,New York,threshold:5ms,ground_link_lost,83,601,7.0,14
+main,main-best-case,three,best-case,15,start,,Chicago,New York,threshold:5%,ground_link_lost,9,39,5.0,8
+main,main-best-case,three,best-case,15,start,,Chicago,New York,threshold:10%,ground_link_lost,54,400,7.0,14
+main,main-best-case,three,best-case,15,start,,Reykjavik,Vladivostok,lowest-delay,ground_link_lost,65,461,7.0,14
+main,main-best-case,three,best-case,15,start,,Reykjavik,Vladivostok,keep-until-broken,ground_link_lost,91,699,7.0,14
+main,main-best-case,three,best-case,15,start,,Reykjavik,Vladivostok,longest-lived,ground_link_lost,32,244,9.0,14
+main,main-best-case,three,best-case,15,start,,Reykjavik,Vladivostok,threshold:0.5ms,ground_link_lost,91,709,8.0,14
+main,main-best-case,three,best-case,15,start,,Reykjavik,Vladivostok,threshold:1ms,ground_link_lost,91,699,7.0,14
+main,main-best-case,three,best-case,15,start,,Reykjavik,Vladivostok,threshold:2ms,ground_link_lost,91,699,7.0,14
+main,main-best-case,three,best-case,15,start,,Reykjavik,Vladivostok,threshold:5ms,ground_link_lost,91,699,7.0,14
+main,main-best-case,three,best-case,15,start,,Reykjavik,Vladivostok,threshold:1%,ground_link_lost,91,709,8.0,14
+main,main-best-case,three,best-case,15,start,,Reykjavik,Vladivostok,threshold:2%,ground_link_lost,91,709,8.0,14
+main,main-best-case,three,best-case,15,start,,Reykjavik,Vladivostok,threshold:5%,ground_link_lost,91,699,7.0,14
+main,main-best-case,three,best-case,15,start,,Reykjavik,Vladivostok,threshold:10%,ground_link_lost,91,699,7.0,14
+main,main-best-case,three,best-case,15,start,,Vladivostok,Reykjavik,lowest-delay,ground_link_lost,65,461,7.0,14
+main,main-best-case,three,best-case,15,start,,Vladivostok,Reykjavik,keep-until-broken,ground_link_lost,91,699,7.0,14
+main,main-best-case,three,best-case,15,start,,Vladivostok,Reykjavik,longest-lived,ground_link_lost,32,244,9.0,14
+main,main-best-case,three,best-case,15,start,,Vladivostok,Reykjavik,threshold:0.5ms,ground_link_lost,91,709,8.0,14
+main,main-best-case,three,best-case,15,start,,Vladivostok,Reykjavik,threshold:1ms,ground_link_lost,91,699,7.0,14
+main,main-best-case,three,best-case,15,start,,Vladivostok,Reykjavik,threshold:2ms,ground_link_lost,91,699,7.0,14
+main,main-best-case,three,best-case,15,start,,Vladivostok,Reykjavik,threshold:5ms,ground_link_lost,91,699,7.0,14
+main,main-best-case,three,best-case,15,start,,Vladivostok,Reykjavik,threshold:1%,ground_link_lost,91,709,8.0,14
+main,main-best-case,three,best-case,15,start,,Vladivostok,Reykjavik,threshold:2%,ground_link_lost,91,709,8.0,14
+main,main-best-case,three,best-case,15,start,,Vladivostok,Reykjavik,threshold:5%,ground_link_lost,91,699,7.0,14
+main,main-best-case,three,best-case,15,start,,Vladivostok,Reykjavik,threshold:10%,ground_link_lost,91,699,7.0,14
+interval,interval-1s-realistic,three,realistic,1,start,highest-elevation,Vladivostok,Reykjavik,lowest-delay,no_service,1,7201,7201.0,7201
+interval,interval-1s-realistic,three,realistic,1,start,highest-elevation,Vladivostok,Reykjavik,keep-until-broken,no_service,1,7201,7201.0,7201
+interval,interval-60s-realistic,three,realistic,60,start,highest-elevation,New York,London,lowest-delay,ground_link_lost,120,4755,45.0,45
+interval,interval-60s-realistic,three,realistic,60,start,highest-elevation,New York,London,keep-until-broken,ground_link_lost,120,4755,45.0,45
+interval,interval-60s-realistic,three,realistic,60,start,highest-elevation,London,New York,lowest-delay,ground_link_lost,120,4665,45.0,45
+interval,interval-60s-realistic,three,realistic,60,start,highest-elevation,London,New York,keep-until-broken,ground_link_lost,120,4665,45.0,45
+interval,interval-60s-realistic,three,realistic,60,start,highest-elevation,San Francisco,Tokyo,lowest-delay,ground_link_lost,119,4365,45.0,45
+interval,interval-60s-realistic,three,realistic,60,start,highest-elevation,San Francisco,Tokyo,keep-until-broken,ground_link_lost,119,4365,45.0,45
+interval,interval-60s-realistic,three,realistic,60,start,highest-elevation,Tokyo,San Francisco,lowest-delay,ground_link_lost,120,4455,45.0,45
+interval,interval-60s-realistic,three,realistic,60,start,highest-elevation,Tokyo,San Francisco,keep-until-broken,ground_link_lost,120,4455,45.0,45
+interval,interval-60s-realistic,three,realistic,60,start,highest-elevation,Frankfurt,Singapore,lowest-delay,ground_link_lost,120,4350,45.0,45
+interval,interval-60s-realistic,three,realistic,60,start,highest-elevation,Frankfurt,Singapore,keep-until-broken,ground_link_lost,120,4350,45.0,45
+interval,interval-60s-realistic,three,realistic,60,start,highest-elevation,Singapore,Frankfurt,lowest-delay,ground_link_lost,110,3900,45.0,45
+interval,interval-60s-realistic,three,realistic,60,start,highest-elevation,Singapore,Frankfurt,keep-until-broken,ground_link_lost,110,3900,45.0,45
+interval,interval-60s-realistic,three,realistic,60,start,highest-elevation,Detroit,Buenos Aires,lowest-delay,ground_link_lost,120,4740,45.0,45
+interval,interval-60s-realistic,three,realistic,60,start,highest-elevation,Detroit,Buenos Aires,keep-until-broken,ground_link_lost,120,4740,45.0,45
+interval,interval-60s-realistic,three,realistic,60,start,highest-elevation,Buenos Aires,Detroit,lowest-delay,ground_link_lost,120,4185,45.0,45
+interval,interval-60s-realistic,three,realistic,60,start,highest-elevation,Buenos Aires,Detroit,keep-until-broken,ground_link_lost,120,4185,45.0,45
+interval,interval-60s-realistic,three,realistic,60,start,highest-elevation,New York,Chicago,lowest-delay,ground_link_lost,120,4755,45.0,45
+interval,interval-60s-realistic,three,realistic,60,start,highest-elevation,New York,Chicago,keep-until-broken,ground_link_lost,120,4755,45.0,45
+interval,interval-60s-realistic,three,realistic,60,start,highest-elevation,Chicago,New York,lowest-delay,ground_link_lost,120,4710,45.0,45
+interval,interval-60s-realistic,three,realistic,60,start,highest-elevation,Chicago,New York,keep-until-broken,ground_link_lost,120,4710,45.0,45
+interval,interval-60s-realistic,three,realistic,60,start,highest-elevation,Reykjavik,Vladivostok,lowest-delay,ground_link_lost,114,4099,36.5,57
+interval,interval-60s-realistic,three,realistic,60,start,highest-elevation,Reykjavik,Vladivostok,keep-until-broken,ground_link_lost,114,4099,36.5,57
+interval,interval-60s-realistic,three,realistic,60,start,highest-elevation,Vladivostok,Reykjavik,lowest-delay,no_service,1,7201,7201.0,7201
+interval,interval-60s-realistic,three,realistic,60,start,highest-elevation,Vladivostok,Reykjavik,keep-until-broken,no_service,1,7201,7201.0,7201
+interval,interval-60s-best-case,three,best-case,60,start,,New York,London,lowest-delay,ground_link_lost,108,4590,45.0,59
+interval,interval-60s-best-case,three,best-case,60,start,,New York,London,keep-until-broken,ground_link_lost,106,4393,43.0,59
+interval,interval-60s-best-case,three,best-case,60,start,,London,New York,lowest-delay,ground_link_lost,108,4590,45.0,59
+interval,interval-60s-best-case,three,best-case,60,start,,London,New York,keep-until-broken,ground_link_lost,106,4393,43.0,59
+interval,interval-60s-best-case,three,best-case,60,start,,San Francisco,Tokyo,lowest-delay,ground_link_lost,96,3603,40.5,59
+interval,interval-60s-best-case,three,best-case,60,start,,San Francisco,Tokyo,keep-until-broken,ground_link_lost,97,3620,41.0,59
+interval,interval-60s-best-case,three,best-case,60,start,,Tokyo,San Francisco,lowest-delay,ground_link_lost,96,3603,40.5,59
+interval,interval-60s-best-case,three,best-case,60,start,,Tokyo,San Francisco,keep-until-broken,ground_link_lost,97,3620,41.0,59
+interval,interval-60s-best-case,three,best-case,60,start,,Frankfurt,Singapore,lowest-delay,ground_link_lost,105,3677,36.0,59
+interval,interval-60s-best-case,three,best-case,60,start,,Frankfurt,Singapore,keep-until-broken,ground_link_lost,105,3821,37.0,59
+interval,interval-60s-best-case,three,best-case,60,start,,Singapore,Frankfurt,lowest-delay,ground_link_lost,105,3677,36.0,59
+interval,interval-60s-best-case,three,best-case,60,start,,Singapore,Frankfurt,keep-until-broken,ground_link_lost,105,3821,37.0,59
+interval,interval-60s-best-case,three,best-case,60,start,,Detroit,Buenos Aires,lowest-delay,ground_link_lost,59,1738,29.0,59
+interval,interval-60s-best-case,three,best-case,60,start,,Detroit,Buenos Aires,keep-until-broken,ground_link_lost,67,1995,29.0,59
+interval,interval-60s-best-case,three,best-case,60,start,,Buenos Aires,Detroit,lowest-delay,ground_link_lost,59,1738,29.0,59
+interval,interval-60s-best-case,three,best-case,60,start,,Buenos Aires,Detroit,keep-until-broken,ground_link_lost,67,1995,29.0,59
+interval,interval-60s-best-case,three,best-case,60,start,,New York,Chicago,lowest-delay,ground_link_lost,35,421,11.0,33
+interval,interval-60s-best-case,three,best-case,60,start,,New York,Chicago,keep-until-broken,ground_link_lost,71,2221,33.0,59
+interval,interval-60s-best-case,three,best-case,60,start,,Chicago,New York,lowest-delay,ground_link_lost,35,421,11.0,33
+interval,interval-60s-best-case,three,best-case,60,start,,Chicago,New York,keep-until-broken,ground_link_lost,71,2221,33.0,59
+interval,interval-60s-best-case,three,best-case,60,start,,Reykjavik,Vladivostok,lowest-delay,ground_link_lost,73,2359,33.0,59
+interval,interval-60s-best-case,three,best-case,60,start,,Reykjavik,Vladivostok,keep-until-broken,ground_link_lost,74,2462,34.5,59
+interval,interval-60s-best-case,three,best-case,60,start,,Vladivostok,Reykjavik,lowest-delay,ground_link_lost,73,2359,33.0,59
+interval,interval-60s-best-case,three,best-case,60,start,,Vladivostok,Reykjavik,keep-until-broken,ground_link_lost,74,2462,34.5,59
+planner,planner-whole-interval-realistic,three,realistic,15,whole-interval,highest-elevation,Vladivostok,Reykjavik,lowest-delay,no_service,1,7201,7201.0,7201
+serving,serving-longest-in-view,three,realistic,15,start,longest-in-view,San Francisco,Tokyo,lowest-delay,ground_link_lost,1,7,7.0,7
+serving,serving-longest-in-view,three,realistic,15,start,longest-in-view,San Francisco,Tokyo,keep-until-broken,ground_link_lost,1,7,7.0,7
+serving,serving-longest-in-view,three,realistic,15,start,longest-in-view,San Francisco,Tokyo,threshold:0.5ms,ground_link_lost,1,7,7.0,7
+serving,serving-longest-in-view,three,realistic,15,start,longest-in-view,San Francisco,Tokyo,threshold:1ms,ground_link_lost,1,7,7.0,7
+serving,serving-longest-in-view,three,realistic,15,start,longest-in-view,San Francisco,Tokyo,threshold:2ms,ground_link_lost,1,7,7.0,7
+serving,serving-longest-in-view,three,realistic,15,start,longest-in-view,San Francisco,Tokyo,threshold:5ms,ground_link_lost,1,7,7.0,7
+serving,serving-longest-in-view,three,realistic,15,start,longest-in-view,San Francisco,Tokyo,threshold:1%,ground_link_lost,1,7,7.0,7
+serving,serving-longest-in-view,three,realistic,15,start,longest-in-view,San Francisco,Tokyo,threshold:2%,ground_link_lost,1,7,7.0,7
+serving,serving-longest-in-view,three,realistic,15,start,longest-in-view,San Francisco,Tokyo,threshold:5%,ground_link_lost,1,7,7.0,7
+serving,serving-longest-in-view,three,realistic,15,start,longest-in-view,San Francisco,Tokyo,threshold:10%,ground_link_lost,1,7,7.0,7
+serving,serving-longest-in-view,three,realistic,15,start,longest-in-view,Reykjavik,Vladivostok,lowest-delay,ground_link_lost,33,261,9.0,14
+serving,serving-longest-in-view,three,realistic,15,start,longest-in-view,Reykjavik,Vladivostok,keep-until-broken,ground_link_lost,33,256,9.0,14
+serving,serving-longest-in-view,three,realistic,15,start,longest-in-view,Reykjavik,Vladivostok,longest-lived,ground_link_lost,7,47,6.0,14
+serving,serving-longest-in-view,three,realistic,15,start,longest-in-view,Reykjavik,Vladivostok,threshold:0.5ms,ground_link_lost,34,267,9.0,14
+serving,serving-longest-in-view,three,realistic,15,start,longest-in-view,Reykjavik,Vladivostok,threshold:1ms,ground_link_lost,34,267,9.0,14
+serving,serving-longest-in-view,three,realistic,15,start,longest-in-view,Reykjavik,Vladivostok,threshold:2ms,ground_link_lost,34,267,9.0,14
+serving,serving-longest-in-view,three,realistic,15,start,longest-in-view,Reykjavik,Vladivostok,threshold:5ms,ground_link_lost,34,267,9.0,14
+serving,serving-longest-in-view,three,realistic,15,start,longest-in-view,Reykjavik,Vladivostok,threshold:1%,ground_link_lost,34,267,9.0,14
+serving,serving-longest-in-view,three,realistic,15,start,longest-in-view,Reykjavik,Vladivostok,threshold:2%,ground_link_lost,34,267,9.0,14
+serving,serving-longest-in-view,three,realistic,15,start,longest-in-view,Reykjavik,Vladivostok,threshold:5%,ground_link_lost,34,267,9.0,14
+serving,serving-longest-in-view,three,realistic,15,start,longest-in-view,Reykjavik,Vladivostok,threshold:10%,ground_link_lost,34,267,9.0,14
+serving,serving-longest-in-view,three,realistic,15,start,longest-in-view,Vladivostok,Reykjavik,lowest-delay,no_service,1,7201,7201.0,7201
+serving,serving-longest-in-view,three,realistic,15,start,longest-in-view,Vladivostok,Reykjavik,keep-until-broken,no_service,1,7201,7201.0,7201
+serving,serving-longest-in-view,three,realistic,15,start,longest-in-view,Vladivostok,Reykjavik,longest-lived,no_service,1,7201,7201.0,7201
+serving,serving-longest-in-view,three,realistic,15,start,longest-in-view,Vladivostok,Reykjavik,threshold:0.5ms,no_service,1,7201,7201.0,7201
+serving,serving-longest-in-view,three,realistic,15,start,longest-in-view,Vladivostok,Reykjavik,threshold:1ms,no_service,1,7201,7201.0,7201
+serving,serving-longest-in-view,three,realistic,15,start,longest-in-view,Vladivostok,Reykjavik,threshold:2ms,no_service,1,7201,7201.0,7201
+serving,serving-longest-in-view,three,realistic,15,start,longest-in-view,Vladivostok,Reykjavik,threshold:5ms,no_service,1,7201,7201.0,7201
+serving,serving-longest-in-view,three,realistic,15,start,longest-in-view,Vladivostok,Reykjavik,threshold:1%,no_service,1,7201,7201.0,7201
+serving,serving-longest-in-view,three,realistic,15,start,longest-in-view,Vladivostok,Reykjavik,threshold:2%,no_service,1,7201,7201.0,7201
+serving,serving-longest-in-view,three,realistic,15,start,longest-in-view,Vladivostok,Reykjavik,threshold:5%,no_service,1,7201,7201.0,7201
+serving,serving-longest-in-view,three,realistic,15,start,longest-in-view,Vladivostok,Reykjavik,threshold:10%,no_service,1,7201,7201.0,7201
+serving,serving-highest-whole-slot,three,realistic,15,start,highest-whole-slot,Chicago,New York,longest-lived,no_gateway,1,15,15.0,15
+serving,serving-highest-whole-slot,three,realistic,15,start,highest-whole-slot,Reykjavik,Vladivostok,lowest-delay,ground_link_lost,35,282,7.0,14
+serving,serving-highest-whole-slot,three,realistic,15,start,highest-whole-slot,Reykjavik,Vladivostok,keep-until-broken,ground_link_lost,40,304,7.0,14
+serving,serving-highest-whole-slot,three,realistic,15,start,highest-whole-slot,Reykjavik,Vladivostok,longest-lived,ground_link_lost,3,23,6.0,11
+serving,serving-highest-whole-slot,three,realistic,15,start,highest-whole-slot,Reykjavik,Vladivostok,threshold:0.5ms,ground_link_lost,36,286,7.0,14
+serving,serving-highest-whole-slot,three,realistic,15,start,highest-whole-slot,Reykjavik,Vladivostok,threshold:1ms,ground_link_lost,36,286,7.0,14
+serving,serving-highest-whole-slot,three,realistic,15,start,highest-whole-slot,Reykjavik,Vladivostok,threshold:2ms,ground_link_lost,36,286,7.0,14
+serving,serving-highest-whole-slot,three,realistic,15,start,highest-whole-slot,Reykjavik,Vladivostok,threshold:5ms,ground_link_lost,38,296,7.0,14
+serving,serving-highest-whole-slot,three,realistic,15,start,highest-whole-slot,Reykjavik,Vladivostok,threshold:1%,ground_link_lost,36,286,7.0,14
+serving,serving-highest-whole-slot,three,realistic,15,start,highest-whole-slot,Reykjavik,Vladivostok,threshold:2%,ground_link_lost,38,296,7.0,14
+serving,serving-highest-whole-slot,three,realistic,15,start,highest-whole-slot,Reykjavik,Vladivostok,threshold:5%,ground_link_lost,40,303,7.0,14
+serving,serving-highest-whole-slot,three,realistic,15,start,highest-whole-slot,Reykjavik,Vladivostok,threshold:10%,ground_link_lost,39,292,7.0,14
+serving,serving-highest-whole-slot,three,realistic,15,start,highest-whole-slot,Vladivostok,Reykjavik,lowest-delay,no_service,1,7201,7201.0,7201
+serving,serving-highest-whole-slot,three,realistic,15,start,highest-whole-slot,Vladivostok,Reykjavik,keep-until-broken,no_service,1,7201,7201.0,7201
+serving,serving-highest-whole-slot,three,realistic,15,start,highest-whole-slot,Vladivostok,Reykjavik,longest-lived,no_service,1,7201,7201.0,7201
+serving,serving-highest-whole-slot,three,realistic,15,start,highest-whole-slot,Vladivostok,Reykjavik,threshold:0.5ms,no_service,1,7201,7201.0,7201
+serving,serving-highest-whole-slot,three,realistic,15,start,highest-whole-slot,Vladivostok,Reykjavik,threshold:1ms,no_service,1,7201,7201.0,7201
+serving,serving-highest-whole-slot,three,realistic,15,start,highest-whole-slot,Vladivostok,Reykjavik,threshold:2ms,no_service,1,7201,7201.0,7201
+serving,serving-highest-whole-slot,three,realistic,15,start,highest-whole-slot,Vladivostok,Reykjavik,threshold:5ms,no_service,1,7201,7201.0,7201
+serving,serving-highest-whole-slot,three,realistic,15,start,highest-whole-slot,Vladivostok,Reykjavik,threshold:1%,no_service,1,7201,7201.0,7201
+serving,serving-highest-whole-slot,three,realistic,15,start,highest-whole-slot,Vladivostok,Reykjavik,threshold:2%,no_service,1,7201,7201.0,7201
+serving,serving-highest-whole-slot,three,realistic,15,start,highest-whole-slot,Vladivostok,Reykjavik,threshold:5%,no_service,1,7201,7201.0,7201
+serving,serving-highest-whole-slot,three,realistic,15,start,highest-whole-slot,Vladivostok,Reykjavik,threshold:10%,no_service,1,7201,7201.0,7201
+serving,serving-with-route,three,realistic,15,start,with-route,New York,London,keep-until-broken,serving_left_view,40,349,10.0,14
+serving,serving-with-route,three,realistic,15,start,with-route,New York,London,longest-lived,serving_left_view,33,246,8.0,14
+serving,serving-with-route,three,realistic,15,start,with-route,New York,London,longest-lived,ground_link_lost,1,1,1.0,1
+serving,serving-with-route,three,realistic,15,start,with-route,New York,London,threshold:5ms,serving_left_view,40,349,10.0,14
+serving,serving-with-route,three,realistic,15,start,with-route,New York,London,threshold:10%,serving_left_view,38,273,7.5,14
+serving,serving-with-route,three,realistic,15,start,with-route,London,New York,keep-until-broken,serving_left_view,43,299,8.0,14
+serving,serving-with-route,three,realistic,15,start,with-route,London,New York,longest-lived,serving_left_view,38,287,8.0,14
+serving,serving-with-route,three,realistic,15,start,with-route,London,New York,threshold:5ms,serving_left_view,43,299,8.0,14
+serving,serving-with-route,three,realistic,15,start,with-route,London,New York,threshold:10%,serving_left_view,43,299,8.0,14
+serving,serving-with-route,three,realistic,15,start,with-route,San Francisco,Tokyo,keep-until-broken,serving_left_view,42,308,7.5,14
+serving,serving-with-route,three,realistic,15,start,with-route,San Francisco,Tokyo,keep-until-broken,ground_link_lost,6,7,1.0,2
+serving,serving-with-route,three,realistic,15,start,with-route,San Francisco,Tokyo,longest-lived,serving_left_view,33,173,4.0,14
+serving,serving-with-route,three,realistic,15,start,with-route,San Francisco,Tokyo,longest-lived,ground_link_lost,23,108,4.0,9
+serving,serving-with-route,three,realistic,15,start,with-route,San Francisco,Tokyo,threshold:5ms,serving_left_view,42,308,7.5,14
+serving,serving-with-route,three,realistic,15,start,with-route,San Francisco,Tokyo,threshold:5ms,ground_link_lost,6,7,1.0,2
+serving,serving-with-route,three,realistic,15,start,with-route,San Francisco,Tokyo,threshold:10%,serving_left_view,42,308,7.5,14
+serving,serving-with-route,three,realistic,15,start,with-route,San Francisco,Tokyo,threshold:10%,ground_link_lost,6,7,1.0,2
+serving,serving-with-route,three,realistic,15,start,with-route,Tokyo,San Francisco,keep-until-broken,serving_left_view,45,380,9.0,14
+serving,serving-with-route,three,realistic,15,start,with-route,Tokyo,San Francisco,keep-until-broken,ground_link_lost,3,3,1.0,1
+serving,serving-with-route,three,realistic,15,start,with-route,Tokyo,San Francisco,longest-lived,serving_left_view,37,265,8.0,14
+serving,serving-with-route,three,realistic,15,start,with-route,Tokyo,San Francisco,longest-lived,ground_link_lost,8,8,1.0,1
+serving,serving-with-route,three,realistic,15,start,with-route,Tokyo,San Francisco,threshold:5ms,serving_left_view,45,380,9.0,14
+serving,serving-with-route,three,realistic,15,start,with-route,Tokyo,San Francisco,threshold:5ms,ground_link_lost,3,3,1.0,1
+serving,serving-with-route,three,realistic,15,start,with-route,Tokyo,San Francisco,threshold:10%,serving_left_view,45,380,9.0,14
+serving,serving-with-route,three,realistic,15,start,with-route,Tokyo,San Francisco,threshold:10%,ground_link_lost,3,3,1.0,1
+serving,serving-with-route,three,realistic,15,start,with-route,Frankfurt,Singapore,keep-until-broken,serving_left_view,40,298,7.0,14
+serving,serving-with-route,three,realistic,15,start,with-route,Frankfurt,Singapore,longest-lived,serving_left_view,42,284,6.0,14
+serving,serving-with-route,three,realistic,15,start,with-route,Frankfurt,Singapore,threshold:5ms,serving_left_view,40,298,7.0,14
+serving,serving-with-route,three,realistic,15,start,with-route,Frankfurt,Singapore,threshold:5%,serving_left_view,7,16,2.0,4
+serving,serving-with-route,three,realistic,15,start,with-route,Frankfurt,Singapore,threshold:10%,serving_left_view,40,298,7.0,14
+serving,serving-with-route,three,realistic,15,start,with-route,Singapore,Frankfurt,keep-until-broken,serving_left_view,43,365,8.0,14
+serving,serving-with-route,three,realistic,15,start,with-route,Singapore,Frankfurt,keep-until-broken,ground_link_lost,1,1,1.0,1
+serving,serving-with-route,three,realistic,15,start,with-route,Singapore,Frankfurt,longest-lived,serving_left_view,39,337,9.0,14
+serving,serving-with-route,three,realistic,15,start,with-route,Singapore,Frankfurt,longest-lived,ground_link_lost,2,2,1.0,1
+serving,serving-with-route,three,realistic,15,start,with-route,Singapore,Frankfurt,threshold:5ms,serving_left_view,43,365,8.0,14
+serving,serving-with-route,three,realistic,15,start,with-route,Singapore,Frankfurt,threshold:5ms,ground_link_lost,1,1,1.0,1
+serving,serving-with-route,three,realistic,15,start,with-route,Singapore,Frankfurt,threshold:5%,serving_left_view,13,71,4.0,12
+serving,serving-with-route,three,realistic,15,start,with-route,Singapore,Frankfurt,threshold:10%,serving_left_view,43,365,8.0,14
+serving,serving-with-route,three,realistic,15,start,with-route,Singapore,Frankfurt,threshold:10%,ground_link_lost,1,1,1.0,1
+serving,serving-with-route,three,realistic,15,start,with-route,Detroit,Buenos Aires,keep-until-broken,serving_left_view,2,14,7.0,8
+serving,serving-with-route,three,realistic,15,start,with-route,Detroit,Buenos Aires,keep-until-broken,ground_link_lost,49,356,7.0,14
+serving,serving-with-route,three,realistic,15,start,with-route,Detroit,Buenos Aires,longest-lived,serving_left_view,14,104,6.0,14
+serving,serving-with-route,three,realistic,15,start,with-route,Detroit,Buenos Aires,longest-lived,ground_link_lost,38,253,6.0,14
+serving,serving-with-route,three,realistic,15,start,with-route,Detroit,Buenos Aires,threshold:5ms,serving_left_view,2,14,7.0,8
+serving,serving-with-route,three,realistic,15,start,with-route,Detroit,Buenos Aires,threshold:5ms,ground_link_lost,49,356,7.0,14
+serving,serving-with-route,three,realistic,15,start,with-route,Detroit,Buenos Aires,threshold:5%,ground_link_lost,49,347,7.0,14
+serving,serving-with-route,three,realistic,15,start,with-route,Detroit,Buenos Aires,threshold:10%,serving_left_view,2,14,7.0,8
+serving,serving-with-route,three,realistic,15,start,with-route,Detroit,Buenos Aires,threshold:10%,ground_link_lost,49,356,7.0,14
+serving,serving-with-route,three,realistic,15,start,with-route,Buenos Aires,Detroit,keep-until-broken,serving_left_view,45,351,8.0,14
+serving,serving-with-route,three,realistic,15,start,with-route,Buenos Aires,Detroit,keep-until-broken,ground_link_lost,7,7,1.0,1
+serving,serving-with-route,three,realistic,15,start,with-route,Buenos Aires,Detroit,longest-lived,serving_left_view,43,394,10.0,14
+serving,serving-with-route,three,realistic,15,start,with-route,Buenos Aires,Detroit,longest-lived,ground_link_lost,1,1,1.0,1
+serving,serving-with-route,three,realistic,15,start,with-route,Buenos Aires,Detroit,threshold:5ms,serving_left_view,45,351,8.0,14
+serving,serving-with-route,three,realistic,15,start,with-route,Buenos Aires,Detroit,threshold:5ms,ground_link_lost,7,7,1.0,1
+serving,serving-with-route,three,realistic,15,start,with-route,Buenos Aires,Detroit,threshold:10%,serving_left_view,45,351,8.0,14
+serving,serving-with-route,three,realistic,15,start,with-route,Buenos Aires,Detroit,threshold:10%,ground_link_lost,7,7,1.0,1
+serving,serving-with-route,three,realistic,15,start,with-route,New York,Chicago,keep-until-broken,serving_left_view,40,349,10.0,14
+serving,serving-with-route,three,realistic,15,start,with-route,New York,Chicago,longest-lived,serving_left_view,33,246,8.0,14
+serving,serving-with-route,three,realistic,15,start,with-route,New York,Chicago,longest-lived,ground_link_lost,1,1,1.0,1
+serving,serving-with-route,three,realistic,15,start,with-route,New York,Chicago,threshold:5ms,serving_left_view,40,349,10.0,14
+serving,serving-with-route,three,realistic,15,start,with-route,Chicago,New York,keep-until-broken,serving_left_view,40,307,8.0,14
+serving,serving-with-route,three,realistic,15,start,with-route,Chicago,New York,keep-until-broken,ground_link_lost,23,23,1.0,1
+serving,serving-with-route,three,realistic,15,start,with-route,Chicago,New York,longest-lived,serving_left_view,38,272,7.5,14
+serving,serving-with-route,three,realistic,15,start,with-route,Chicago,New York,longest-lived,ground_link_lost,11,11,1.0,1
+serving,serving-with-route,three,realistic,15,start,with-route,Chicago,New York,threshold:5ms,serving_left_view,40,307,8.0,14
+serving,serving-with-route,three,realistic,15,start,with-route,Chicago,New York,threshold:5ms,ground_link_lost,23,23,1.0,1
+serving,serving-with-route,three,realistic,15,start,with-route,Reykjavik,Vladivostok,lowest-delay,serving_left_view,84,643,8.0,14
+serving,serving-with-route,three,realistic,15,start,with-route,Reykjavik,Vladivostok,lowest-delay,ground_link_lost,40,305,7.5,14
+serving,serving-with-route,three,realistic,15,start,with-route,Reykjavik,Vladivostok,keep-until-broken,serving_left_view,59,413,7.0,14
+serving,serving-with-route,three,realistic,15,start,with-route,Reykjavik,Vladivostok,keep-until-broken,ground_link_lost,42,305,7.5,14
+serving,serving-with-route,three,realistic,15,start,with-route,Reykjavik,Vladivostok,longest-lived,serving_left_view,15,90,5.0,13
+serving,serving-with-route,three,realistic,15,start,with-route,Reykjavik,Vladivostok,longest-lived,ground_link_lost,25,175,7.0,14
+serving,serving-with-route,three,realistic,15,start,with-route,Reykjavik,Vladivostok,threshold:0.5ms,serving_left_view,84,640,8.0,14
+serving,serving-with-route,three,realistic,15,start,with-route,Reykjavik,Vladivostok,threshold:0.5ms,ground_link_lost,36,278,8.0,14
+serving,serving-with-route,three,realistic,15,start,with-route,Reykjavik,Vladivostok,threshold:1ms,serving_left_view,81,624,8.0,14
+serving,serving-with-route,three,realistic,15,start,with-route,Reykjavik,Vladivostok,threshold:1ms,ground_link_lost,35,260,8.0,14
+serving,serving-with-route,three,realistic,15,start,with-route,Reykjavik,Vladivostok,threshold:2ms,serving_left_view,75,569,7.0,14
+serving,serving-with-route,three,realistic,15,start,with-route,Reykjavik,Vladivostok,threshold:2ms,ground_link_lost,34,249,8.0,14
+serving,serving-with-route,three,realistic,15,start,with-route,Reykjavik,Vladivostok,threshold:5ms,serving_left_view,58,421,7.0,14
+serving,serving-with-route,three,realistic,15,start,with-route,Reykjavik,Vladivostok,threshold:5ms,ground_link_lost,42,306,7.5,14
+serving,serving-with-route,three,realistic,15,start,with-route,Reykjavik,Vladivostok,threshold:1%,serving_left_view,82,634,8.0,14
+serving,serving-with-route,three,realistic,15,start,with-route,Reykjavik,Vladivostok,threshold:1%,ground_link_lost,36,267,8.0,14
+serving,serving-with-route,three,realistic,15,start,with-route,Reykjavik,Vladivostok,threshold:2%,serving_left_view,78,602,8.0,14
+serving,serving-with-route,three,realistic,15,start,with-route,Reykjavik,Vladivostok,threshold:2%,ground_link_lost,34,254,8.0,14
+serving,serving-with-route,three,realistic,15,start,with-route,Reykjavik,Vladivostok,threshold:5%,serving_left_view,64,469,7.5,14
+serving,serving-with-route,three,realistic,15,start,with-route,Reykjavik,Vladivostok,threshold:5%,ground_link_lost,34,241,7.5,14
+serving,serving-with-route,three,realistic,15,start,with-route,Reykjavik,Vladivostok,threshold:10%,serving_left_view,59,413,7.0,14
+serving,serving-with-route,three,realistic,15,start,with-route,Reykjavik,Vladivostok,threshold:10%,ground_link_lost,42,305,7.5,14
+serving,serving-with-route,three,realistic,15,start,with-route,Vladivostok,Reykjavik,lowest-delay,no_service,1,7201,7201.0,7201
+serving,serving-with-route,three,realistic,15,start,with-route,Vladivostok,Reykjavik,keep-until-broken,no_service,1,7201,7201.0,7201
+serving,serving-with-route,three,realistic,15,start,with-route,Vladivostok,Reykjavik,longest-lived,no_service,1,7201,7201.0,7201
+serving,serving-with-route,three,realistic,15,start,with-route,Vladivostok,Reykjavik,threshold:0.5ms,no_service,1,7201,7201.0,7201
+serving,serving-with-route,three,realistic,15,start,with-route,Vladivostok,Reykjavik,threshold:1ms,no_service,1,7201,7201.0,7201
+serving,serving-with-route,three,realistic,15,start,with-route,Vladivostok,Reykjavik,threshold:2ms,no_service,1,7201,7201.0,7201
+serving,serving-with-route,three,realistic,15,start,with-route,Vladivostok,Reykjavik,threshold:5ms,no_service,1,7201,7201.0,7201
+serving,serving-with-route,three,realistic,15,start,with-route,Vladivostok,Reykjavik,threshold:1%,no_service,1,7201,7201.0,7201
+serving,serving-with-route,three,realistic,15,start,with-route,Vladivostok,Reykjavik,threshold:2%,no_service,1,7201,7201.0,7201
+serving,serving-with-route,three,realistic,15,start,with-route,Vladivostok,Reykjavik,threshold:5%,no_service,1,7201,7201.0,7201
+serving,serving-with-route,three,realistic,15,start,with-route,Vladivostok,Reykjavik,threshold:10%,no_service,1,7201,7201.0,7201
+pattern,pattern-plus-grid-realistic,plus-grid,realistic,15,start,highest-elevation,Reykjavik,Vladivostok,lowest-delay,ground_link_lost,36,291,7.5,14
+pattern,pattern-plus-grid-realistic,plus-grid,realistic,15,start,highest-elevation,Reykjavik,Vladivostok,keep-until-broken,ground_link_lost,36,284,7.0,14
+pattern,pattern-plus-grid-realistic,plus-grid,realistic,15,start,highest-elevation,Vladivostok,Reykjavik,lowest-delay,no_service,1,7201,7201.0,7201
+pattern,pattern-plus-grid-realistic,plus-grid,realistic,15,start,highest-elevation,Vladivostok,Reykjavik,keep-until-broken,no_service,1,7201,7201.0,7201
+pattern,pattern-plus-grid-best-case,plus-grid,best-case,15,start,,New York,London,lowest-delay,ground_link_lost,163,1191,7.0,14
+pattern,pattern-plus-grid-best-case,plus-grid,best-case,15,start,,New York,London,keep-until-broken,ground_link_lost,180,1386,8.0,14
+pattern,pattern-plus-grid-best-case,plus-grid,best-case,15,start,,London,New York,lowest-delay,ground_link_lost,163,1191,7.0,14
+pattern,pattern-plus-grid-best-case,plus-grid,best-case,15,start,,London,New York,keep-until-broken,ground_link_lost,180,1386,8.0,14
+pattern,pattern-plus-grid-best-case,plus-grid,best-case,15,start,,San Francisco,Tokyo,lowest-delay,ground_link_lost,164,1213,8.0,14
+pattern,pattern-plus-grid-best-case,plus-grid,best-case,15,start,,San Francisco,Tokyo,keep-until-broken,ground_link_lost,168,1258,8.0,14
+pattern,pattern-plus-grid-best-case,plus-grid,best-case,15,start,,Tokyo,San Francisco,lowest-delay,ground_link_lost,164,1213,8.0,14
+pattern,pattern-plus-grid-best-case,plus-grid,best-case,15,start,,Tokyo,San Francisco,keep-until-broken,ground_link_lost,168,1258,8.0,14
+pattern,pattern-plus-grid-best-case,plus-grid,best-case,15,start,,Frankfurt,Singapore,lowest-delay,ground_link_lost,210,1666,8.0,14
+pattern,pattern-plus-grid-best-case,plus-grid,best-case,15,start,,Frankfurt,Singapore,keep-until-broken,ground_link_lost,212,1702,8.0,14
+pattern,pattern-plus-grid-best-case,plus-grid,best-case,15,start,,Singapore,Frankfurt,lowest-delay,ground_link_lost,210,1666,8.0,14
+pattern,pattern-plus-grid-best-case,plus-grid,best-case,15,start,,Singapore,Frankfurt,keep-until-broken,ground_link_lost,212,1702,8.0,14
+pattern,pattern-plus-grid-best-case,plus-grid,best-case,15,start,,Detroit,Buenos Aires,lowest-delay,ground_link_lost,81,577,6.0,14
+pattern,pattern-plus-grid-best-case,plus-grid,best-case,15,start,,Detroit,Buenos Aires,keep-until-broken,ground_link_lost,101,723,6.0,14
+pattern,pattern-plus-grid-best-case,plus-grid,best-case,15,start,,Buenos Aires,Detroit,lowest-delay,ground_link_lost,81,577,6.0,14
+pattern,pattern-plus-grid-best-case,plus-grid,best-case,15,start,,Buenos Aires,Detroit,keep-until-broken,ground_link_lost,101,723,6.0,14
+pattern,pattern-plus-grid-best-case,plus-grid,best-case,15,start,,New York,Chicago,keep-until-broken,ground_link_lost,83,601,7.0,14
+pattern,pattern-plus-grid-best-case,plus-grid,best-case,15,start,,Chicago,New York,keep-until-broken,ground_link_lost,83,601,7.0,14
+pattern,pattern-plus-grid-best-case,plus-grid,best-case,15,start,,Reykjavik,Vladivostok,lowest-delay,ground_link_lost,114,885,8.0,14
+pattern,pattern-plus-grid-best-case,plus-grid,best-case,15,start,,Reykjavik,Vladivostok,keep-until-broken,ground_link_lost,109,827,8.0,14
+pattern,pattern-plus-grid-best-case,plus-grid,best-case,15,start,,Vladivostok,Reykjavik,lowest-delay,ground_link_lost,114,885,8.0,14
+pattern,pattern-plus-grid-best-case,plus-grid,best-case,15,start,,Vladivostok,Reykjavik,keep-until-broken,ground_link_lost,109,827,8.0,14
+pattern,pattern-six-realistic,six,realistic,15,start,highest-elevation,Reykjavik,Vladivostok,lowest-delay,ground_link_lost,43,345,7.0,14
+pattern,pattern-six-realistic,six,realistic,15,start,highest-elevation,Reykjavik,Vladivostok,keep-until-broken,ground_link_lost,42,333,7.0,14
+pattern,pattern-six-realistic,six,realistic,15,start,highest-elevation,Vladivostok,Reykjavik,lowest-delay,no_service,1,7201,7201.0,7201
+pattern,pattern-six-realistic,six,realistic,15,start,highest-elevation,Vladivostok,Reykjavik,keep-until-broken,no_service,1,7201,7201.0,7201
+pattern,pattern-six-best-case,six,best-case,15,start,,New York,London,lowest-delay,ground_link_lost,161,1163,7.0,14
+pattern,pattern-six-best-case,six,best-case,15,start,,New York,London,keep-until-broken,ground_link_lost,180,1377,8.0,14
+pattern,pattern-six-best-case,six,best-case,15,start,,London,New York,lowest-delay,ground_link_lost,161,1163,7.0,14
+pattern,pattern-six-best-case,six,best-case,15,start,,London,New York,keep-until-broken,ground_link_lost,180,1377,8.0,14
+pattern,pattern-six-best-case,six,best-case,15,start,,San Francisco,Tokyo,lowest-delay,ground_link_lost,187,1430,8.0,14
+pattern,pattern-six-best-case,six,best-case,15,start,,San Francisco,Tokyo,keep-until-broken,ground_link_lost,188,1463,8.0,14
+pattern,pattern-six-best-case,six,best-case,15,start,,Tokyo,San Francisco,lowest-delay,ground_link_lost,187,1430,8.0,14
+pattern,pattern-six-best-case,six,best-case,15,start,,Tokyo,San Francisco,keep-until-broken,ground_link_lost,188,1463,8.0,14
+pattern,pattern-six-best-case,six,best-case,15,start,,Frankfurt,Singapore,lowest-delay,ground_link_lost,236,1866,8.0,14
+pattern,pattern-six-best-case,six,best-case,15,start,,Frankfurt,Singapore,keep-until-broken,ground_link_lost,246,1943,8.0,14
+pattern,pattern-six-best-case,six,best-case,15,start,,Singapore,Frankfurt,lowest-delay,ground_link_lost,236,1866,8.0,14
+pattern,pattern-six-best-case,six,best-case,15,start,,Singapore,Frankfurt,keep-until-broken,ground_link_lost,246,1943,8.0,14
+pattern,pattern-six-best-case,six,best-case,15,start,,Detroit,Buenos Aires,lowest-delay,ground_link_lost,83,600,7.0,14
+pattern,pattern-six-best-case,six,best-case,15,start,,Detroit,Buenos Aires,keep-until-broken,ground_link_lost,105,790,7.0,14
+pattern,pattern-six-best-case,six,best-case,15,start,,Buenos Aires,Detroit,lowest-delay,ground_link_lost,83,600,7.0,14
+pattern,pattern-six-best-case,six,best-case,15,start,,Buenos Aires,Detroit,keep-until-broken,ground_link_lost,105,790,7.0,14
+pattern,pattern-six-best-case,six,best-case,15,start,,New York,Chicago,keep-until-broken,ground_link_lost,83,601,7.0,14
+pattern,pattern-six-best-case,six,best-case,15,start,,Chicago,New York,keep-until-broken,ground_link_lost,83,601,7.0,14
+pattern,pattern-six-best-case,six,best-case,15,start,,Reykjavik,Vladivostok,lowest-delay,ground_link_lost,118,907,8.0,14
+pattern,pattern-six-best-case,six,best-case,15,start,,Reykjavik,Vladivostok,keep-until-broken,ground_link_lost,121,927,8.0,14
+pattern,pattern-six-best-case,six,best-case,15,start,,Vladivostok,Reykjavik,lowest-delay,ground_link_lost,118,907,8.0,14
+pattern,pattern-six-best-case,six,best-case,15,start,,Vladivostok,Reykjavik,keep-until-broken,ground_link_lost,121,927,8.0,14
