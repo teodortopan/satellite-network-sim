@@ -1,7 +1,8 @@
 # Phase 3: Routing
 
-**Status:** specified 2026-11-20. The `routing` program (4.2 to 4.8, 6.1, 6.2) implemented
-2026-11-20; the independent model and the reproductions of 6.3 and 6.4 not yet.
+**Status:** specified 2026-11-20 and implemented, with the independent model, the
+reproductions of 6.3 and 6.4 and the runs of section 5. Results:
+[phase-3-results.md](phase-3-results.md).
 
 Sources checked on 2026-11-20:
 [Hypatia](https://github.com/snkas/hypatia) and its
