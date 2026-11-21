@@ -426,7 +426,7 @@ Input: everything the `routing` program takes (Phase 3 spec 4.8), and:
 | `--repoint` | `on`, `off` (default) |
 | `--detection-s`, `--hop-processing-s`, `--compute-s`, `--planner-processing-s`, `--acquisition-s` | 4.9 |
 | `--plan-time` | The reference time of the shells, planes and laser plan. Default: the run's start. With it a short run uses the same network as a longer one that started earlier |
-| `--events-out`, `--facts-out` | The two CSVs below; not written without them |
+| `--events-out`, `--facts-out`, `--floods-out` | The three CSVs below; not written without them |
 
 One run steps through time once and evaluates the baseline and every listed reaction mode.
 `--strategies` applies to `planner` and `local-repair`; `flooding` is `lowest-delay`.
@@ -450,6 +450,32 @@ Output:
 
 Exit status as the `routing` program: 0, 1 if any check of 6.1 fails, 2 for bad arguments or
 inputs.
+
+Details:
+
+- Next to the listed reaction modes a run always carries two more lanes per direction and
+  strategy: `baseline` (no failures at all) and `reference` (a planner that knows the true
+  network at every plan, 4.7). The reaction column names them so.
+- **Routes CSV:** the `routing` program's columns, then `reaction`, `state` (4.6) and
+  `failed_element`. The Phase 3 `status` is `ok` exactly when the state is `delivered`.
+- **Events CSV** columns: `start_s`, `end_s`, `from`, `to`, `role`, `pattern`, `model`,
+  `strategy`, `reaction`, `state`, `drop_cause`, `failed_element`, `one_way_ms`, `route`,
+  `serving_norad_cat_id`, `gateway`. An interval ends when the state, the route, the cause or
+  the element changes, and at the end of the run; the delay is the one at its start. Rows are
+  ordered by direction, strategy, reaction, then start.
+- An element is written `satellite:<catalogue number>`, `link:<a>-<b>` with the lower
+  catalogue number first, or `gateway:<name>`.
+- **Facts CSV** columns: `fact` (its number, from 0, in the order the facts arise),
+  `subject` (an element as above), `state` (`down` or `up`), `t_s`, `old` (`yes` for news
+  every actor has from the first step), `detectors`, `planner_known_s`, `reports`,
+  `report_hops`, `flood_nodes`, `flood_last_s`, `messages`. Detectors are written
+  `satellite:<number>@<instant>`, `city:<name>@<instant>` or `gateway:<name>@<instant>`,
+  joined by `;`. `reports` is the number of detectors whose report can reach a gateway and
+  `report_hops` the hops of the report that arrives first. The three flood columns are empty
+  unless `flooding` is listed. An instant that never comes is written `never`.
+- **Floods CSV** (with `flooding`): one row per fact and node that learns it: `fact`, `node`
+  (written as a detector is), `learn_s`.
+- Instants and delays are written with enough digits to read back as the same number.
 
 ## 5. Runs
 
