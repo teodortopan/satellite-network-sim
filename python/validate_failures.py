@@ -1292,9 +1292,21 @@ class Model:
         }
         repair_up = up_pairs - self.planned_pairs
         for x, pairs in self.sat_planned.items():
-            # A satellite whose every planned laser link is known down is taken as down.
-            # 4.4: and no repair link of it known up.
-            if all(p in down_pairs for p in pairs) and not any(x in p for p in repair_up):
+            # 4.4: every planned laser link of x went silent with only the other end noticing
+            # (latest fact down, not old news, x not among its detectors), and no repair link
+            # of x is known up.
+            # SPEC-GAP: x listed as a detector with the instant `never` still counts as one of
+            # the fact's detectors.
+            def silent(p: Pair, x: int = x) -> bool:
+                f = latest.get(("link", p))
+                return (
+                    f is not None
+                    and f.state == "down"
+                    and not f.old
+                    and all(node != ("satellite", x) for node, _ in f.detectors)
+                )
+
+            if all(silent(p) for p in pairs) and not any(x in p for p in repair_up):
                 down.add(x)
         present = {p for p in self.planned_pairs if p not in down_pairs} | repair_up
         present = {p for p in present if p[0] not in down and p[1] not in down}
@@ -2875,6 +2887,41 @@ def test_old_facts_and_no_measures() -> None:
     check(ignored.facts == [], "a failure that ended at the start is ignored")
 
 
+def test_satellite_down_inference() -> None:
+    """4.4: a working satellite whose neighbours all fail is not taken as down (it detects
+    the losses itself); a dead one whose neighbours report is."""
+    world = toy_diamond()
+    # 0's neighbours 1 and 2 fail: 0 detects both link facts, so 0 stays up in every view.
+    model = Model(
+        world,
+        toy_settings(),
+        [Failure("satellite", (1,), "", 2.0, None), Failure("satellite", (2,), "", 2.0, None)],
+        [Direction("A", "B", "study")],
+    )
+    view = model.planner_view(10.0)
+    check(fact_of(model, ("link", (0, 1)), "down").planner_known_s < 10.0, "0's report")
+    check(0 not in view.down_sats, f"a working satellite cut off is still up {view}")
+    # 1 fails: its links' facts are detected by 0 and 3 only, so 1 is taken as down.
+    model = Model(
+        world,
+        toy_settings(),
+        [Failure("satellite", (1,), "", 2.0, None)],
+        [Direction("A", "B", "study")],
+    )
+    check(1 in model.planner_view(10.0).down_sats, "a dead satellite whose neighbours report")
+    # Old link facts never make the guess: old 0-1 and 1-3 link failures leave 1 up.
+    model = Model(
+        world,
+        toy_settings(),
+        [
+            Failure("laser_link", (0, 1), "", -9.0, None),
+            Failure("laser_link", (1, 3), "", -9.0, None),
+        ],
+        [Direction("A", "B", "study")],
+    )
+    check(1 not in model.planner_view(0.0).down_sats, "old link facts do not take 1 down")
+
+
 def test_network_rows() -> None:
     world = toy_planes()
     model = Model(
@@ -2903,6 +2950,7 @@ SELF_TESTS = [
     test_repaired_route_kept,
     test_old_facts_and_no_measures,
     test_network_rows,
+    test_satellite_down_inference,
     test_dijkstra_tie_rule,
     test_flood_against_single_sources,
     test_union_find_against_bfs,
