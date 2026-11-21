@@ -224,3 +224,77 @@ What proves the topology is right, since SpaceX doesn't publish its data for thi
 - **Why:** Provides best coverage. The physical checks make sure the links are actually possible. A separate model written in Python has to give the same answer as our program, and that model reproduces Hypatia's published result within 0.5%. Comparing with published Starlink measurements shows if results are plausible.
 
 - **Tradeoff:** None of the three is proof on its own, since no real link map exists. Our 4 link grid is not the same as Hypatia's, so we can't compare with Hypatia directly and need the separate model in between.
+
+## Phase 3: Routing
+
+### 1. Who Plans the Routes, and How Often?
+
+- **Options:** A central planner using predicted orbits, or each satellite working it out from messages with its neighbours. Routes re-planned every 1s, 15s or 60s.
+
+- **Chosen:** A central planner. Routes re-planned every 15s, with 1s and 60s as comparison runs. The planner uses the positions at the start of each interval and holds the route until the next one. A second version that only uses links predicted to stay up for the whole interval is run for comparison.
+
+- **Why:** Orbits are predictable, so one planner can compute consistent routes ahead of time. The evidence points to Starlink doing the same: researchers measured dishes being re-assigned worldwide, in step, every 15s. The re-plan interval is also how stale a route gets, so comparing intervals measures staleness directly.
+
+- **Tradeoff:** Three intervals to run and compare. A path can break in the middle of an interval, and that has to be detected and logged. Satellites working out routes between themselves only matters when something unpredicted happens, so it moves to Phase 4.
+
+### 2. What Does a Route Optimise?
+
+- **Options:** Lowest delay every time, keep the path until it breaks, pick the path that will last longest, or switch only when the gain passes a threshold.
+
+- **Chosen:** Build all four and compare, with lowest delay as the baseline. "Longest-lived" means picking the first and last satellites with the longest time left in view. The threshold is tested over several values.
+
+- **Why:** Most lowest-delay changes gain almost nothing. New York to London changes about 190 times an hour, and the biggest jump is 2ms. Changes still hurt: when a path gets shorter, new packets overtake old ones, and TCP reads that as loss and slows down. One paper more than doubled throughput with longer-lived paths at the same median delay. This is the main experiment of the phase.
+
+- **Tradeoff:** Four strategies to build and a threshold to sweep. No laser link dropped in 12 hours in Phase 2, so a path almost only breaks when its first or last satellite leaves view.
+
+### 3. What Does a Path Change Cost?
+
+- **Options:** Free, counts only, one weighted penalty score, or a full packet simulation.
+
+- **Chosen:** Counts only, reported side by side: total changes, bad changes (the delay drops, which causes reordering), delay increases and breaks, each with its size.
+
+- **Why:** A single score needs a weight that we would have to make up, and that weight would decide the winner. Separate counts keep the comparison honest.
+
+- **Tradeoff:** No single number says which strategy is best. A packet simulation would show the real effect on TCP, but it is a project in itself.
+
+### 4. Serving Satellite Rule
+
+Which satellite does a dish use?
+
+- **Options:** Highest in the sky, longest time left in view, highest among those in view for the whole slot, chosen together with the route, or least loaded.
+
+- **Chosen:** Highest in the sky as the main rule, held for a 15s slot. The next three are comparison runs in the realistic model. The laser route behind the dish can change while the serving satellite stays the same.
+
+- **Why:** Highest is the common baseline: shortest distance up and best signal. Measurements show Starlink prefers high satellites, but not strictly. Choosing together with the route is the only rule that checks if the satellite can reach anything, which is what breaks Reykjavik to Vladivostok.
+
+- **Tradeoff:** Four rules to run. In the best case the route picks these satellites itself, so the rules only apply to the realistic model. Least loaded needs a traffic model, so it is left for later.
+
+### 5. Clocks and Run Length
+
+- **Options:** Keep the 15s step from Phase 2, or go down to 1s. One 12 hour run, or a shorter one.
+
+- **Chosen:** 1s step. Routes re-planned every 15s, serving slot of 15s. One 2 hour window, starting at the same time as Phase 2, with more windows added if results depend on the window.
+
+- **Why:** A 1s step catches path changes a 15s step misses, over a run short enough to stay cheap.
+
+- **Tradeoff:** Hypatia found that even 1s misses changes for 6% of pairs, so every count is a lower bound. Two hours is one sixth of the Phase 2 run.
+
+### 6. What Counts as Reliable?
+
+- **Options:** Any mix of change counts, path lifetime, jump size, time with no path, stretch and backup path delay.
+
+- **Chosen:** All of them: changes per hour, how long a path lasts, jump size, bad changes, time with no path, stretch (delay ÷ (great-circle distance ÷ c)), and the delay of a backup path that shares no satellite with the main one. Every drop is logged with its time, length, city pair, the satellite or link responsible, and a cause.
+
+- **Why:** A steady 40ms and a 40ms that jumps to 140ms are not the same service, and the median alone hides that. Logging the cause of each drop shows if it came from coverage, the serving rule, a laser link, a split network or a missing gateway.
+
+- **Tradeoff:** Many numbers to report. Buildings, terrain and weather are not modelled. In the realistic model the backup path has to share the serving satellite, since there is only one.
+
+### 7. Proof of Correctness
+
+- **Options:** Reproduce Hypatia's path change counts, reproduce the Bariloche to Beijing paper's counts, compare with real dish logs.
+
+- **Chosen:** The first two as proof, each on the paper's own constellation, time step and definition of a change. Real dish logs as a plausibility check if the dates can be matched.
+
+- **Why:** Hypatia gives a median of 4 path changes per 200s. The Bariloche paper gives 185 changes for lowest delay, 103 for keep until broken and 58 for longest-lived, which tests exactly the strategies in decision 2. A published number only proves something under a matching setup.
+
+- **Tradeoff:** Our 4 link grid is not Hypatia's, so the program has to read a link list from a file. The Bariloche paper has no public code and doesn't state every setting, so an exact match may not be possible.
