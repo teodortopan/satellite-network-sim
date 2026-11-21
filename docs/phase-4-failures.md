@@ -191,6 +191,35 @@ in continuous time.
 - A fact about an element is replaced by a later fact about the same element: "up again"
   after "down", and the other way round.
 
+Details:
+
+- Instants are seconds from the run's start; step k is at k × step. The step of an instant is
+  the last step at or before it.
+- Who detects is read from the step of the failure instant: a laser link's end detects if the
+  link was in force or acquiring and its geometry was up at that step; a gateway or a city
+  detects a failed satellite if the satellite is in its list of visible satellites at that
+  step. Cities detect only in the best case: in the realistic model a dish's one link is its
+  serving satellite, and what the dish does is part of the reaction mode (4.5), not a fact
+  that travels.
+- A laser link whose geometry was down at the failure instant is detected at the first later
+  step at which its geometry is up, plus the detection time; never, if the failure ends first
+  or the run does.
+- A detector that is itself down detects nothing.
+- When a satellite returns, every gateway that sees it at the step of that instant, and in the
+  best case every city that sees it, holds "this satellite is up again" from that instant.
+  When a gateway returns, the satellites it sees hold "this gateway is up again" from that
+  instant, and the planner from that instant plus its processing time.
+- When a failure ends, each planned laser link it had taken down, with both ends working and
+  no other failure on it, acquires from that instant and carries traffic one acquisition time
+  later; both ends hold "this link is up again" from then.
+- **Old failures** (4.2): one that ended before the run starts is ignored. Otherwise its
+  "down" facts are known to every actor from the first step.
+- **The messages graph.** Reports and floods travel over: every laser link that carries
+  traffic, every gateway's links to the satellites it sees (in both endpoint models), and in
+  the best case every dish's links to the satellites its city sees. A link's delay is its
+  length ÷ c plus `--hop-delay-ms`, and every hop adds the per-hop time of 4.9. Elements that
+  are down are not in it.
+
 ### 4.5 The three reaction modes
 
 In all three, routes are planned as in Phase 3: at every re-plan instant, on a planning graph.
@@ -330,6 +359,27 @@ comparison: it stays idle.
   only part of what is lost.
 - Matching needs both satellites to agree on the new pair. How they agree is not modelled: the
   rule is deterministic and takes no time beyond detection.
+
+Details:
+
+- A freed laser may be matched from the first step at or after the instant its own satellite
+  knew of the loss: the detection instant for a failed link, the instant of the return for a
+  repair link that was dropped. Matching runs once at every step at which some laser may be
+  matched for the first time, over every free laser that may be matched by then and every
+  laser that never had a partner.
+- The two ends of a failed link are not matched to each other again while it is failed, and no
+  pair already joined by a link that carries traffic or is acquiring is joined twice.
+- In a plane the rule goes round the plane's working satellites in order: a satellite with a
+  free laser ahead and the next working satellite ahead of it with a free laser behind are
+  linked if the link has line of sight at that step and is permanent. So a run of several dead
+  satellites is bridged by one link, if it can be.
+- A repair link acquires from the step it is matched and carries traffic one acquisition time
+  later; both ends then hold "this link is up". A repair link dropped on a return is down from
+  that instant, and both ends know at once.
+- A repair link goes down like any other link when one of its satellites fails.
+- For an old failure (4.2) the freed lasers are matched on the first step's geometry, and a
+  repair link carries traffic from the failure instant plus the acquisition time, or from the
+  first step if that is earlier; in that case every actor knows it from the first step.
 
 The acquisition values run: 2 s, 12 s, 30 s and 100 s. 30 s and 2 s are one vendor's first
 and later acquisitions, 100 s is the SDA standard's limit, and 12 s is the fastest SpaceX is
