@@ -37,7 +37,7 @@ struct ViewState {
   std::vector<Belief> gateways;
   /// Per satellite: taken as down (non-zero): its latest fact is "down", or every planned
   /// laser link of it (Timeline::links before planned_count touching it; at least one) is
-  /// kDown in `links`.
+  /// kDown in `links` and none of its repair links (from planned_count on) is kUp.
   std::vector<char> satellite_down;
   /// Per gateway: its latest fact is "down".
   std::vector<char> gateway_down;

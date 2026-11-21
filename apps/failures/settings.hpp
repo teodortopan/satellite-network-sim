@@ -1,9 +1,13 @@
 #pragma once
 
+#include <array>
+#include <cstdint>
 #include <optional>
 #include <string>
+#include <string_view>
 
-// The times of Phase 4 spec 4.9 that are settings, and whether freed lasers re-point (4.8).
+// The times of Phase 4 spec 4.9 that are settings, whether freed lasers re-point (4.8), and the
+// reaction modes (4.5).
 
 namespace satsim::failures_app {
 
@@ -26,5 +30,19 @@ struct ReactionTimes {
 
 /// nullopt if usable, else what is wrong: every time finite and >= 0.
 [[nodiscard]] std::optional<std::string> check_reaction_times(const ReactionTimes& times);
+
+/// Who may change a route after a failure (spec 4.5).
+enum class Reaction : std::uint8_t {
+  kPlanner,      ///< "planner": the planner only, at its re-plan instants.
+  kLocalRepair,  ///< "local-repair": the planner, and the node before a dead element.
+  kFlooding,     ///< "flooding": every node, from its own view (not available yet).
+};
+
+inline constexpr std::array<Reaction, 3> kAllReactions = {
+    Reaction::kPlanner, Reaction::kLocalRepair, Reaction::kFlooding};
+
+/// "planner", "local-repair", "flooding".
+[[nodiscard]] std::string_view name_of(Reaction reaction) noexcept;
+[[nodiscard]] std::optional<Reaction> parse_reaction(std::string_view text) noexcept;
 
 }  // namespace satsim::failures_app

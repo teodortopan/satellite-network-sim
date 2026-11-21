@@ -133,6 +133,30 @@ TEST(ViewTest, InferenceNeedsEveryPlannedLinkDown) {
             (std::vector<char>{0, 0, 0, 0}));
 }
 
+// Satellite 2's planned links are 1 (1-2) and 2 (0-2); its repair link 3 (2-3). Both planned
+// links held down take it as down, unless the repair link is known up (spec 4.4): a laser of
+// it still works.
+TEST(ViewTest, RepairLinkKnownUpLiftsTheInference) {
+  const Timeline down = small_timeline({fact(SubjectKind::kLink, 1, true, 10.0, 11.0),
+                                        fact(SubjectKind::kLink, 2, true, 10.0, 11.0)});
+  EXPECT_EQ(satsim::failures_app::view_at(down, known_at(down), 11.0).satellite_down,
+            (std::vector<char>{0, 0, 1, 0}));
+  const Timeline repaired = small_timeline({fact(SubjectKind::kLink, 1, true, 10.0, 11.0),
+                                            fact(SubjectKind::kLink, 2, true, 10.0, 11.0),
+                                            fact(SubjectKind::kLink, 3, false, 40.0, 41.0)});
+  EXPECT_EQ(satsim::failures_app::view_at(repaired, known_at(repaired), 40.5).satellite_down,
+            (std::vector<char>{0, 0, 1, 0}));
+  EXPECT_EQ(satsim::failures_app::view_at(repaired, known_at(repaired), 41.0).satellite_down,
+            (std::vector<char>{0, 0, 0, 0}));
+  // The repair link known down again: down again.
+  const Timeline dropped = small_timeline({fact(SubjectKind::kLink, 1, true, 10.0, 11.0),
+                                           fact(SubjectKind::kLink, 2, true, 10.0, 11.0),
+                                           fact(SubjectKind::kLink, 3, false, 40.0, 41.0),
+                                           fact(SubjectKind::kLink, 3, true, 50.0, 51.0)});
+  EXPECT_EQ(satsim::failures_app::view_at(dropped, known_at(dropped), 51.0).satellite_down,
+            (std::vector<char>{0, 0, 1, 0}));
+}
+
 StepGeometry step_geometry() {
   StepGeometry g{.utc = satsim::failures_app::testing::some_time(),
                  .position_ecef_km = {},

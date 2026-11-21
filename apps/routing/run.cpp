@@ -192,6 +192,92 @@ EngineNetwork network_of(const PreparedRun& run) {
   return net;
 }
 
+void append_route_columns(std::string& line, const PreparedRun& run, const GraphLayout& layout,
+                          std::string_view time_text, std::string_view strategy_name,
+                          const RouteRow& row) {
+  const Options& o = run.options;
+  const bool realistic = o.model == app::EndpointModel::kRealistic;
+  const app::PairDirection& pd = run.directions[row.direction];
+  line.append(time_text);
+  line.push_back(',');
+  append_csv_field(line, run.cities[pd.from].site.name);
+  line.push_back(',');
+  append_csv_field(line, run.cities[pd.to].site.name);
+  line.push_back(',');
+  line.append(app::role_name(pd.role));
+  line.push_back(',');
+  line.append(topology::name_of(o.pattern));
+  line.push_back(',');
+  line.append(app::name_of(o.model));
+  line.push_back(',');
+  line.append(strategy_name);
+  line.append(row.ok ? ",ok," : ",drop,");
+  if (row.cause) {
+    line.append(name_of(*row.cause));
+  }
+  line.push_back(',');
+  if (row.ok) {
+    append_double(line, row.delay_s * kMsPerS);
+  }
+  line.push_back(',');
+  if (row.ideal_s) {
+    append_double(line, *row.ideal_s * kMsPerS);
+  }
+  // The route's satellites, laser hops and gateway.
+  std::vector<std::size_t> satellites;
+  std::optional<std::size_t> gateway;
+  std::size_t laser_hops = 0;
+  for (std::size_t n = 0; n < row.route.size(); ++n) {
+    const NodeMeaning m = layout.meaning(row.route[n]);
+    if (m.kind == NodeKind::kSatellite) {
+      if (!satellites.empty() && layout.meaning(row.route[n - 1]).kind == NodeKind::kSatellite) {
+        ++laser_hops;
+      }
+      satellites.push_back(m.index);
+    } else if (m.kind == NodeKind::kGateway) {
+      gateway = m.index;
+    }
+  }
+  line.push_back(',');
+  if (row.ok) {
+    append_integer(line, static_cast<std::int64_t>(laser_hops));
+  }
+  line.push_back(',');
+  if (row.ok) {
+    for (std::size_t n = 0; n < satellites.size(); ++n) {
+      if (n > 0) {
+        line.push_back(' ');
+      }
+      append_integer(line, run.working.satellites.at(satellites[n]).norad_cat_id);
+    }
+  }
+  append_norad(line, run,
+               row.ok && !satellites.empty() ? std::optional(satellites.front()) : std::nullopt);
+  append_norad(line, run,
+               row.ok && !satellites.empty() ? std::optional(satellites.back()) : std::nullopt);
+  append_norad(line, run, realistic ? row.serving : std::nullopt);
+  line.push_back(',');
+  if (row.ok && gateway) {
+    append_csv_field(line, run.gateways.at(*gateway).site.name);
+  }
+  line.push_back(',');
+  if (row.ok && gateway) {
+    line.append(app::name_of(run.gateways.at(*gateway).source));
+  }
+  line.push_back(',');
+  if (const auto& pop = run.home_pops[pd.from].pop; realistic && pop) {
+    append_csv_field(line, pop->code);
+  }
+  line.push_back(',');
+  if (row.plan) {
+    line.append(routing::name_of(*row.plan));
+  }
+  line.push_back(',');
+  if (row.backup_s) {
+    append_double(line, *row.backup_s * kMsPerS);
+  }
+}
+
 PreparedRunOrError prepare_run(const Options& options) {
   if (auto error = check_options(options)) {
     return std::move(*error);
@@ -234,7 +320,6 @@ RunOutcome write_routes(const PreparedRun& run, std::ostream& csv, const RunHook
   const double step_s = static_cast<double>(o.step_ns) / kNsPerS;
   const SnapshotLookahead ahead(steps, run.cities.size(), step_s);
   const GraphLayout& layout = engine.layout();
-  const bool realistic = o.model == app::EndpointModel::kRealistic;
   const std::size_t city_count = run.cities.size();
   std::vector<std::string> strategy_names;
   strategy_names.reserve(o.strategies.size());
@@ -275,91 +360,11 @@ RunOutcome write_routes(const PreparedRun& run, std::ostream& csv, const RunHook
 
     const std::string time_text = app::format_utc_iso(positions.utc, run.fraction_digits);
     for (const RouteRow& row : rows) {
-      const app::PairDirection& pd = run.directions[row.direction];
       if (row.strategy == 0 && row.ideal_s) {
         stats.ideal_ms[row.direction].push_back(*row.ideal_s * kMsPerS);
       }
       line.clear();
-      line.append(time_text);
-      line.push_back(',');
-      append_csv_field(line, run.cities[pd.from].site.name);
-      line.push_back(',');
-      append_csv_field(line, run.cities[pd.to].site.name);
-      line.push_back(',');
-      line.append(app::role_name(pd.role));
-      line.push_back(',');
-      line.append(topology::name_of(o.pattern));
-      line.push_back(',');
-      line.append(app::name_of(o.model));
-      line.push_back(',');
-      line.append(strategy_names[row.strategy]);
-      line.append(row.ok ? ",ok," : ",drop,");
-      if (row.cause) {
-        line.append(name_of(*row.cause));
-      }
-      line.push_back(',');
-      if (row.ok) {
-        append_double(line, row.delay_s * kMsPerS);
-      }
-      line.push_back(',');
-      if (row.ideal_s) {
-        append_double(line, *row.ideal_s * kMsPerS);
-      }
-      // The route's satellites, laser hops and gateway.
-      std::vector<std::size_t> satellites;
-      std::optional<std::size_t> gateway;
-      std::size_t laser_hops = 0;
-      for (std::size_t n = 0; n < row.route.size(); ++n) {
-        const NodeMeaning m = layout.meaning(row.route[n]);
-        if (m.kind == NodeKind::kSatellite) {
-          if (!satellites.empty() &&
-              layout.meaning(row.route[n - 1]).kind == NodeKind::kSatellite) {
-            ++laser_hops;
-          }
-          satellites.push_back(m.index);
-        } else if (m.kind == NodeKind::kGateway) {
-          gateway = m.index;
-        }
-      }
-      line.push_back(',');
-      if (row.ok) {
-        append_integer(line, static_cast<std::int64_t>(laser_hops));
-      }
-      line.push_back(',');
-      if (row.ok) {
-        for (std::size_t n = 0; n < satellites.size(); ++n) {
-          if (n > 0) {
-            line.push_back(' ');
-          }
-          append_integer(line, run.working.satellites.at(satellites[n]).norad_cat_id);
-        }
-      }
-      append_norad(
-          line, run,
-          row.ok && !satellites.empty() ? std::optional(satellites.front()) : std::nullopt);
-      append_norad(line, run,
-                   row.ok && !satellites.empty() ? std::optional(satellites.back()) : std::nullopt);
-      append_norad(line, run, realistic ? row.serving : std::nullopt);
-      line.push_back(',');
-      if (row.ok && gateway) {
-        append_csv_field(line, run.gateways.at(*gateway).site.name);
-      }
-      line.push_back(',');
-      if (row.ok && gateway) {
-        line.append(app::name_of(run.gateways.at(*gateway).source));
-      }
-      line.push_back(',');
-      if (realistic && run.home_pops[pd.from].pop) {
-        append_csv_field(line, run.home_pops[pd.from].pop->code);
-      }
-      line.push_back(',');
-      if (row.plan) {
-        line.append(routing::name_of(*row.plan));
-      }
-      line.push_back(',');
-      if (row.backup_s) {
-        append_double(line, *row.backup_s * kMsPerS);
-      }
+      append_route_columns(line, run, layout, time_text, strategy_names[row.strategy], row);
       line.push_back('\n');
       csv.write(line.data(), static_cast<std::streamsize>(line.size()));
       ++stats.rows_written;
@@ -435,7 +440,7 @@ bool write_drops(const PreparedRun& run, const RunStatistics& stats, std::ostrea
   return static_cast<bool>(csv);
 }
 
-void write_summary(const PreparedRun& run, const RunStatistics& stats, std::ostream& out) {
+void write_summary_body(const PreparedRun& run, const RunStatistics& stats, std::ostream& out) {
   const Options& o = run.options;
   const app::InputOptions inputs = app::input_options_of(o);
   const bool realistic = o.model == app::EndpointModel::kRealistic;
@@ -534,6 +539,10 @@ void write_summary(const PreparedRun& run, const RunStatistics& stats, std::ostr
   }
   out << "  rows written: " << stats.rows_written << ", drop events: " << stats.drop_events.size()
       << '\n';
+}
+
+void write_summary(const PreparedRun& run, const RunStatistics& stats, std::ostream& out) {
+  write_summary_body(run, stats, out);
   out << "  checks: " << (stats.passed() ? "PASSED" : "FAILED") << '\n';
 }
 

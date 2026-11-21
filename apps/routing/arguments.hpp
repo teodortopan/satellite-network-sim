@@ -7,8 +7,10 @@
 #include <span>
 #include <string>
 #include <string_view>
+#include <variant>
 #include <vector>
 
+#include "inputs/input_arguments.hpp"
 #include "inputs/inputs.hpp"
 #include "routing/settings.hpp"
 #include "satsim/constellation/classification.hpp"
@@ -82,6 +84,19 @@ struct ParsedArguments {
 /// or serving slot that is not a positive number of seconds (at most 9 decimals) or not a whole
 /// multiple of the step, and a hop delay that is not a finite number of milliseconds >= 0.
 [[nodiscard]] ParsedArguments parse_arguments(std::span<const std::string_view> args);
+
+/// Every option name parse_arguments reads: app::kRequiredInputOptionNames, the routing
+/// program's own required ones (--model, --strategies, --replan-s, --out),
+/// app::kOptionalInputOptionNames, then its own optional ones. The first
+/// kRoutingRequiredOptionCount are required. For programs that take the routing program's
+/// options and more (the failures program).
+[[nodiscard]] std::vector<std::string_view> routing_option_names();
+inline constexpr std::size_t kRoutingRequiredOptionCount = 11;
+
+/// What parse_arguments does once the values are read and every required option is present:
+/// the Options, or the message refusing them (the same messages).
+[[nodiscard]] std::variant<Options, std::string> parse_routing_options(
+    const app::OptionLookup& value_of);
 
 /// The --help text.
 [[nodiscard]] std::string_view usage() noexcept;

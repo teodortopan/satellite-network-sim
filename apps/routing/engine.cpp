@@ -900,6 +900,17 @@ std::optional<std::size_t> Engine::serving_of(std::size_t dish) const {
   return dishes_.at(dish).serving;
 }
 
+std::optional<std::size_t> Engine::pick_serving(const Lookahead& ahead, const StepGround& seen,
+                                                std::size_t city) {
+  // pick_by_rule caches times left in view per site for the step's own lists: set that cache
+  // aside so that neither list sees the other's times.
+  std::map<std::size_t, std::vector<double>> kept;
+  kept.swap(times_left_);
+  const std::optional<std::size_t> pick = pick_by_rule(ahead, seen, city);
+  times_left_.swap(kept);
+  return pick;
+}
+
 void Engine::set_serving(std::size_t dish, std::optional<std::size_t> satellite) {
   dishes_.at(dish).serving = satellite;
 }

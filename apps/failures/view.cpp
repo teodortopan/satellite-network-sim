@@ -136,8 +136,20 @@ ViewState view_at(const Timeline& timeline, std::span<const double> knowledge, d
       }
     }
   }
+  // ... unless a repair link of it is known up (spec 4.4): that laser still works.
+  std::vector<char> repair_up(view.satellites.size(), 0);
+  for (std::size_t i = timeline.planned_count; i < timeline.links.size(); ++i) {
+    if (view.links[i] != Belief::kUp) {
+      continue;
+    }
+    for (const std::size_t s : {timeline.links[i].satellite_a, timeline.links[i].satellite_b}) {
+      if (s < repair_up.size()) {
+        repair_up[s] = 1;
+      }
+    }
+  }
   for (std::size_t s = 0; s < view.satellites.size(); ++s) {
-    if (planned[s] > 0 && held_down[s] == planned[s]) {
+    if (planned[s] > 0 && held_down[s] == planned[s] && repair_up[s] == 0) {
       view.satellite_down[s] = 1;
     }
   }
