@@ -1,12 +1,14 @@
 #include "satsim/topology/link_state.hpp"
 
 #include <Eigen/Core>
+#include <algorithm>
 #include <array>
 #include <cassert>
 #include <cmath>
 #include <cstddef>
 #include <numbers>
 #include <optional>
+#include <span>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -68,6 +70,26 @@ std::string_view name_of(LinkDownReason reason) noexcept {
       return "sun_exclusion";
     case LinkDownReason::kLockingOn:
       return "locking_on";
+    case LinkDownReason::kFailed:
+      return "failed";
+    case LinkDownReason::kAcquiring:
+      return "acquiring";
+    case LinkDownReason::kNotInForce:
+      return "not_in_force";
+  }
+  return "?";
+}
+
+std::string_view name_of(LinkForce force) noexcept {
+  switch (force) {
+    case LinkForce::kInForce:
+      return "in_force";
+    case LinkForce::kAcquiring:
+      return "acquiring";
+    case LinkForce::kFailed:
+      return "failed";
+    case LinkForce::kNotInForce:
+      return "not_in_force";
   }
   return "?";
 }
@@ -85,11 +107,46 @@ std::size_t count_up(const StepLinks& links) noexcept {
 std::array<std::size_t, 5> count_down_by_reason(const StepLinks& links) noexcept {
   std::array<std::size_t, 5> counts{};
   for (const LinkState& state : links.states) {
-    if (state.down_reason) {
+    // The reasons of failures and repair links come after the five geometric ones and are
+    // left out.
+    if (state.down_reason && static_cast<std::size_t>(*state.down_reason) < counts.size()) {
       ++counts[static_cast<std::size_t>(*state.down_reason)];
     }
   }
   return counts;
+}
+
+std::array<std::size_t, 8> count_down_by_reason_with_failures(const StepLinks& links) noexcept {
+  std::array<std::size_t, 8> counts{};
+  for (const LinkState& state : links.states) {
+    if (state.down_reason && static_cast<std::size_t>(*state.down_reason) < counts.size()) {
+      ++counts[static_cast<std::size_t>(*state.down_reason)];
+    }
+  }
+  return counts;
+}
+
+void apply_link_force(StepLinks& links, std::span<const LinkForce> force) noexcept {
+  assert(force.size() == links.states.size());
+  const std::size_t count = std::min(force.size(), links.states.size());
+  for (std::size_t i = 0; i < count; ++i) {
+    LinkState& state = links.states[i];
+    switch (force[i]) {
+      case LinkForce::kInForce:
+        break;
+      case LinkForce::kAcquiring:
+        if (state.up()) {
+          state.down_reason = LinkDownReason::kAcquiring;
+        }
+        break;
+      case LinkForce::kFailed:
+        state.down_reason = LinkDownReason::kFailed;
+        break;
+      case LinkForce::kNotInForce:
+        state.down_reason = LinkDownReason::kNotInForce;
+        break;
+    }
+  }
 }
 
 LinkState geometric_link_state(const std::optional<Eigen::Vector3d>& a_ecef_km,

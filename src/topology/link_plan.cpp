@@ -15,6 +15,7 @@
 #include <variant>
 #include <vector>
 
+#include "laser_matching.hpp"
 #include "satsim/constellation/classification.hpp"
 #include "satsim/constellation/geometry.hpp"
 #include "satsim/topology/geometry.hpp"
@@ -91,22 +92,6 @@ class Planner {
     return l != nullptr && !l->link.has_value();
   }
 
-  [[nodiscard]] const Eigen::Vector3d* position(std::size_t satellite) const {
-    if (satellite >= positions_.size()) {
-      return nullptr;
-    }
-    const std::optional<Eigen::Vector3d>& p = positions_[satellite];
-    return p.has_value() ? &*p : nullptr;
-  }
-
-  // Whether a link between a and b keeps line of sight for a whole orbit.
-  [[nodiscard]] bool permanent(std::size_t a, std::size_t b) const {
-    const std::optional<constellation::OrbitGeometry>& ga = classification_->satellites[a].geometry;
-    const std::optional<constellation::OrbitGeometry>& gb = classification_->satellites[b].geometry;
-    return ga.has_value() && gb.has_value() &&
-           keeps_line_of_sight_for_an_orbit(*ga, *gb, settings_.atmosphere_km);
-  }
-
   // Whether a and b already share a link: one of a's lasers (at most six) links to b.
   [[nodiscard]] bool linked(std::size_t a, std::size_t b) const {
     for (const Laser& l : plan_.lasers[a]) {
@@ -154,100 +139,16 @@ class Planner {
   }
 
   // Greedy shortest-first matching of plane `from`'s `side_from` lasers with plane `to`'s
-  // `side_to` lasers.
+  // `side_to` lasers (detail::match_across_planes, shared with match_free_lasers).
   void match(std::size_t shell, std::size_t from, std::size_t to, LaserSide side_from,
              LaserSide side_to, LinkKind kind) {
-    struct Candidate {
-      double distance_km;
-      std::int64_t id_a;
-      std::int64_t id_b;
-      std::size_t a;
-      std::size_t b;
-    };
     const auto& planes = classification_->planes[shell];
-    // Each satellite with a position and a free laser on the side wanted, as plain doubles: the
-    // loop below runs over every pair of the two planes, so it avoids Eigen expressions, which
-    // dominate the cost in unoptimised sanitizer builds.
-    struct End {
-      std::size_t satellite;
-      double x, y, z;
-      double tangent_km;  // Tangent length to the limiting sphere (0 if inside it).
-    };
-    const double limit_km = line_of_sight_radius_km(settings_.atmosphere_km);
-    const auto ends = [&](const std::vector<std::size_t>& members, LaserSide side) {
-      std::vector<End> out;
-      out.reserve(members.size());
-      for (const std::size_t s : members) {
-        const Eigen::Vector3d* p = position(s);
-        if (p != nullptr && free(s, side)) {
-          const double x = p->x();
-          const double y = p->y();
-          const double z = p->z();
-          const double r_squared = (x * x) + (y * y) + (z * z);
-          const double t_squared = r_squared - (limit_km * limit_km);
-          out.push_back(End{.satellite = s,
-                            .x = x,
-                            .y = y,
-                            .z = z,
-                            .tangent_km = t_squared > 0.0 ? std::sqrt(t_squared) : 0.0});
-        }
-      }
-      return out;
-    };
-    const std::vector<End> from_ends = ends(planes[from].members, side_from);
-    const std::vector<End> to_ends = ends(planes[to].members, side_to);
-    std::vector<Candidate> candidates;
-    for (const End& ea : from_ends) {
-      for (const End& eb : to_ends) {
-        const double dx = eb.x - ea.x;
-        const double dy = eb.y - ea.y;
-        const double dz = eb.z - ea.z;
-        const double length_squared = (dx * dx) + (dy * dy) + (dz * dz);
-        const double reach_km = ea.tangent_km + eb.tangent_km;
-        // Two satellites farther apart than the sum of their tangent lengths
-        // (max_link_length_km) cannot see each other: a cheap first rejection.
-        if (ea.satellite == eb.satellite || length_squared > reach_km * reach_km) {
-          continue;
-        }
-        // The exact test, as segment_min_radius_km computes it: the point of the segment
-        // closest to the centre, a + t d with t clamped to [0, 1]. Line of sight at the
-        // reference time does not change during the matching, so a pair without it can never
-        // be accepted and is left out before sorting.
-        const double t =
-            length_squared > 0.0
-                ? std::clamp(-((ea.x * dx) + (ea.y * dy) + (ea.z * dz)) / length_squared, 0.0, 1.0)
-                : 0.0;
-        const double cx = ea.x + (t * dx);
-        const double cy = ea.y + (t * dy);
-        const double cz = ea.z + (t * dz);
-        if (std::sqrt((cx * cx) + (cy * cy) + (cz * cz)) < limit_km ||
-            linked(ea.satellite, eb.satellite)) {
-          continue;
-        }
-        candidates.push_back(
-            Candidate{.distance_km = std::sqrt(length_squared),
-                      .id_a = classification_->satellites[ea.satellite].norad_cat_id,
-                      .id_b = classification_->satellites[eb.satellite].norad_cat_id,
-                      .a = ea.satellite,
-                      .b = eb.satellite});
-      }
-    }
-    std::ranges::sort(candidates, [](const Candidate& x, const Candidate& y) {
-      if (x.distance_km != y.distance_km) {
-        return x.distance_km < y.distance_km;
-      }
-      if (x.id_a != y.id_a) {
-        return x.id_a < y.id_a;
-      }
-      return x.id_b < y.id_b;
-    });
-    // Permanence depends only on the pair, so it is tested last, and only for a pair that
-    // would otherwise be linked: the result is the same as testing every candidate first.
-    for (const Candidate& c : candidates) {
-      if (free(c.a, side_from) && free(c.b, side_to) && !linked(c.a, c.b) && permanent(c.a, c.b)) {
-        add_link(shell, c.a, side_from, c.b, side_to, kind);
-      }
-    }
+    detail::match_across_planes(
+        *classification_, positions_, settings_.atmosphere_km, planes[from].members,
+        planes[to].members, [&](std::size_t s) { return free(s, side_from); },
+        [&](std::size_t s) { return free(s, side_to); },
+        [&](std::size_t a, std::size_t b) { return linked(a, b); },
+        [&](std::size_t a, std::size_t b) { add_link(shell, a, side_from, b, side_to, kind); });
   }
 
   void record_unassigned() {

@@ -218,4 +218,63 @@ PhysicalCheckCounts run_physical_checks(const constellation::Classification& cla
   return counts;
 }
 
+ForceCheckCounts run_force_checks(const constellation::Classification& classification,
+                                  std::span<const PlannedLink> links, std::size_t planned_count,
+                                  std::span<const LinkForce> force, const StepLinks& states,
+                                  const StepPositions& positions,
+                                  std::span<const char> satellite_down, const LinkLimits& limits) {
+  ForceCheckCounts counts;
+  const std::size_t satellite_count = classification.satellites.size();
+  const bool links_out_of_range = std::ranges::any_of(links, [&](const PlannedLink& link) {
+    return link.satellite_a >= satellite_count || link.satellite_b >= satellite_count;
+  });
+  if (force.size() != links.size() || states.states.size() != links.size() ||
+      planned_count > links.size() || satellite_down.size() != satellite_count ||
+      positions.position_ecef_km.size() != satellite_count || links_out_of_range) {
+    ++counts.structure;
+    return counts;
+  }
+
+  const double min_radius_km = line_of_sight_radius_km(limits.atmosphere_km);
+  // (satellite, side) of every laser in a link in force or acquiring.
+  std::vector<std::pair<std::size_t, LaserSide>> lasers_in_use;
+  for (std::size_t i = 0; i < links.size(); ++i) {
+    const PlannedLink& link = links[i];
+    const std::size_t a = link.satellite_a;
+    const std::size_t b = link.satellite_b;
+    const bool engaged = force[i] == LinkForce::kInForce || force[i] == LinkForce::kAcquiring;
+    if (engaged) {
+      lasers_in_use.emplace_back(a, link.side_a);
+      lasers_in_use.emplace_back(b, link.side_b);
+      if (i >= planned_count) {
+        const std::optional<std::size_t> shell_a = member_shell(classification, a);
+        const std::optional<std::size_t> shell_b = member_shell(classification, b);
+        if (!shell_a.has_value() || !shell_b.has_value() || *shell_a != *shell_b) {
+          ++counts.repair_shell;
+        }
+      }
+    }
+    if (!states.states[i].up()) {
+      continue;
+    }
+    if (satellite_down[a] != 0 || satellite_down[b] != 0) {
+      ++counts.failed_satellite_link;
+    }
+    const auto* pa = position_of(positions, a);
+    const auto* pb = position_of(positions, b);
+    if (pa == nullptr || pb == nullptr ||
+        independent_min_radius_km(*pa, *pb) < min_radius_km - kLengthToleranceKm) {
+      ++counts.line_of_sight;
+    }
+  }
+
+  std::ranges::sort(lasers_in_use);
+  for (std::size_t i = 1; i < lasers_in_use.size(); ++i) {
+    if (lasers_in_use[i] == lasers_in_use[i - 1]) {
+      ++counts.laser_reuse;
+    }
+  }
+  return counts;
+}
+
 }  // namespace satsim::topology

@@ -65,4 +65,39 @@ struct PhysicalCheckCounts {
     std::span<const std::vector<VisibleSatellite>> visible,
     const ElevationMaskSettings& mask_settings = {});
 
+/// Violations per rule at one step of a run whose laser links change (Phase 4 spec 6.1, last
+/// bullet). Every count is 0 for a correct network.
+struct ForceCheckCounts {
+  /// Lasers, identified by (satellite, side), in more than one link whose force is kInForce or
+  /// kAcquiring: each link beyond the first at a laser counts once.
+  std::size_t laser_reuse = 0;
+  /// Repair links (index >= planned_count) in force or acquiring whose two ends are not both
+  /// plane members of one shell (by the classification).
+  std::size_t repair_shell = 0;
+  /// Links whose state is up while one of their end satellites is down.
+  std::size_t failed_satellite_link = 0;
+  /// Links whose state is up without line of sight (the minimum radius recomputed with
+  /// run_physical_checks' independent formula, with its 1e-9 km tolerance), or with an end
+  /// without a position.
+  std::size_t line_of_sight = 0;
+  /// The spans disagree in size with the link list or the classification, or a link names a
+  /// satellite out of range: nothing else can be trusted, and nothing else is counted.
+  std::size_t structure = 0;
+
+  [[nodiscard]] std::size_t total() const noexcept {
+    return laser_reuse + repair_shell + failed_satellite_link + line_of_sight + structure;
+  }
+};
+
+/// Checks one step of a run's fixed link list: `links` are the planned links (the first
+/// `planned_count`) followed by every repair link of the run; `force[i]` and `states.states[i]`
+/// are link i's force and state at the step (after apply_link_force); `satellite_down` is
+/// non-zero for a satellite that is down, one per satellite of the classification, as are
+/// `positions`. Only limits.atmosphere_km is used. The Phase 2 checks of run_physical_checks
+/// are not repeated here: run them on the links in force.
+[[nodiscard]] ForceCheckCounts run_force_checks(
+    const constellation::Classification& classification, std::span<const PlannedLink> links,
+    std::size_t planned_count, std::span<const LinkForce> force, const StepLinks& states,
+    const StepPositions& positions, std::span<const char> satellite_down, const LinkLimits& limits);
+
 }  // namespace satsim::topology
