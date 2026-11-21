@@ -595,9 +595,6 @@ class Builder {
         }
         start_s = std::max(start_s, freed_s);
       }
-      if (start_s == -kInfinity) {
-        start_s = t;
-      }
       const std::size_t link = add_link(l);
       for (const auto& [satellite, side] :
            {std::pair{l.satellite_a, l.side_a}, std::pair{l.satellite_b, l.side_b}}) {
@@ -606,6 +603,16 @@ class Builder {
           laser->eligible_s = kInfinity;
           laser->old_freed_s.reset();
         }
+      }
+      if (k == 0 && start_s == -kInfinity) {
+        // Matched for old failures between two lasers that never had a partner: it carries
+        // traffic from the first step (spec 4.8 Details), old news.
+        set_force(link, -kInfinity, LinkForce::kInForce);
+        add_old_fact({.kind = SubjectKind::kLink, .index = link}, false, 0.0, std::nullopt);
+        continue;
+      }
+      if (start_s == -kInfinity) {
+        start_s = t;
       }
       const double in_force_s = start_s + settings_.times.acquisition_s;
       if (start_s < t && in_force_s <= t) {

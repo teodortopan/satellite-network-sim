@@ -15,6 +15,7 @@
 #include "inputs/step_source.hpp"
 #include "routing/arguments.hpp"
 #include "routing/engine.hpp"
+#include "routing/graph.hpp"
 #include "satsim/topology/link_state.hpp"
 #include "satsim/topology/physical_checks.hpp"
 
@@ -137,6 +138,13 @@ void keep_forward_directions(PreparedRun& run);
 /// sums them.
 [[nodiscard]] EngineNetwork network_of(const PreparedRun& run);
 
+/// One row of the routes CSV without its line end: kRoutesColumns in order for `row`, at the
+/// step written `time_text`, under the strategy spelled `strategy_name`. `layout` numbers the
+/// row's route. (write_routes writes every row with it; the failures program too.)
+void append_route_columns(std::string& line, const PreparedRun& run, const GraphLayout& layout,
+                          std::string_view time_text, std::string_view strategy_name,
+                          const RouteRow& row);
+
 /// Steps through the run once for every strategy and writes the routes CSV.
 [[nodiscard]] RunOutcome write_routes(const PreparedRun& run, std::ostream& csv,
                                       const RunHooks& hooks = {});
@@ -144,7 +152,10 @@ void keep_forward_directions(PreparedRun& run);
 /// Writes the drops CSV. Returns false if the stream fails.
 bool write_drops(const PreparedRun& run, const RunStatistics& stats, std::ostream& csv);
 
-/// Writes the human-readable summary.
+/// The human-readable summary without its last line ("  checks: PASSED" or "FAILED").
+void write_summary_body(const PreparedRun& run, const RunStatistics& stats, std::ostream& out);
+
+/// Writes the human-readable summary: write_summary_body, then the checks line.
 void write_summary(const PreparedRun& run, const RunStatistics& stats, std::ostream& out);
 
 /// The whole program: parses `args`, prepares, writes the routes CSV to --out (or `out` for

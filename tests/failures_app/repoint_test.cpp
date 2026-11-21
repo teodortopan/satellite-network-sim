@@ -4,6 +4,7 @@
 #include <cstddef>
 #include <limits>
 #include <optional>
+#include <variant>
 #include <vector>
 
 #include "failures/timeline.hpp"
@@ -96,6 +97,37 @@ Failure failure(ElementKind kind, std::size_t element, double start_s,
                  .start_utc = start.plus_seconds(start_s),
                  .start_s = start_s,
                  .length_s = length_s};
+}
+
+Timeline run_on(const LinkPlan& on, const std::vector<Failure>& failures, bool repoint = true,
+                double detection_s = 0.1) {
+  IdealGeometry geometry(twelve_planes(), satsim::constellation::testing::utc(kEpoch), 1.0);
+  TimelineSettings settings;
+  settings.times.repoint = repoint;
+  settings.times.detection_s = detection_s;
+  settings.step_s = 1.0;
+  settings.step_count = 120;
+  settings.gateway_count = 0;
+  return satsim::failures_app::build_timeline(
+      twelve_planes().classification, on, satsim::failure::FailureSchedule{.failures = failures},
+      settings, geometry);
+}
+
+// plan() without link `removed`: its two lasers never had a partner (kNoFreePartner).
+LinkPlan without_link(std::size_t removed) {
+  LinkPlan p = plan();
+  p.links.erase(p.links.begin() + static_cast<std::ptrdiff_t>(removed));
+  for (auto& lasers : p.lasers) {
+    for (satsim::topology::Laser& laser : lasers) {
+      if (laser.link == removed) {
+        laser.link.reset();
+        laser.unassigned = satsim::topology::UnassignedReason::kNoFreePartner;
+      } else if (laser.link && *laser.link > removed) {
+        --*laser.link;
+      }
+    }
+  }
+  return p;
 }
 
 Timeline run(const std::vector<Failure>& failures, bool repoint = true, double detection_s = 0.1) {
@@ -247,6 +279,42 @@ TEST(RepointTest, YoungOldFailureRepairLinkIsStillAcquiring) {
   EXPECT_EQ(facts[0]->t_s, up);
   ASSERT_EQ(facts[0]->detectors.size(), 2U);
   EXPECT_EQ(facts[0]->detectors[0].t_s, up);
+}
+
+// Two lasers that never had a partner (a cross-plane link taken out of the plan) are matched
+// by the step-0 call an old failure elsewhere makes: that link carries traffic from the first
+// step, with an old "up" fact (spec 4.8 Details), not one acquisition time later.
+TEST(RepointTest, OldCallLinkBetweenNeverPartneredLasersIsInForceFromTheStart) {
+  std::optional<std::size_t> cross;
+  for (std::size_t i = 0; i < plan().links.size() && !cross; ++i) {
+    const PlannedLink& l = plan().links[i];
+    const auto& placement = twelve_planes().classification.satellites[l.satellite_a].placement;
+    if (l.kind == LinkKind::kCrossPlane &&
+        std::get<satsim::constellation::PlaneAssignment>(placement).plane_index == 0) {
+      cross = i;
+    }
+  }
+  ASSERT_TRUE(cross.has_value());
+  const PlannedLink removed = plan().links[*cross];
+  const LinkPlan p = without_link(*cross);
+  const Timeline t = run_on(p, {failure(ElementKind::kSatellite, member(6, 7), -3600.0)});
+  std::optional<std::size_t> made;
+  for (std::size_t i = p.links.size(); i < t.links.size(); ++i) {
+    const PlannedLink& l = t.links[i];
+    if ((l.satellite_a == removed.satellite_a && l.satellite_b == removed.satellite_b) ||
+        (l.satellite_a == removed.satellite_b && l.satellite_b == removed.satellite_a)) {
+      made = i;
+    }
+  }
+  ASSERT_TRUE(made.has_value());
+  EXPECT_EQ(t.force[*made],
+            (std::vector<ForceChange>{{.from_s = -kInf, .force = LinkForce::kInForce}}));
+  const auto facts = facts_of_link(t, *made);
+  ASSERT_EQ(facts.size(), 1U);
+  EXPECT_TRUE(facts[0]->old);
+  EXPECT_FALSE(facts[0]->down);
+  EXPECT_EQ(facts[0]->t_s, 0.0);
+  EXPECT_EQ(facts[0]->planner_known_s, 0.0);
 }
 
 }  // namespace

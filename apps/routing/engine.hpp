@@ -287,6 +287,11 @@ class Engine {
 
   /// Dish `dish`'s serving satellite (realistic; dish_of numbers them), nullopt for none.
   [[nodiscard]] std::optional<std::size_t> serving_of(std::size_t dish) const;
+  /// The serving rule's pick for city `city` among seen.city_visible[city], times left in view
+  /// from `ahead`: what a slot start gives a dish of that city (with-route: highest-elevation).
+  /// For local repair (spec 4.5), on any ground; uses no cache of the current step.
+  [[nodiscard]] std::optional<std::size_t> pick_serving(const Lookahead& ahead,
+                                                        const StepGround& seen, std::size_t city);
   /// Gives dish `dish` another serving satellite (or none) until the next slot start (local
   /// repair, spec 4.5). The next step's graph and rows use it.
   void set_serving(std::size_t dish, std::optional<std::size_t> satellite);

@@ -121,6 +121,9 @@ constexpr std::array<std::string_view, 8> kOptionalOwn = {
     "--planner",      "--serving",    "--serving-slot-s", "--backup",
     "--hop-delay-ms", "--directions", "--drops-out",      "--links-out"};
 
+static_assert(app::kRequiredInputOptionNames.size() + kRequiredOwn.size() ==
+              kRoutingRequiredOptionCount);
+
 // Every option name: the shared required ones, ours, the shared optional ones, ours.
 std::vector<std::string_view> option_names() {
   std::vector<std::string_view> names;
@@ -183,6 +186,107 @@ std::optional<std::int64_t> parse_multiple(std::string_view name, std::string_vi
 
 std::string_view usage() noexcept { return kUsage; }
 
+std::vector<std::string_view> routing_option_names() { return option_names(); }
+
+std::variant<Options, std::string> parse_routing_options(const app::OptionLookup& value_of) {
+  const auto value = [&](std::string_view name) { return value_of(name).value_or(""); };
+
+  std::variant<app::InputOptions, std::string> shared = app::parse_input_options(value_of);
+  if (auto* error = std::get_if<std::string>(&shared)) {
+    return std::string(std::move(*error));
+  }
+  const app::InputOptions& inputs = std::get<app::InputOptions>(shared);
+  Options options{.snapshot_dir = inputs.snapshot_dir,
+                  .ground_dir = inputs.ground_dir,
+                  .cities_file = inputs.cities_file,
+                  .start = inputs.start,
+                  .shells = {},
+                  .strategies = {},
+                  .out = {}};
+  app::assign_input_options(options, inputs);
+
+  if (value("--out").empty()) {
+    return std::string("--out is empty (use - for standard output)");
+  }
+  options.out = std::string(value("--out"));
+  const std::optional<app::EndpointModel> model = app::parse_endpoint_model(value("--model"));
+  if (!model) {
+    return std::string("--model " + quote(value("--model")) + " is not realistic or best-case");
+  }
+  options.model = *model;
+  std::string error;
+  auto strategies = parse_strategies(value("--strategies"), error);
+  if (!strategies) {
+    return std::string(std::move(error));
+  }
+  options.strategies = std::move(*strategies);
+  const auto replan_ns = parse_multiple("--replan-s", value("--replan-s"), options.step_ns, error);
+  if (!replan_ns) {
+    return std::string(std::move(error));
+  }
+  options.replan_ns = *replan_ns;
+  if (const auto text = value_of("--serving-slot-s")) {
+    const auto slot_ns = parse_multiple("--serving-slot-s", *text, options.step_ns, error);
+    if (!slot_ns) {
+      return std::string(std::move(error));
+    }
+    options.slot_ns = *slot_ns;
+  } else if (options.slot_ns % options.step_ns != 0) {
+    return std::string(
+        "the default serving slot of 15 s is not a whole multiple of the step; give "
+        "--serving-slot-s");
+  }
+  if (const auto text = value_of("--planner")) {
+    const std::optional<Planner> planner = parse_planner(*text);
+    if (!planner) {
+      return std::string("--planner " + quote(*text) + " is not start or whole-interval");
+    }
+    options.planner = *planner;
+  }
+  if (const auto text = value_of("--serving")) {
+    const std::optional<ServingRule> rule = parse_serving_rule(*text);
+    if (!rule) {
+      return std::string("--serving " + quote(*text) +
+                         " is not highest-elevation, longest-in-view, highest-whole-slot or "
+                         "with-route");
+    }
+    options.serving = *rule;
+  }
+  if (const auto text = value_of("--backup")) {
+    if (*text != "on" && *text != "off") {
+      return std::string("--backup " + quote(*text) + " is not on or off");
+    }
+    options.backup = *text == "on";
+  }
+  if (const auto text = value_of("--hop-delay-ms")) {
+    const std::optional<double> ms = app::parse_finite_double(*text);
+    if (!ms || *ms < 0.0) {
+      return std::string("--hop-delay-ms " + quote(*text) +
+                         " is not a finite number of milliseconds >= 0");
+    }
+    options.hop_delay_s = *ms / kMsPerS;
+  }
+  if (const auto text = value_of("--directions")) {
+    if (*text != "both" && *text != "forward") {
+      return std::string("--directions " + quote(*text) + " is not both or forward");
+    }
+    options.both_directions = *text == "both";
+  }
+  if (const auto path = value_of("--drops-out")) {
+    if (path->empty() || *path == "-") {
+      return std::string("--drops-out must name a file");
+    }
+    options.drops_out = std::filesystem::path(*path);
+  }
+  if (const auto path = value_of("--links-out")) {
+    if (path->empty()) {
+      return std::string("--links-out is empty");
+    }
+    options.links_out = std::filesystem::path(*path);
+  }
+  return options;
+}
+
 ParsedArguments parse_arguments(std::span<const std::string_view> args) {
   if (std::any_of(args.begin(), args.end(),
                   [](std::string_view a) { return a == "--help" || a == "-h"; })) {
@@ -201,7 +305,7 @@ ParsedArguments parse_arguments(std::span<const std::string_view> args) {
                              : read.values.at(static_cast<std::size_t>(it - names.begin()));
   };
   std::string missing;
-  const std::size_t required = app::kRequiredInputOptionNames.size() + kRequiredOwn.size();
+  const std::size_t required = kRoutingRequiredOptionCount;
   for (std::size_t i = 0; i < required; ++i) {
     if (!read.values.at(i)) {
       missing += (missing.empty() ? "" : ", ") + std::string(names.at(i));
@@ -210,103 +314,12 @@ ParsedArguments parse_arguments(std::span<const std::string_view> args) {
   if (!missing.empty()) {
     return failure("missing required option(s): " + missing);
   }
-  const auto value = [&](std::string_view name) { return value_of(name).value_or(""); };
-
-  std::variant<app::InputOptions, std::string> shared = app::parse_input_options(value_of);
-  if (auto* error = std::get_if<std::string>(&shared)) {
+  std::variant<Options, std::string> parsed = parse_routing_options(value_of);
+  if (auto* error = std::get_if<std::string>(&parsed)) {
     return failure(std::move(*error));
   }
-  const app::InputOptions& inputs = std::get<app::InputOptions>(shared);
-  Options options{.snapshot_dir = inputs.snapshot_dir,
-                  .ground_dir = inputs.ground_dir,
-                  .cities_file = inputs.cities_file,
-                  .start = inputs.start,
-                  .shells = {},
-                  .strategies = {},
-                  .out = {}};
-  app::assign_input_options(options, inputs);
-
-  if (value("--out").empty()) {
-    return failure("--out is empty (use - for standard output)");
-  }
-  options.out = std::string(value("--out"));
-  const std::optional<app::EndpointModel> model = app::parse_endpoint_model(value("--model"));
-  if (!model) {
-    return failure("--model " + quote(value("--model")) + " is not realistic or best-case");
-  }
-  options.model = *model;
-  std::string error;
-  auto strategies = parse_strategies(value("--strategies"), error);
-  if (!strategies) {
-    return failure(std::move(error));
-  }
-  options.strategies = std::move(*strategies);
-  const auto replan_ns = parse_multiple("--replan-s", value("--replan-s"), options.step_ns, error);
-  if (!replan_ns) {
-    return failure(std::move(error));
-  }
-  options.replan_ns = *replan_ns;
-  if (const auto text = value_of("--serving-slot-s")) {
-    const auto slot_ns = parse_multiple("--serving-slot-s", *text, options.step_ns, error);
-    if (!slot_ns) {
-      return failure(std::move(error));
-    }
-    options.slot_ns = *slot_ns;
-  } else if (options.slot_ns % options.step_ns != 0) {
-    return failure(
-        "the default serving slot of 15 s is not a whole multiple of the step; give "
-        "--serving-slot-s");
-  }
-  if (const auto text = value_of("--planner")) {
-    const std::optional<Planner> planner = parse_planner(*text);
-    if (!planner) {
-      return failure("--planner " + quote(*text) + " is not start or whole-interval");
-    }
-    options.planner = *planner;
-  }
-  if (const auto text = value_of("--serving")) {
-    const std::optional<ServingRule> rule = parse_serving_rule(*text);
-    if (!rule) {
-      return failure("--serving " + quote(*text) +
-                     " is not highest-elevation, longest-in-view, highest-whole-slot or "
-                     "with-route");
-    }
-    options.serving = *rule;
-  }
-  if (const auto text = value_of("--backup")) {
-    if (*text != "on" && *text != "off") {
-      return failure("--backup " + quote(*text) + " is not on or off");
-    }
-    options.backup = *text == "on";
-  }
-  if (const auto text = value_of("--hop-delay-ms")) {
-    const std::optional<double> ms = app::parse_finite_double(*text);
-    if (!ms || *ms < 0.0) {
-      return failure("--hop-delay-ms " + quote(*text) +
-                     " is not a finite number of milliseconds >= 0");
-    }
-    options.hop_delay_s = *ms / kMsPerS;
-  }
-  if (const auto text = value_of("--directions")) {
-    if (*text != "both" && *text != "forward") {
-      return failure("--directions " + quote(*text) + " is not both or forward");
-    }
-    options.both_directions = *text == "both";
-  }
-  if (const auto path = value_of("--drops-out")) {
-    if (path->empty() || *path == "-") {
-      return failure("--drops-out must name a file");
-    }
-    options.drops_out = std::filesystem::path(*path);
-  }
-  if (const auto path = value_of("--links-out")) {
-    if (path->empty()) {
-      return failure("--links-out is empty");
-    }
-    options.links_out = std::filesystem::path(*path);
-  }
   ParsedArguments result;
-  result.options = std::move(options);
+  result.options = std::move(std::get<Options>(parsed));
   return result;
 }
 

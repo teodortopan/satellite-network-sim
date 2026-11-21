@@ -74,7 +74,7 @@ glossary of every orbital term used here.
 | `apps/constellation/` | The `constellation` program: each satellite's shell, plane and position, or why it has none |
 | `apps/topology/` | The `topology` program: delay per city pair, direction and time step, under two endpoint models |
 | `apps/routing/` | The `routing` program: each direction's route over time under several strategies, with the cause of every drop |
-| `apps/failures/` | The `failures` program's core: what a failure schedule causes over time, the truth and each actor's view |
+| `apps/failures/` | The `failures` program: what a failure schedule causes over time, the truth and each actor's view, every lane (baseline, reference, planner, local repair) stepped through it in continuous time, its measures, checks and CSVs |
 | `apps/inputs/` | What `topology` and `routing` share: loading the snapshot and ground data, city pairs, positions and link states per step |
 | `apps/common/` | Helpers every program shares: CSV, statistics, time steps, arguments |
 | `tests/<module>/` | GoogleTest per module, with small fixtures |

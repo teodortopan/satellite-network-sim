@@ -194,7 +194,9 @@ struct Timeline {
 ///     a link of that call whose lasers were freed by old failures starts acquiring at the
 ///     latest of those failures' start_s (a laser freed at step 0 or never partnered counts as
 ///     0 and as -infinity): in force from that + acquisition_s, from the start with an old
-///     "link up" fact at that instant if it is <= 0. An old failure that ends during the run
+///     "link up" fact at that instant if it is <= 0; a link of that call between two lasers
+///     that never had a partner is in force from the start (from -infinity), with an old
+///     "link up" fact at 0 (spec 4.8 Details). An old failure that ends during the run
 ///     ends as in (b).
 /// (e) planner_known_s as in the header comment; +infinity when no detector reports (a
 ///     detector whose detection instant is at or after the run's end does not report). Old
