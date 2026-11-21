@@ -33,6 +33,7 @@ add_subdirectory(src/ground)
 add_subdirectory(src/orbit)
 add_subdirectory(src/constellation)
 add_subdirectory(src/topology)
+add_subdirectory(src/failure)
 add_subdirectory(src/network)
 add_subdirectory(src/routing)
 

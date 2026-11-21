@@ -67,6 +67,7 @@ glossary of every orbital term used here.
 | `include/satsim/constellation/`, `src/constellation/` | Shells, planes, order in a plane, exclusion reasons, shell definitions from a file |
 | `include/satsim/ground/`, `src/ground/` | Cities, gateways, PoPs, the home-PoP rule, great-circle distance, fibre delay |
 | `include/satsim/topology/`, `src/topology/` | Positions per step, line of sight, elevation and masks, laser patterns, link state, ground links, physical checks |
+| `include/satsim/failure/`, `src/failure/` | The failure schedule and its file, what is down at an instant, who can detect a failure from the laser plan |
 | `include/satsim/network/`, `src/network/` | A weighted graph, Dijkstra (also avoiding given nodes), whether a path is up and its delay |
 | `include/satsim/routing/`, `src/routing/` | The four routing strategies, the held route of one direction, how a route change is classified |
 | `apps/propagate/` | The `propagate` program: snapshot and time range in, CSV out |
@@ -83,8 +84,9 @@ glossary of every orbital term used here.
 | `docs/` | Per phase: the spec (`phase-N-<name>.md`), the report (`phase-N-results.md`), its data and plots; `ci.md` |
 
 Later modules may depend on earlier ones (core, time, frames, orbit,
-constellation, ground, topology), never the reverse. `network` depends on
-nothing else, and `routing` only on `network`.
+constellation, ground, topology), never the reverse. `failure` may depend on
+`topology` and the modules before it. `network` depends on nothing else, and
+`routing` only on `network`.
 
 ## Conventions
 
