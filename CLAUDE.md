@@ -30,8 +30,11 @@ glossary of every orbital term used here.
 - `scripts/check.sh <step>` runs one step (`format`, `python-lint`,
   `asan-gcc`, `asan-clang`, `valgrind`, `tidy`, `validate`, `validate-topology`,
   `validate-routing`).
-  The GCC sanitizer step takes 10 to 15 minutes and the full check about 30;
-  `asan-clang` runs the same tests in seconds, so prefer it while iterating.
+  Measured in a cloud session (x86-64, 4 cores, 2026-11-21): the full check takes
+  about 7 minutes once the build trees exist, and longer on a session's first run,
+  which compiles everything. clang-tidy is the longest step (about 8 minutes when
+  the cores are shared with other work); the 620 sanitizer tests take under a minute
+  with either compiler. Prefer `asan-clang` while iterating.
 - `python/compare_spacex.py` (against SpaceX's trajectory files) and
   `python/plot_phase1.py` (the report's plots) are run by hand; the exact
   commands are in `docs/phase-1-results.md`. The same goes for Phase 2:
