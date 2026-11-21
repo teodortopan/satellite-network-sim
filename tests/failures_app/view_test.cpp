@@ -157,6 +157,52 @@ TEST(ViewTest, RepairLinkKnownUpLiftsTheInference) {
             (std::vector<char>{0, 0, 1, 0}));
 }
 
+// The bug: a working satellite whose neighbours all fail was taken as down for good. On the
+// failure tests' small network satellite 1's planned links are 0 (0-1), 1 (1-2) and 4 (1-5);
+// its three neighbours 0, 2 and 5 fail at 10 s. Satellite 1 detects each of those three link
+// facts itself, so it is plainly alive: no view knowing everything takes it as down (spec 4.4,
+// corrected). The same failures as old news (an hour before the run) give old link facts,
+// which never count: no view takes 1 as down either. Satellites 0, 2 and 5 are down by their
+// own facts or by link facts detected only at the other end.
+TEST(ViewTest, AWorkingSatelliteWhoseNeighboursAllFailIsNotTakenAsDown) {
+  for (const double start_s : {10.0, -3600.0}) {
+    SCOPED_TRACE(start_s);
+    World w;
+    const Timeline t = w.timeline({failure_at(ElementKind::kSatellite, 0, start_s),
+                                   failure_at(ElementKind::kSatellite, 2, start_s),
+                                   failure_at(ElementKind::kSatellite, 5, start_s)});
+    const std::vector<double> everything(t.facts.size(), 0.0);
+    const ViewState v = satsim::failures_app::view_at(t, everything, 100.0);
+    EXPECT_EQ(v.satellite_down.at(1), 0);
+    EXPECT_EQ(v.satellite_down.at(0), 1);
+    EXPECT_EQ(v.satellite_down.at(2), 1);
+    EXPECT_EQ(v.satellite_down.at(5), 1);
+  }
+}
+
+// Link facts detected only at the other end still take a satellite as down: satellite 0's
+// planned links 0 (0-1) and 2 (0-2) reported by 1 and by 2.
+TEST(ViewTest, LinkFactsDetectedByTheOtherEndsStillTakeASatelliteAsDown) {
+  std::vector<Fact> facts = {fact(SubjectKind::kLink, 0, true, 10.0, 11.0),
+                             fact(SubjectKind::kLink, 2, true, 10.0, 11.0)};
+  facts[0].detectors = {{.node = 1, .t_s = 10.1}};
+  facts[1].detectors = {{.node = 2, .t_s = 10.1}};
+  const Timeline t = small_timeline(facts);
+  EXPECT_EQ(satsim::failures_app::view_at(t, known_at(t), 11.0).satellite_down,
+            (std::vector<char>{1, 0, 0, 0}));
+  // Reported by satellite 0 itself: alive.
+  facts[1].detectors = {{.node = 0, .t_s = 10.1}};
+  const Timeline itself = small_timeline(facts);
+  EXPECT_EQ(satsim::failures_app::view_at(itself, known_at(itself), 11.0).satellite_down,
+            (std::vector<char>{0, 0, 0, 0}));
+  // Old news: never inferred.
+  facts[1].detectors.clear();
+  facts[0].old = true;
+  const Timeline old = small_timeline(facts);
+  EXPECT_EQ(satsim::failures_app::view_at(old, known_at(old), 11.0).satellite_down,
+            (std::vector<char>{0, 0, 0, 0}));
+}
+
 StepGeometry step_geometry() {
   StepGeometry g{.utc = satsim::failures_app::testing::some_time(),
                  .position_ecef_km = {},

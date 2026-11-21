@@ -419,6 +419,25 @@ TEST(LoopTest, ReplanOnReport) {
   EXPECT_EQ(scene.loop->checks().total(), 0U);
 }
 
+// The bug of a working satellite taken as down: cities A and B both also see satellite 1
+// (500 km), whose three neighbours 0, 2 and 5 failed an hour before the run. Satellite 1 has
+// no working laser but still joins the two cities: A 1 B. Every lane takes it, the planner's
+// as the reference's.
+TEST(LoopTest, AWorkingSatelliteWhoseNeighboursAllFailedStillCarriesTraffic) {
+  Scene scene;
+  scene.geometry.base.city_visible = {{seen(0, 500.0), seen(1, 500.0)},
+                                      {seen(1, 500.0), seen(2, 500.0), seen(5, 500.0)}};
+  scene.run({failure_at(ElementKind::kSatellite, 0, -3600.0),
+             failure_at(ElementKind::kSatellite, 2, -3600.0),
+             failure_at(ElementKind::kSatellite, 5, -3600.0)});
+  const Route via1 = {22, 1, 25};
+  for (const LaneKind kind : {LaneKind::kReference, LaneKind::kPlanner, LaneKind::kLocalRepair}) {
+    SCOPED_TRACE(static_cast<int>(kind));
+    expect_intervals(scene.lane(kind), {{0.0, kEnd, DirectionState::kDelivered, via1}});
+  }
+  EXPECT_EQ(scene.loop->checks().total(), 0U);
+}
+
 // An old failure (satellite 1, an hour before the run): known by everyone from the first
 // step; every lane takes A 0 4 5 B from 0 s and nothing else happens.
 TEST(LoopTest, OldFailureKnownFromTheFirstStep) {

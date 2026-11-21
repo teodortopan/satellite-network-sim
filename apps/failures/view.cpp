@@ -1,5 +1,6 @@
 #include "failures/view.hpp"
 
+#include <algorithm>
 #include <cstddef>
 #include <cstdint>
 #include <limits>
@@ -88,6 +89,8 @@ ViewState view_at(const Timeline& timeline, std::span<const double> knowledge, d
   std::vector<double> satellite_t(view.satellites.size(), kNone);
   std::vector<double> gateway_t(view.gateways.size(), kNone);
   std::vector<bool> link_set(view.links.size(), false);
+  // Per link: the fact that decides its belief.
+  std::vector<const Fact*> link_fact(view.links.size(), nullptr);
   std::vector<bool> satellite_set(view.satellites.size(), false);
   std::vector<bool> gateway_set(view.gateways.size(), false);
   for (std::size_t f = 0; f < timeline.facts.size() && f < knowledge.size(); ++f) {
@@ -116,13 +119,18 @@ ViewState view_at(const Timeline& timeline, std::span<const double> knowledge, d
       (*set)[i] = true;
       (*latest)[i] = fact.t_s;
       (*beliefs)[i] = fact.down ? Belief::kDown : Belief::kUp;
+      if (fact.subject.kind == SubjectKind::kLink) {
+        link_fact[i] = &fact;
+      }
     }
   }
   view.satellite_down.assign(view.satellites.size(), 0);
   for (std::size_t s = 0; s < view.satellites.size(); ++s) {
     view.satellite_down[s] = static_cast<char>(view.satellites[s] == Belief::kDown);
   }
-  // The inference: every planned laser link of a satellite held down.
+  // The inference (spec 4.4): every planned laser link of a satellite held down by a fact that
+  // is not old news and that the satellite did not detect itself (a satellite that reported
+  // the loss is alive; one down by old news has its own old fact).
   std::vector<std::size_t> planned(view.satellites.size(), 0);
   std::vector<std::size_t> held_down(view.satellites.size(), 0);
   for (std::size_t i = 0; i < timeline.planned_count && i < timeline.links.size(); ++i) {
@@ -130,7 +138,10 @@ ViewState view_at(const Timeline& timeline, std::span<const double> knowledge, d
     for (const std::size_t s : {link.satellite_a, link.satellite_b}) {
       if (s < planned.size()) {
         ++planned[s];
-        if (view.links[i] == Belief::kDown) {
+        const Fact* f = link_fact[i];
+        if (view.links[i] == Belief::kDown && f != nullptr && !f->old &&
+            std::none_of(f->detectors.begin(), f->detectors.end(),
+                         [&](const Detection& d) { return d.node == nodes.satellite(s); })) {
           ++held_down[s];
         }
       }
