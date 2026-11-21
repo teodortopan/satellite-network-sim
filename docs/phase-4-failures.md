@@ -185,10 +185,13 @@ in continuous time.
     went silent holds "this satellite is down", and a satellite whose gateway went silent
     holds "this gateway is down". In this model nothing else silences a ground link that is
     in view.
-- **A view takes a satellite as down** when it holds "this satellite is down", or when it
-  holds "this laser link is down" for every planned laser link of that satellite and "this
-  link is up" for none of its repair links. A satellite with no working laser can pass nothing
-  on, so the view stops using it for ground links too.
+- **A view takes a satellite as down** when it holds "this satellite is down", or when every
+  planned laser link of that satellite went silent with only the other end noticing: the view
+  holds "this laser link is down" for each of them, the satellite itself is a detector of
+  none of those facts, none of them is old news, and the view holds "this link is up" for
+  none of the satellite's repair links. A satellite that reported the loss of a link is
+  plainly alive, and can still carry traffic between two ground sites with no laser at all.
+  Old news needs no such guess: a satellite that is down has its own old fact.
 - A fact about an element is replaced by a later fact about the same element: "up again"
   after "down", and the other way round.
 
