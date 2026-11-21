@@ -20,8 +20,23 @@ fibre) and Starlink as a backbone (space only). Over 12 hours, New York to Londo
 median 40 ms one way as a provider and 21 ms as a backbone, against a physical lower bound
 of 19 ms. Every network passes physical checks at every step, and the program agrees with an
 independent model to 1e-6 ms on an ideal shell. The numbers, the plots and the assumptions
-are in [docs/phase-2-results.md](docs/phase-2-results.md). Routing, failures and the
-dashboard come in later phases.
+are in [docs/phase-2-results.md](docs/phase-2-results.md).
+
+Phase 3 (routing) is implemented. The `routing` program follows each route through time: a
+planner chooses a route, holds it and re-plans on a fixed interval, under four strategies
+(lowest delay, keep until broken, longest lived, switch only above a threshold). It reports
+how often a route changes, how much the delay jumps, how long there is no route and why.
+Over two hours at 1 s steps, a backbone route re-planned every 15 s on one instant's
+positions is down 6% to 19% of the time on five of six city pairs, because the lowest-delay
+route uses satellites about to leave view; planning with the links predicted to last the
+whole interval removes every one of those drops for at most 0.2 ms of median delay. As an internet provider,
+the dish's serving satellite changes at 41% to 76% of the 15 s slots and every strategy but
+one gives the same route. The program agrees row for row with an independent model,
+reproduces Hypatia's published median of path changes and comes within 8.1% of a second
+paper's counts.
+The numbers, the plots and the limits are in
+[docs/phase-3-results.md](docs/phase-3-results.md). Failures and the dashboard come in later
+phases.
 
 This repository is the source of truth for the project.
 
@@ -29,8 +44,8 @@ This repository is the source of truth for the project.
 
 The only host requirement is Docker. The check builds the CI image and runs every step in it
 (formatting, Python lint, ASan/UBSan builds with GCC and Clang, Valgrind, clang-tidy, the
-comparison of `propagate` against Skyfield, and the comparison of `topology` against an
-independent model):
+comparison of `propagate` against Skyfield, and the comparisons of `topology` and `routing`
+against independent models):
 
 ```sh
 scripts/check.sh            # all steps
@@ -69,6 +84,23 @@ topology --snapshot data/starlink/2026-11-18 --ground data/ground/2026-11-19 \
 
 `--pattern` is `three`, `plus-grid` or `six` lasers per satellite; `--model` is `realistic`
 or `best-case`. `topology --help` lists the limits that can be changed.
+
+## Routes over time
+
+`routing` (built to `build/<preset>/bin/routing`) writes one CSV row per time step, city
+pair, direction and strategy: whether the held route still works, its delay against the
+lowest delay possible at that step, the route itself, and the cause of every drop.
+
+```sh
+routing --snapshot data/starlink/2026-11-18 --ground data/ground/2026-11-19 \
+  --cities data/ground/cities.json --start 2026-11-18T21:15:00 \
+  --duration-s 7200 --step-s 1 --pattern three --model best-case \
+  --strategies lowest-delay,keep-until-broken,longest-lived,threshold:1ms \
+  --replan-s 15 --out routes.csv --drops-out drops.csv
+```
+
+`--planner` is `start` or `whole-interval`; `--serving` chooses how a dish picks its
+satellite in the realistic model. `routing --help` lists every option.
 
 ## License
 
