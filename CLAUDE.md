@@ -40,6 +40,8 @@ glossary of every orbital term used here.
   Phase 3's published reproductions (`python/reproduce_routing.py hypatia|bariloche`)
   and the LENS comparison (`python/compare_lens.py`) are run by hand too; usage in
   each script's docstring.
+  So are Phase 3's 15 real-data runs (`python/run_phase3.py`, about 30 minutes) and
+  `python/plot_phase3.py`, with commands in `docs/phase-3-results.md`.
 - `python/fetch_ground.py` downloads the ground data and
   `python/make_assumed_gateways.py` derives the assumed gateways; both by hand.
   `python/fetch_lens.py` downloads the LENS ping files (one request each, no
@@ -227,6 +229,11 @@ The rules from the owner's global file that this project relies on.
 - **Docker in the cloud:** it is installed but the daemon does not start by
   itself; run `dockerd` in the background (or have the environment's setup script
   do it) before `scripts/check.sh`. The image is rebuilt in every new session.
+  If the image build fails at `pip install` with a certificate error (the cloud's proxy
+  re-signs HTTPS), build it from a copy of the Dockerfile outside the repo that also copies
+  `/root/.ccr/ca-bundle.crt` in and sets `PIP_CERT` to it, tag it `satsim-ci`, and run
+  `scripts/ci.sh <step>` in it with the `docker run` line of `scripts/check.sh`. Never
+  commit that copy.
 - **Not in git, so not in the cloud:** a snapshot's SpaceX trajectory files
   (only `python/compare_spacex.py` needs them, and they cannot be downloaded
   again), the LENS ping files (`python/fetch_lens.py`; only
