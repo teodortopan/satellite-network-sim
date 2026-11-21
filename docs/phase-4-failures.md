@@ -544,9 +544,14 @@ Details:
   `extra_settled_ms`, `reports`, `messages`. A measure that does not exist is written `none`.
   The extra delay is taken at the steps at or after t_f where the lane and the baseline are
   both delivered; `extra_settled_ms` at the first step at or after the settle instant.
+  There is no row for the baseline or the reference. For `planner` and `local-repair`,
+  `reports` is the number of reports sent in the run and `messages` the sum of their hops;
+  for `flooding`, `reports` is `none` and `messages` is every sending of every flood.
 - **Network CSV:** one row per step and scope, the scopes being `all` and each shell:
   `utc`, `scope`, `working_satellites`, `pieces`, `largest_piece`, `largest_piece_share`,
   counted on the true network's laser links that carry traffic.
+  A shell's scope is its name. The share is the largest piece over the working satellites,
+  `none` when there is none.
 - The `flooding` rows carry the strategy `lowest-delay`, once, whatever `--strategies` lists.
 - Instants and delays are written with enough digits to read back as the same number.
 
