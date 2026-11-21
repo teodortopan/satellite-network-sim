@@ -5,6 +5,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <optional>
+#include <span>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -38,22 +39,51 @@ struct LinkLimits {
 /// and > 0, sun_exclusion_rad finite and in (0, pi], lock_on_s finite and >= 0.
 [[nodiscard]] std::optional<std::string> check_limits(const LinkLimits& limits);
 
-/// Why a planned link is down, in the order they are tested (the first that applies is the
-/// one reported).
+/// Why a planned link is down. The first five are geometric, in the order they are tested
+/// (the first that applies is the one reported). The last three come from failures and repair
+/// links (Phase 4 spec 4.8) and are set only by apply_link_force, never by the evaluator.
 enum class LinkDownReason : std::uint8_t {
   kEndNotPropagated,  ///< One end has no position at this step (propagation failed).
   kNoLineOfSight,     ///< The segment passes below the atmosphere layer.
   kOverRangeCap,      ///< Longer than LinkLimits::range_cap_km.
   kSunExclusion,      ///< The Sun is within LinkLimits::sun_exclusion_rad of the beam.
   kLockingOn,         ///< Available, but not yet for LinkLimits::lock_on_s.
+  kFailed,            ///< The link or one of its end satellites has failed.
+  /// A link just matched, or just returned from a failure, still locking on (Phase 4 spec 4.8).
+  kAcquiring,
+  kNotInForce,  ///< A repair link before it is matched or after it is dropped.
 };
 
+/// The five geometric reasons: the ones the topology and routing programs count and print.
 inline constexpr std::array<LinkDownReason, 5> kAllLinkDownReasons = {
     LinkDownReason::kEndNotPropagated, LinkDownReason::kNoLineOfSight,
     LinkDownReason::kOverRangeCap, LinkDownReason::kSunExclusion, LinkDownReason::kLockingOn};
 
-/// "end_not_propagated", "no_line_of_sight", "over_range_cap", "sun_exclusion", "locking_on".
+/// Every reason, the geometric five then kFailed, kAcquiring, kNotInForce.
+inline constexpr std::array<LinkDownReason, 8> kAllLinkDownReasonsWithFailures = {
+    LinkDownReason::kEndNotPropagated, LinkDownReason::kNoLineOfSight,
+    LinkDownReason::kOverRangeCap,     LinkDownReason::kSunExclusion,
+    LinkDownReason::kLockingOn,        LinkDownReason::kFailed,
+    LinkDownReason::kAcquiring,        LinkDownReason::kNotInForce};
+
+/// "end_not_propagated", "no_line_of_sight", "over_range_cap", "sun_exclusion", "locking_on",
+/// "failed", "acquiring", "not_in_force".
 [[nodiscard]] std::string_view name_of(LinkDownReason reason) noexcept;
+
+/// What failures and repair links make of one link at an instant (Phase 4 spec 4.8), as the
+/// failure schedule decides it; the geometry is the evaluator's business.
+enum class LinkForce : std::uint8_t {
+  kInForce,     ///< Nothing stops the link: its state is the geometric one.
+  kAcquiring,   ///< Just matched or just returned, still locking on: carries nothing.
+  kFailed,      ///< The link or one of its end satellites has failed.
+  kNotInForce,  ///< A repair link not (or no longer) matched.
+};
+
+inline constexpr std::array<LinkForce, 4> kAllLinkForces = {
+    LinkForce::kInForce, LinkForce::kAcquiring, LinkForce::kFailed, LinkForce::kNotInForce};
+
+/// "in_force", "acquiring", "failed", "not_in_force".
+[[nodiscard]] std::string_view name_of(LinkForce force) noexcept;
 
 /// One planned link at one step.
 struct LinkState {
@@ -77,8 +107,25 @@ struct StepLinks {
 /// Links up at the step.
 [[nodiscard]] std::size_t count_up(const StepLinks& links) noexcept;
 
-/// Links down at the step, indexed by LinkDownReason.
+/// Links down at the step for one of the five geometric reasons (kAllLinkDownReasons), indexed
+/// by LinkDownReason. A link down for kFailed, kAcquiring or kNotInForce is not counted (it is
+/// in no entry): the topology and routing programs never see those reasons.
 [[nodiscard]] std::array<std::size_t, 5> count_down_by_reason(const StepLinks& links) noexcept;
+
+/// Links down at the step for any reason, indexed by LinkDownReason
+/// (kAllLinkDownReasonsWithFailures).
+[[nodiscard]] std::array<std::size_t, 8> count_down_by_reason_with_failures(
+    const StepLinks& links) noexcept;
+
+/// Applies each link's force to its state at one step (Phase 4 spec 4.8), link by link:
+///   kInForce    unchanged;
+///   kAcquiring  down with kAcquiring if the state is up, else unchanged (the geometric reason
+///               is kept: a link that cannot be up anyway is reported for its geometry);
+///   kFailed     down with kFailed, whatever the state (a failure is the reason reported);
+///   kNotInForce down with kNotInForce, whatever the state.
+/// length_km is never changed. Precondition: force has one entry per state
+/// (force.size() == links.states.size()).
+void apply_link_force(StepLinks& links, std::span<const LinkForce> force) noexcept;
 
 /// The geometric state of one link (everything but lock-on): kEndNotPropagated if an end has no
 /// position, else kNoLineOfSight, kOverRangeCap or kSunExclusion, else up. `sun_direction_ecef`

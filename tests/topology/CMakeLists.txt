@@ -2,7 +2,7 @@
 # for the sanitizer and Valgrind runs); the shells come from tests/support.
 satsim_add_test(satsim_topology_tests
   SOURCES ideal.cpp geometry_test.cpp link_plan_test.cpp link_state_test.cpp
-    ground_links_test.cpp physical_checks_test.cpp link_file_test.cpp
+    ground_links_test.cpp physical_checks_test.cpp link_file_test.cpp link_repair_test.cpp
   DEPS satsim::topology satsim::test_support satsim::constellation satsim::ground
     satsim::orbit satsim::frames satsim::time satsim::core)
 

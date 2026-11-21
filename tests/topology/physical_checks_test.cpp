@@ -294,6 +294,149 @@ TEST(PhysicalChecksTest, GroundLinkMask) {
   }
 }
 
+// The valid network after satellite 1 failed, with one repair link: the planned links 0-1 and
+// 1-2 (indices 0 and 1) are failed and down, and the repair link 0 -> 2 (index 5, 0's ahead to
+// 2's behind, 10 deg apart, in sight) is in force and up.
+struct ForceNetwork {
+  Network network;
+  std::vector<PlannedLink> links;
+  std::size_t planned_count = 0;
+  std::vector<satsim::topology::LinkForce> force;
+  std::vector<char> down;
+};
+
+ForceNetwork after_satellite_1_failed() {
+  using satsim::topology::LinkForce;
+  ForceNetwork f{
+      .network = valid_network(), .links = {}, .planned_count = 0, .force = {}, .down = {}};
+  f.links = f.network.plan.links;
+  f.planned_count = f.links.size();
+  f.links.push_back(PlannedLink{.satellite_a = 0,
+                                .satellite_b = 2,
+                                .side_a = LaserSide::kAhead,
+                                .side_b = LaserSide::kBehind,
+                                .kind = LinkKind::kInPlane,
+                                .shell_index = 0});
+  f.network.plan.links = f.links;
+  f.network.links = all_up(f.network.plan, f.network.positions);
+  f.force.assign(f.links.size(), LinkForce::kInForce);
+  f.force[0] = LinkForce::kFailed;
+  f.force[1] = LinkForce::kFailed;
+  satsim::topology::apply_link_force(f.network.links, f.force);
+  f.down.assign(7, 0);
+  f.down[1] = 1;
+  return f;
+}
+
+satsim::topology::ForceCheckCounts force_check(const ForceNetwork& f) {
+  return satsim::topology::run_force_checks(f.network.classification, f.links, f.planned_count,
+                                            f.force, f.network.links, f.network.positions, f.down,
+                                            {});
+}
+
+TEST(ForceChecksTest, ValidNetworkAfterAFailurePasses) {
+  const ForceNetwork f = after_satellite_1_failed();
+  EXPECT_EQ(f.network.links.states[0].down_reason, LinkDownReason::kFailed);
+  EXPECT_TRUE(f.network.links.states[5].up());
+  EXPECT_EQ(force_check(f).total(), 0U);
+}
+
+// The failed link 0-1 acquiring again while the repair link 0 -> 2 is in force: 0's ahead
+// laser is in two links. Its state is down (acquiring), so nothing else fires. Failed or not in
+// force, it uses no laser.
+TEST(ForceChecksTest, LaserReuse) {
+  using satsim::topology::LinkForce;
+  ForceNetwork f = after_satellite_1_failed();
+  f.force[0] = LinkForce::kAcquiring;
+  f.network.links.states[0].down_reason = LinkDownReason::kAcquiring;
+  auto counts = force_check(f);
+  EXPECT_EQ(counts.laser_reuse, 1U);
+  EXPECT_EQ(counts.total(), 1U);
+  // The failed 1-2 in force again (down for its geometry): 2's behind laser is in it and in
+  // the repair link too. 1's lasers are in one engaged link each.
+  f.force[1] = LinkForce::kInForce;
+  f.network.links.states[1].down_reason = LinkDownReason::kNoLineOfSight;
+  EXPECT_EQ(force_check(f).laser_reuse, 2U);
+  f.force[0] = LinkForce::kNotInForce;
+  EXPECT_EQ(force_check(f).laser_reuse, 1U);
+  f.force[1] = LinkForce::kFailed;
+  EXPECT_EQ(force_check(f).laser_reuse, 0U);
+}
+
+// A repair link from 3 to 4 (another shell), then to 6 (in no plane), acquiring and down.
+// The same link listed among the planned links is not this check's business.
+TEST(ForceChecksTest, RepairLinkAcrossShells) {
+  using satsim::topology::LinkForce;
+  for (const std::size_t other : {std::size_t{4}, std::size_t{6}}) {
+    ForceNetwork f = after_satellite_1_failed();
+    f.links.push_back(PlannedLink{.satellite_a = 3,
+                                  .satellite_b = other,
+                                  .side_a = LaserSide::kEast,
+                                  .side_b = LaserSide::kWest,
+                                  .kind = LinkKind::kCrossPlane,
+                                  .shell_index = 0});
+    f.force.push_back(LinkForce::kAcquiring);
+    f.network.links.states.push_back(
+        LinkState{.length_km = 1000.0, .down_reason = LinkDownReason::kAcquiring});
+    const auto counts = force_check(f);
+    EXPECT_EQ(counts.repair_shell, 1U) << other;
+    EXPECT_EQ(counts.total(), 1U) << other;
+    f.force.back() = LinkForce::kNotInForce;
+    EXPECT_EQ(force_check(f).total(), 0U) << other;
+    f.force.back() = LinkForce::kAcquiring;
+    // The first repair link (0 -> 2 counted as planned): still a repair link.
+    f.planned_count = f.links.size() - 1;
+    EXPECT_EQ(force_check(f).repair_shell, 1U) << other;
+    f.planned_count = f.links.size();
+    EXPECT_EQ(force_check(f).total(), 0U) << other;
+  }
+}
+
+// The failed link 0-1 marked up although satellite 1 is down.
+TEST(ForceChecksTest, LinkUpToAFailedSatellite) {
+  ForceNetwork f = after_satellite_1_failed();
+  f.network.links.states[0].down_reason = std::nullopt;
+  const auto counts = force_check(f);
+  EXPECT_EQ(counts.failed_satellite_link, 1U);
+  EXPECT_EQ(counts.total(), 1U);
+  // Satellite 2 down too: the planned link 2-3 and the repair link 0 -> 2 are up to it as well.
+  f.down[2] = 1;
+  EXPECT_EQ(force_check(f).failed_satellite_link, 3U);
+}
+
+// Satellite 3 moved to the far side of the Earth: 2-3 and 3-0, in force and up, pass through
+// it. Satellite 5 without a position: 4-5 is up without one.
+TEST(ForceChecksTest, LineOfSight) {
+  ForceNetwork f = after_satellite_1_failed();
+  f.network.positions.position_ecef_km[3] =
+      -f.network.positions.position_ecef_km[3].value_or(Eigen::Vector3d::Zero());
+  auto counts = force_check(f);
+  EXPECT_EQ(counts.line_of_sight, 2U);
+  EXPECT_EQ(counts.total(), 2U);
+  f.network.links.states[2].down_reason = LinkDownReason::kNoLineOfSight;
+  f.network.links.states[3].down_reason = LinkDownReason::kNoLineOfSight;
+  EXPECT_EQ(force_check(f).total(), 0U);
+
+  ForceNetwork g = after_satellite_1_failed();
+  g.network.positions.position_ecef_km[5].reset();
+  EXPECT_EQ(force_check(g).line_of_sight, 1U);
+}
+
+TEST(ForceChecksTest, Structure) {
+  ForceNetwork f = after_satellite_1_failed();
+  f.force.pop_back();
+  EXPECT_EQ(force_check(f).structure, 1U);
+  ForceNetwork g = after_satellite_1_failed();
+  g.down.pop_back();
+  EXPECT_EQ(force_check(g).structure, 1U);
+  ForceNetwork h = after_satellite_1_failed();
+  h.planned_count = h.links.size() + 1;
+  EXPECT_EQ(force_check(h).structure, 1U);
+  ForceNetwork k = after_satellite_1_failed();
+  k.links.back().satellite_b = 7;
+  EXPECT_EQ(force_check(k).structure, 1U);
+}
+
 TEST(PhysicalChecksTest, Structure) {
   Network n = valid_network();
   n.links.states.pop_back();

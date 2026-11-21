@@ -29,6 +29,7 @@ using satsim::time::UtcTime;
 using satsim::topology::check_limits;
 using satsim::topology::geometric_link_state;
 using satsim::topology::LinkDownReason;
+using satsim::topology::LinkForce;
 using satsim::topology::LinkLimits;
 using satsim::topology::LinkPlan;
 using satsim::topology::LinkState;
@@ -175,6 +176,81 @@ TEST(LinkStateEvaluatorTest, LockOnZeroIsUpAtOnceAndShorterLockOn) {
   EXPECT_EQ(
       fifteen.step(step_positions(t0.plus_seconds(45.0), Positions{kA, kB})).states[0].down_reason,
       LinkDownReason::kLockingOn);
+}
+
+TEST(LinkDownReasonTest, NamesAndTheTwoLists) {
+  EXPECT_EQ(satsim::topology::kAllLinkDownReasons.size(), 5U);
+  ASSERT_EQ(satsim::topology::kAllLinkDownReasonsWithFailures.size(), 8U);
+  for (std::size_t i = 0; i < 5; ++i) {
+    EXPECT_EQ(satsim::topology::kAllLinkDownReasonsWithFailures[i],
+              satsim::topology::kAllLinkDownReasons[i]);
+  }
+  for (std::size_t i = 0; i < 8; ++i) {
+    EXPECT_EQ(static_cast<std::size_t>(satsim::topology::kAllLinkDownReasonsWithFailures[i]), i);
+  }
+  EXPECT_EQ(satsim::topology::name_of(LinkDownReason::kFailed), "failed");
+  EXPECT_EQ(satsim::topology::name_of(LinkDownReason::kAcquiring), "acquiring");
+  EXPECT_EQ(satsim::topology::name_of(LinkDownReason::kNotInForce), "not_in_force");
+  EXPECT_EQ(satsim::topology::name_of(LinkForce::kInForce), "in_force");
+  EXPECT_EQ(satsim::topology::name_of(LinkForce::kAcquiring), "acquiring");
+  EXPECT_EQ(satsim::topology::name_of(LinkForce::kFailed), "failed");
+  EXPECT_EQ(satsim::topology::name_of(LinkForce::kNotInForce), "not_in_force");
+}
+
+// One state per reason, and one up: the count of the five geometric reasons ignores the
+// three new ones (and never reads past its end), the count of all eight has one in each.
+TEST(LinkDownReasonTest, CountingWithAndWithoutTheReasonsOfFailures) {
+  StepLinks links{.utc = satsim::constellation::testing::utc(kEpoch), .states = {}};
+  for (const LinkDownReason reason : satsim::topology::kAllLinkDownReasonsWithFailures) {
+    links.states.push_back(LinkState{.length_km = 1000.0, .down_reason = reason});
+  }
+  links.states.push_back(LinkState{.length_km = 1000.0, .down_reason = std::nullopt});
+  EXPECT_EQ(satsim::topology::count_down_by_reason(links),
+            (std::array<std::size_t, 5>{1, 1, 1, 1, 1}));
+  EXPECT_EQ(satsim::topology::count_down_by_reason_with_failures(links),
+            (std::array<std::size_t, 8>{1, 1, 1, 1, 1, 1, 1, 1}));
+  EXPECT_EQ(satsim::topology::count_up(links), 1U);
+}
+
+// Each force on an up link and on a link down for its geometry (no line of sight):
+//   force         up link            no-line-of-sight link
+//   in_force      up                 no_line_of_sight
+//   acquiring     acquiring          no_line_of_sight   (the geometry is kept)
+//   failed        failed             failed             (the failure is reported)
+//   not_in_force  not_in_force       not_in_force
+// The length is never touched, nor is a link without a position's missing length.
+TEST(ApplyLinkForceTest, EachForceOnAnUpAndADownLink) {
+  const std::array<LinkForce, 4> forces = satsim::topology::kAllLinkForces;
+  const std::array<std::optional<LinkDownReason>, 4> on_up = {
+      std::nullopt, LinkDownReason::kAcquiring, LinkDownReason::kFailed,
+      LinkDownReason::kNotInForce};
+  const std::array<std::optional<LinkDownReason>, 4> on_down = {
+      LinkDownReason::kNoLineOfSight, LinkDownReason::kNoLineOfSight, LinkDownReason::kFailed,
+      LinkDownReason::kNotInForce};
+  StepLinks links{.utc = satsim::constellation::testing::utc(kEpoch), .states = {}};
+  std::vector<LinkForce> force;
+  for (const LinkForce f : forces) {
+    links.states.push_back(LinkState{.length_km = 1234.5, .down_reason = std::nullopt});
+    links.states.push_back(
+        LinkState{.length_km = 9876.5, .down_reason = LinkDownReason::kNoLineOfSight});
+    links.states.push_back(
+        LinkState{.length_km = std::nullopt, .down_reason = LinkDownReason::kEndNotPropagated});
+    force.insert(force.end(), {f, f, f});
+  }
+  satsim::topology::apply_link_force(links, force);
+  for (std::size_t k = 0; k < forces.size(); ++k) {
+    const LinkState& up = links.states[3 * k];
+    const LinkState& hidden = links.states[(3 * k) + 1];
+    const LinkState& missing = links.states[(3 * k) + 2];
+    EXPECT_EQ(up.down_reason, on_up[k]) << satsim::topology::name_of(forces[k]);
+    EXPECT_EQ(hidden.down_reason, on_down[k]) << satsim::topology::name_of(forces[k]);
+    EXPECT_EQ(up.length_km, 1234.5);
+    EXPECT_EQ(hidden.length_km, 9876.5);
+    EXPECT_FALSE(missing.length_km.has_value());
+  }
+  // A link without a position under acquiring keeps its own reason too.
+  EXPECT_EQ(links.states[5].down_reason, LinkDownReason::kEndNotPropagated);
+  EXPECT_EQ(links.states[8].down_reason, LinkDownReason::kFailed);
 }
 
 // positions_at: a satellite that has decayed by the step gives an error, never a position; a
