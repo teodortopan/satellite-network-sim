@@ -298,3 +298,95 @@ Which satellite does a dish use?
 - **Why:** Hypatia gives a median of 4 path changes per 200s. The Bariloche paper gives 185 changes for lowest delay, 103 for keep until broken and 58 for longest-lived, which tests exactly the strategies in decision 2. A published number only proves something under a matching setup.
 
 - **Tradeoff:** Our 4 link grid is not Hypatia's, so the program has to read a link list from a file. The Bariloche paper has no public code and doesn't state every setting, so an exact match may not be possible.
+
+## Phase 4: Failures
+
+### 1. What Fails?
+
+- **Options:** Hand-picked failures (one satellite or laser on a live route, a whole plane, a region, a gateway), a random share of satellites or lasers from 0.1% to 30%, a random rate based on real data, or an attack on the busiest satellites.
+
+- **Chosen:** Hand-picked failures as the main experiment. Also the random sweep, and one attack run. The real rate is only mentioned for context.
+
+- **Why:** Real losses are too rare to show anything: about one satellite a week out of 11,000, so a 2 hour run would see 0.01 failures. Hand-picked failures are the only way to measure recovery on the six study pairs. Random shares and attacks are what the papers use, so results can be compared.
+
+- **Tradeoff:** The scenarios are our choice, not reality's. The random sweep needs many repeated runs.
+
+### 2. How Does a Failure Behave?
+
+- **Options:** Instant and permanent, instant then back after a set time, lasers dropping at random to match SpaceX's 99% uptime, or degraded (less capacity, not a full outage).
+
+- **Chosen:** Instant. Either permanent, or back after 10s or 60s. Random laser drops as an optional extra run.
+
+- **Why:** "Without warning" means sudden. Every study uses instant loss. Degraded needs a traffic model, which we don't have.
+
+- **Tradeoff:** No partial failures. A laser that comes back has to lock on again before it carries anything.
+
+### 3. Who Reacts?
+
+- **Options:** The central planner at its next plan, the planner plus local repair (the satellite next to the failure switches to a backup right away), every satellite told by flooding and working out its own routes, or neighbours swapping distance tables.
+
+- **Chosen:** Build the first three and compare. Distance tables are left out.
+
+- **Why:** The planner alone is the Phase 3 baseline, where a broken route stays down until the next plan. Local repair is the cheapest real improvement. Flooding is the "satellites route among themselves" idea moved here from Phase 3. Distance tables settle slowly after a failure and no satellite paper has numbers for them.
+
+- **Tradeoff:** Three mechanisms to build and test. Nobody outside SpaceX knows which one Starlink uses.
+
+### 4. How Long Do Detection and Reaction Take?
+
+- **Options:** One fixed set of times, or settings with a sweep.
+
+- **Chosen:** Settings with a sweep. Detection at 10ms, 100ms, 1s and 40s. The report to the ground takes as long as the path to the nearest gateway. Passing a message on takes about 1ms per hop, working out new routes 10 to 100ms.
+
+- **Why:** SpaceX publishes none of these, so one number wouldn't be defensible. Same approach as the laser limits in Phase 2. The sweep shows which time actually decides the result.
+
+- **Tradeoff:** More runs. The 1ms and the 10 to 100ms are our own guesses, with no source.
+
+### 5. Time Resolution
+
+- **Options:** Count recovery in whole 1s steps, keep 1s steps for the satellites but work out recovery in continuous time, shorter steps near a failure, or a full event simulator.
+
+- **Chosen:** 1s steps for where the satellites are. Recovery is worked out in continuous time on that step's frozen network.
+
+- **Why:** Recovery takes milliseconds, so whole steps would round it to 0 or 1. Within one second the delays change by microseconds, so freezing the network is accurate. The other two cost far more and add nothing without packets.
+
+- **Tradeoff:** This changes a Phase 3 rule: events between two 1s steps are no longer out of scope, for recovery only. A recovery longer than a second has to carry into the next step.
+
+### 6. Re-pointing Lasers
+
+- **Options:** None (a laser that loses its partner stays idle), freed lasers find a new partner after a loss, also re-point across gaps we can predict, or re-match the whole shell every so often.
+
+- **Chosen:** Freed lasers find a new partner, and the new link works after an acquisition time. 30s as the default, with 2s, 12s and 100s for comparison. No re-pointing as a comparison run.
+
+- **Why:** It's the change that failures actually need. 30s and 2s are a laser maker's numbers (first contact, then every time after). 100s is the US military standard's limit. 12s is what SpaceX says is its fastest, but we couldn't confirm it. Re-matching a whole shell is done for traffic, which we don't model.
+
+- **Tradeoff:** The laser plan is no longer fixed for a run, so the checks have to accept a plan that changes. The default is a vendor's number, not Starlink's. A freed laser can only pair with one facing the right way, so only part of the damage is repaired.
+
+### 7. The Ground
+
+- **Options:** Space only, plus losing a gateway, or plus PoPs, fibre and the core software.
+
+- **Chosen:** Plus losing a gateway. Real US gateways and the ones we assumed at PoPs are reported separately.
+
+- **Why:** 9 of the 11 directions with service use one gateway almost all the time, so it matters. In the US the next gateway is 4 to 16km away. Outside the US we only assumed one per PoP, so the next is 500 to 2,500km away, and losing it mostly tests our own assumption. Nothing public describes the PoPs or the core software well enough to model them.
+
+- **Tradeoff:** The results outside the US say more about our assumption than about Starlink. An outage like July 2025 (2.5 hours, core software) can't be modelled.
+
+### 8. Runs and Measures
+
+- **Options:** The full 2 hour window or short windows around each failure. 30, 100 or 1,000 repeats for the random runs. Any mix of reachability, extra delay, time sent to a dead satellite, loop time, time until stable, and message count.
+
+- **Chosen:** Each hand-picked failure at 10 different times, with 5 minutes of running after it. 100 repeats for each random share, with the seeds written down. All six measures side by side.
+
+- **Why:** What a failure does depends on where the satellites are at that moment, so one time could be a lucky one. 100 repeats is enough to tell 5% damage from 30%. No single score, same as Phase 3.
+
+- **Tradeoff:** Many runs. No packet loss or throughput, since there are no packets.
+
+### 9. Proof of Correctness
+
+- **Options:** Exact checks against a separate Python model, reproducing a published failure study, comparing with real outages.
+
+- **Chosen:** The exact checks as proof. One published number (StarGlider: the backup costs over 20% more delay in 7% of cases) as a comparison with no pass or fail. Real outages for plausibility only.
+
+- **Why:** No published failure study gives both its setup and its numbers, and a published number only proves something under a matching setup. The exact checks can be exact: a flood has to reach each satellite at the shortest path time, and after recovery every satellite's routes have to match the planner's.
+
+- **Tradeoff:** Nothing outside the project confirms the failure numbers. That's weaker than Phases 2 and 3.
