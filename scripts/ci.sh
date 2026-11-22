@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 # CI steps. Runs inside the satsim-ci Docker image, from the repo root.
-# Usage: scripts/ci.sh <format|python-lint|asan-gcc|asan-clang|valgrind|tidy|validate|validate-topology|validate-routing|validate-failures|all>
+# Usage: scripts/ci.sh <format|python-lint|asan-gcc|asan-clang|valgrind|tidy|validate|validate-topology|validate-routing|validate-failures|dashboard|dashboard-site|all>
 set -euo pipefail
 
 usage() {
-  echo "usage: $0 <format|python-lint|asan-gcc|asan-clang|valgrind|tidy|validate|validate-topology|validate-routing|validate-failures|all>" >&2
+  echo "usage: $0 <format|python-lint|asan-gcc|asan-clang|valgrind|tidy|validate|validate-topology|validate-routing|validate-failures|dashboard|dashboard-site|all>" >&2
 }
 
 # Our C++ sources (not third-party code under build/).
@@ -138,6 +138,57 @@ step_validate_failures() {
   python3 python/validate_failures.py --failures-program "$dir/bin/failures"
 }
 
+# The programs the dashboard's export runs, optimised and without sanitizers.
+build_export_programs() {
+  local dir=$1
+  CC=gcc CXX=g++ cmake --preset valgrind -B "$dir" -DSATSIM_BUILD_TESTS=OFF
+  cmake --build "$dir" --target propagate constellation topology routing failures
+}
+
+# The page's packages, exactly as dashboard/package-lock.json lists them. The browser in the
+# image belongs to one Playwright release, so a different one in the lock file is refused here
+# and not as a missing-browser error in the middle of the test.
+install_dashboard_packages() {
+  local wanted
+  wanted=$(node -p "require('./dashboard/package.json').devDependencies['@playwright/test']")
+  if [[ $wanted != "$SATSIM_PLAYWRIGHT_VERSION" ]]; then
+    echo "dashboard: @playwright/test is $wanted but the image has the browser of" \
+      "$SATSIM_PLAYWRIGHT_VERSION (docker/Dockerfile)" >&2
+    return 1
+  fi
+  (cd dashboard && npm ci --no-audit --no-fund)
+}
+
+# The dashboard (docs/phase-5-dashboard.md 6): the small export of real engine runs into
+# dashboard/public/data (it replaces whatever export was there), the data check that compares
+# every exported number with the engine's CSV files and measures the interpolation error, then
+# the page's type check, lint, unit tests, build and browser test on that data. Only `npm ci`
+# needs the network.
+step_dashboard() {
+  local dir=build/validate
+  build_export_programs "$dir"
+  python3 python/export_dashboard.py --small --bin "$dir/bin"
+  python3 python/check_dashboard_data.py
+  install_dashboard_packages
+  cd dashboard
+  npm run typecheck
+  npm run lint
+  npm test
+  npm run build
+  npm run e2e -- --trace off
+}
+
+# The site as it is published: the full export, its data check, and the built page in
+# dashboard/dist. Not part of `all`; the Pages workflow runs it.
+step_dashboard_site() {
+  local dir=build/validate
+  build_export_programs "$dir"
+  python3 python/export_dashboard.py --bin "$dir/bin"
+  python3 python/check_dashboard_data.py
+  install_dashboard_packages
+  (cd dashboard && npm run build)
+}
+
 run_step() {
   echo "==> $1"
   case "$1" in
@@ -151,6 +202,8 @@ run_step() {
     validate-topology) step_validate_topology ;;
     validate-routing) step_validate_routing ;;
     validate-failures) step_validate_failures ;;
+    dashboard) step_dashboard ;;
+    dashboard-site) step_dashboard_site ;;
     *)
       usage
       exit 2
@@ -170,7 +223,7 @@ main() {
   fi
 
   local steps=(format python-lint asan-gcc asan-clang valgrind tidy validate validate-topology
-    validate-routing validate-failures)
+    validate-routing validate-failures dashboard)
   local failed=() s
   for s in "${steps[@]}"; do
     # Separate process so one failing step does not stop the others. (A subshell in an
