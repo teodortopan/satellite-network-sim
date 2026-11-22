@@ -46,3 +46,6 @@ data/lens/*/*
 # Outputs of python/run_phase2.py (about 1 GB of CSV); the committed summaries are in
 # docs/phase-2-data/.
 results/
+
+# The dashboard's exported data (python/export_dashboard.py): built at deploy time, not committed.
+dashboard/public/data/
