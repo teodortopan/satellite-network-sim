@@ -375,9 +375,9 @@ Which satellite does a dish use?
 
 - **Options:** The full 2 hour window or short windows around each failure. 30, 100 or 1,000 repeats for the random runs. Any mix of reachability, extra delay, time sent to a dead satellite, loop time, time until stable, and message count.
 
-- **Chosen:** Each hand-picked failure at 10 different times, with 5 minutes of running after it. 100 repeats for each random share, with the seeds written down. All six measures side by side.
+- **Chosen:** Each hand-picked failure at 10 different times, with 5 minutes of running after it. The runs that only vary one setting use 4 of those times. 30 repeats for each random share, with the seeds written down. All six measures side by side.
 
-- **Why:** What a failure does depends on where the satellites are at that moment, so one time could be a lucky one. 100 repeats is enough to tell 5% damage from 30%. No single score, same as Phase 3.
+- **Why:** What a failure does depends on where the satellites are at that moment, so one time could be a lucky one. We started with 100 repeats and 10 times everywhere, but the full set took too long to run, so we cut it. 30 repeats is still enough to tell 5% damage from 30%. No single score, same as Phase 3.
 
 - **Tradeoff:** Many runs. No packet loss or throughput, since there are no packets.
 

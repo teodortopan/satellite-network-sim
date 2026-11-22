@@ -598,11 +598,11 @@ window at least 60 s before T_i and ends 300 s after T_i.
 | Group | Varies | Fixed |
 |---|---|---|
 | Main | Every scenario, the three reaction modes, both models, the six study pairs one way, the ten instants; permanent | The defaults of 4.9, re-pointing off |
-| Transient | `route-satellite` and `route-laser` lasting 10 s and 60 s | As main |
-| Detection | Detection 0.01, 1 and 40 s; `route-satellite` and `route-laser` | As main |
-| Compute | Compute 0.01 s; `flooding` | As main |
-| Planner | `--replan-on-report on`; and the `start` planner | As main |
-| Re-pointing | Re-pointing on with acquisition 2, 12, 30 and 100 s; `route-satellite`, `plane`, `region` | As main |
+| Transient | `route-satellite` and `route-laser` lasting 10 s and 60 s | As main, the first four instants |
+| Detection | Detection 0.01, 1 and 40 s; `route-satellite` and `route-laser` | As main, the first four instants |
+| Compute | Compute 0.01 s; `flooding` | As main, the first four instants |
+| Planner | `--replan-on-report on`; and the `start` planner | As main, the first four instants |
+| Re-pointing | Re-pointing on with acquisition 2, 12, 30 and 100 s; `route-satellite`, `plane`, `region` | As main, the first four instants |
 | Gateway | `gateway`, with the next-nearest gateway's distance; real and assumed gateways reported apart | As main, realistic |
 
 **After recovery.** One step, best case, Hypatia's 100 cities (4,950 pairs, one way), every
@@ -610,14 +610,14 @@ failure dated an hour before the step so that everyone knows it (4.2):
 
 | Group | What fails | Repeats |
 |---|---|---|
-| Random satellites | 0.1%, 0.3%, 1%, 3%, 10% and 30% of the satellites in planes | 100 seeds each, at T_0 |
-| Random lasers | The same shares of the planned laser links | 100 seeds each, at T_0 |
+| Random satellites | 0.1%, 0.3%, 1%, 3%, 10% and 30% of the satellites in planes | 30 seeds each, at T_0 |
+| Random lasers | The same shares of the planned laser links | 30 seeds each, at T_0 |
 | Attack | The same shares of satellites, taking first those that carry the most of the 4,950 baseline routes at that instant | Once at each of the ten instants |
 | Re-pointing | Random satellites and the attack again, re-pointing on | As above |
-| Pattern | Random satellites with `plus-grid` and `six` | 100 seeds each |
+| Pattern | Random satellites with `plus-grid` and `six` | 30 seeds each |
 
 The random choices are made by `python/make_failures.py` from a seed with numpy's `default_rng`
-and written to the failure files; the seeds are 0 to 99 and are recorded in the summaries.
+and written to the failure files; the seeds are 0 to 29 and are recorded in the summaries.
 
 The real rate of unannounced losses is reported only as context: about one satellite a week
 across the fleet would mean about 0.01 failures in a two-hour run.

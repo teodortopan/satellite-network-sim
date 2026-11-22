@@ -12,7 +12,8 @@ defaults unless a group varies one: --detection-s 0.1, --hop-processing-s 0.001,
 0.1, --planner-processing-s 0, --acquisition-s 30, --repoint off, --replan-on-report off. Every
 one of these is passed explicitly.
 
-The failure instants: T_i = 21:15:00 + 300 s + i x 697 s, i = 0 to 9. A hand-picked run starts
+The failure instants: T_i = 21:15:00 + 300 s + i x 697 s, i = 0 to 9 (the main and gateway
+groups; the other hand-picked groups use i = 0 to 3). A hand-picked run starts
 at the last re-plan instant (21:15:00 + a multiple of 15 s) at least 60 s before T_i and ends
 300 s after T_i.
 
@@ -42,7 +43,7 @@ lane must hold that same route at T_i; a run where it does not fails the script.
 
 After-recovery groups: one step (--duration-s 0), best case, Hypatia's 100 cities
 (data/ground/hypatia/cities.json, --roles all: its 4,950 pairs, one way), --reactions planner,
-every failure permanent and dated an hour before the step (old news, spec 4.2). Seeds 0 to 99,
+every failure permanent and dated an hour before the step (old news, spec 4.2). Seeds 0 to 29,
 shares 0.1%, 0.3%, 1%, 3%, 10% and 30%.
 
   random-satellites    a random share of the satellites in planes, at T_0.
@@ -167,6 +168,9 @@ PLAN_TIME = "2026-11-18T21:15:00"
 STEP_S = 1
 REPLAN_S = 15
 INSTANTS = 10
+# The groups that vary one setting use only the first instants.
+SENSITIVITY_GROUPS = ("transient", "detection", "compute", "planner", "repointing")
+SENSITIVITY_INSTANTS = 4
 FIRST_OFFSET_S = 300
 INSTANT_SPACING_S = 697
 LEAD_S = 60  # A run starts at the last re-plan instant at least this long before T_i ...
@@ -179,7 +183,7 @@ ALL_REACTIONS = ("planner", "local-repair", "flooding")
 REACTIONS = ALL_REACTIONS
 
 SHARES = (0.001, 0.003, 0.01, 0.03, 0.1, 0.3)
-SEEDS = 100
+SEEDS = 30
 HAND_GROUPS = ("main", "transient", "detection", "compute", "planner", "repointing", "gateway")
 RECOVERY_GROUPS = ("random-satellites", "random-lasers", "attack", "recovery-repointing",
                    "pattern")  # fmt: skip
@@ -324,6 +328,8 @@ def hand_runs(groups, pairs, instants) -> list[HandRun]:
                         continue
                     for pair in pairs:
                         for i in instants:
+                            if group in SENSITIVITY_GROUPS and i >= SENSITIVITY_INSTANTS:
+                                continue
                             runs.append(
                                 HandRun(group, scenario, variant, model, pair, i, settings,
                                         length_s)
