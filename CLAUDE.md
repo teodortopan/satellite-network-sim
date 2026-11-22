@@ -35,7 +35,7 @@ glossary of every orbital term used here.
   Measured in a cloud session (x86-64, 4 cores, 2026-11-21): the full check takes
   about 7 minutes once the build trees exist, and longer on a session's first run,
   which compiles everything. clang-tidy is the longest step (about 8 minutes when
-  the cores are shared with other work); the 620 sanitizer tests take under a minute
+  the cores are shared with other work); the 805 sanitizer tests take under a minute
   with either compiler. Prefer `asan-clang` while iterating.
 - `python/compare_spacex.py` (against SpaceX's trajectory files) and
   `python/plot_phase1.py` (the report's plots) are run by hand; the exact
@@ -47,7 +47,7 @@ glossary of every orbital term used here.
   each script's docstring.
   So are Phase 3's 15 real-data runs (`python/run_phase3.py`, about 30 minutes) and
   `python/plot_phase3.py`, with commands in `docs/phase-3-results.md`.
-  Phase 4's runs (`python/run_phase4.py`, about 8,000 short runs, several hours; `--reuse`
+  Phase 4's runs (`python/run_phase4.py`, about 3,300 short runs, about two hours on 4 cores; `--reuse`
   picks up where a stopped run left off; failure files from `python/make_failures.py`), its
   two comparisons (`python/compare_failures.py`) and `python/plot_phase4.py` are run by hand
   as well, with commands in `docs/phase-4-results.md`.
