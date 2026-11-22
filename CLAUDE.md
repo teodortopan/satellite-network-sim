@@ -47,6 +47,10 @@ glossary of every orbital term used here.
   each script's docstring.
   So are Phase 3's 15 real-data runs (`python/run_phase3.py`, about 30 minutes) and
   `python/plot_phase3.py`, with commands in `docs/phase-3-results.md`.
+  Phase 4's runs (`python/run_phase4.py`, about 8,000 short runs, several hours; `--reuse`
+  picks up where a stopped run left off; failure files from `python/make_failures.py`), its
+  two comparisons (`python/compare_failures.py`) and `python/plot_phase4.py` are run by hand
+  as well, with commands in `docs/phase-4-results.md`.
 - `python/fetch_ground.py` downloads the ground data and
   `python/make_assumed_gateways.py` derives the assumed gateways; both by hand.
   `python/fetch_lens.py` downloads the LENS ping files (one request each, no
@@ -76,12 +80,12 @@ glossary of every orbital term used here.
 | `apps/constellation/` | The `constellation` program: each satellite's shell, plane and position, or why it has none |
 | `apps/topology/` | The `topology` program: delay per city pair, direction and time step, under two endpoint models |
 | `apps/routing/` | The `routing` program: each direction's route over time under several strategies, with the cause of every drop |
-| `apps/failures/` | The `failures` program: what a failure schedule causes over time, the truth and each actor's view, every lane (baseline, reference, planner, local repair) stepped through it in continuous time, its measures, checks and CSVs |
+| `apps/failures/` | The `failures` program: what a failure schedule causes over time, the truth and each actor's view, every lane (baseline, reference, planner, local repair, flooding) stepped through it in continuous time, its measures, checks and CSVs |
 | `apps/inputs/` | What `topology` and `routing` share: loading the snapshot and ground data, city pairs, positions and link states per step |
 | `apps/common/` | Helpers every program shares: CSV, statistics, time steps, arguments |
 | `tests/<module>/` | GoogleTest per module, with small fixtures |
 | `tests/failures_app/` | The `failures` program's core on hand-made geometry, re-matching on ideal shells, the real geometry against `StepSource` |
-| `python/` | Snapshot and ground-data download, reference generation, validation (three independent models), SpaceX comparison, the Phase 2 runs, the Phase 3 reproductions, plots |
+| `python/` | Snapshot and ground-data download, reference generation, validation (four independent models), SpaceX comparison, the Phase 2 runs, the Phase 3 reproductions, the Phase 4 failure files, runs and comparisons, plots |
 | `data/starlink/<date>/` | One dated snapshot: element sets, IERS file, trajectory checksums |
 | `data/ground/` | Cities and pairs; per date: SpaceX's PoP and location files, the community gateway list, assumed gateways; `hypatia/`: Hypatia's 100 cities |
 | `data/lens/<date>/` | Checksums of the LENS dish ping files (the files are not in git) |
@@ -170,6 +174,16 @@ constellation, ground, topology), never the reverse. `failure` may depend on
 - Prefer deciding whether a laser link is permanent from the widest angle the
   two satellites ever reach over the link's state at one instant, because a pair
   in sight at the reference time can be out of sight half an orbit later.
+- Prefer building a plan from what the planner (or a satellite) knows over the true network,
+  because after a failure the two differ until the news arrives, and that gap is what Phase 4
+  measures. The truth decides only whether traffic gets through.
+- Prefer one fixed list of laser links for a run (the planned ones, then every repair link the
+  run will ever have, each with a status over time) over a list that grows while stepping,
+  because link states, graphs and checks all index links by position.
+- Prefer taking a satellite as down only from news that cannot have come from itself over "all
+  its laser links are known down", because a working satellite whose neighbours all failed
+  still carries traffic between two ground sites: that guess made every view wrong for good
+  at a 30% failed share.
 - Prefer exact IEEE arithmetic over `-ffast-math`, because it breaks the
   bit-level agreement with the published SGP4 cases and differs between
   arm64 (local) and x86-64 (CI).
@@ -238,6 +252,9 @@ The rules from the owner's global file that this project relies on.
 - **Docker in the cloud:** it is installed but the daemon does not start by
   itself; run `dockerd` in the background (or have the environment's setup script
   do it) before `scripts/check.sh`. The image is rebuilt in every new session.
+  After the session's worker restarts, `dockerd` can fail with "timeout waiting for
+  containerd": stop any `containerd`, delete `/var/run/docker/containerd/containerd.pid` and
+  `/var/run/docker.pid`, and start it again.
   If the image build fails at `pip install` with a certificate error (the cloud's proxy
   re-signs HTTPS), build it from a copy of the Dockerfile outside the repo that also copies
   `/root/.ccr/ca-bundle.crt` in and sets `PIP_CERT` to it, tag it `satsim-ci`, and run
