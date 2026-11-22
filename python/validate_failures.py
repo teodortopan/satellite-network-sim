@@ -49,6 +49,18 @@ report_hops, flood_nodes, flood_last_s, messages), every row of the floods CSV, 
 row's state, cause, element, route, delay, ideal delay (the lane's own true network) and
 plan, every row of the measures CSV (to 1e-9) and every row of the network CSV.
 
+Cases (CASES below; Hypatia's shell from its epoch, 1 s steps, re-plan every 15 s, Hypatia's
+ground range, New York -> London and Frankfurt -> Singapore one way, lowest-delay and
+keep-until-broken, all three reaction modes; the failures are picked from the baseline route
+at 7 s and written as failure files):
+  satellite-three  `three` plan, the route's middle satellite, 40 s, whole-interval
+  laser-grid       +Grid, the route's middle laser link, 40 s, whole-interval
+  transient-three  `three`, the middle laser link for 10 s, acquisition 5 s
+  repoint-three    `three`, two satellites whose cross-plane partners face each other,
+                   --repoint on, acquisition 2 s (in-plane and cross-plane repair links)
+  report-three     `three`, the middle satellite, --replan-on-report on, `start`, 25 s
+  after-recovery   one step, 3% of the satellites failed an hour before, --repoint on
+
 Not modelled: the realistic endpoint model, gateway failures, the `longest-lived` and
 `threshold` strategies, links between shells.
 
@@ -1035,6 +1047,7 @@ class Timeline:
         self.laser_use[(x, side_x)] = i
         self.laser_use[(y, side_y)] = i
         carry = t + s.acquisition_s
+        happened = carry
         if k == 0:
             # 4.8 Details, old failures: carries from the failure instant plus the acquisition
             # time, or from the first step if that is earlier.
@@ -1045,12 +1058,17 @@ class Timeline:
                 for laser in ((x, side_x), (y, side_y))
             ]
             if all(f < 0.0 for f in freed):
-                carry = max(max(freed) + s.acquisition_s, 0.0)
+                happened = max(freed) + s.acquisition_s
+                carry = max(happened, 0.0)
         link.carry_s = carry
         self.repairs.append(RepairRecord(x, y, side_x, side_y, k, carry))
         if carry <= t:
             link.set(t, "in_force")
-            self.facts.append(Fact(("link", link.pair), "up", t, True))
+            # SPEC-GAP: the instant of an old repair link's "up" fact is when its acquisition
+            # ended (the failure instant plus the acquisition time, before the start), as the
+            # program writes it; 0 for a link between two lasers that never had a partner.
+            t_s = happened if math.isfinite(happened) else t
+            self.facts.append(Fact(("link", link.pair), "up", t_s, True))
             return
         link.set(t, "acquiring")
         link.generation += 1
@@ -1229,6 +1247,8 @@ class Model:
         for fact in self.facts:
             if fact.old:
                 fact.planner_known_s = 0.0
+                if self.flooding:
+                    fact.flood_nodes, fact.flood_last_s, fact.messages = 0, INF, 0
                 continue
             for node, d in fact.detectors:
                 # 4.4 Details: a detection after the last step sends no report.
@@ -1682,9 +1702,11 @@ def measures(
     reference: list[Interval],
     t_f: float | None,
     settings: Settings,
+    steps: tuple[list[Sample], list[Sample]] | None = None,
 ) -> Measures:
-    """4.7 for one lane. Without a failure that is not old news, every measure that counts
-    from t_f is none (4.7)."""
+    """4.7 for one lane; `steps` holds the lane's and the baseline's state at each step (with
+    that step's delay, which an interval does not keep). Without a failure that is not old
+    news, every measure that counts from t_f is none (4.7)."""
     m = Measures()
     if t_f is None:
         return m
@@ -1722,8 +1744,12 @@ def measures(
         m.settle_s = last_differ_end - t_f
 
     def extra_at(k: int) -> float | None:
-        t = settings.instant(k)
-        mine, base = sample_at(lane, t), sample_at(baseline, t)
+        # 4.10 Details: per step, the lane's delay minus the baseline's at that step.
+        if steps is None:
+            t = settings.instant(k)
+            mine, base = sample_at(lane, t), sample_at(baseline, t)
+        else:
+            mine, base = steps[0][k], steps[1][k]
         if mine.state == "delivered" and base.state == "delivered":
             return (mine.delay_s - base.delay_s) * 1e3  # type: ignore[operator]
         return None
@@ -1823,9 +1849,10 @@ def route_text(route: tuple[int, ...], ids: list[int]) -> str:
 
 def fact_row(f: Fact, ids: list[int], flooding: bool) -> dict[str, str]:
     # 4.4 Details: an old fact has no detectors, no reports and no flood; the planner knows
-    # it from the first step (0).
+    # it from the first step (0). As a fact nobody detects in the run, its flood columns are
+    # 0 nodes, `never` and 0 messages (4.10 Details).
     detectors = ";".join(f"{node_text(n, ids)}@{instant_text(t)}" for n, t in f.detectors)
-    flood = flooding and not f.old
+    flood = flooding
     return {
         "fact": str(f.number),
         "subject": element_text(f.subject, ids),
@@ -1862,7 +1889,9 @@ def compare_events(rows, lanes, ids, end_s) -> list[str]:
     for r in rows:
         got.setdefault((r["from"], r["to"], r["strategy"], r["reaction"]), []).append(r)
     for key, lane in lanes.items():
-        want = intervals_of(lane.samples, end_s)
+        # SPEC-GAP: an interval of no length (a one-step run, or a change at the last step's
+        # instant) is not written; read from the program, the spec does not say.
+        want = [x for x in intervals_of(lane.samples, end_s) if x.end_s > x.start_s]
         have = got.pop(key, [])
         where = " ".join(key)
         if len(have) != len(want):
@@ -2114,7 +2143,12 @@ def model_measures(lanes, src, dst, strategy, kind, t_f, settings: Settings) -> 
     def iv(k: str) -> list[Interval]:
         return intervals_of(lanes[(src, dst, strategy, k)].samples, settings.end_s)
 
-    return measures(iv(kind), iv("baseline"), iv("reference"), t_f, settings)
+    def at_steps(k: str) -> list[Sample]:
+        by_t = dict(lanes[(src, dst, strategy, k)].samples)
+        return [by_t[settings.instant(j)] for j in range(settings.steps)]
+
+    steps = (at_steps(kind), at_steps("baseline"))
+    return measures(iv(kind), iv("baseline"), iv("reference"), t_f, settings, steps)
 
 
 # ---------------------------------------------------------------------------------------
@@ -2161,10 +2195,10 @@ CASES = [
         planner="start",
         duration_s=25,
     ),
-]
-BY_HAND = [
+    # Old news only: one step, 3% of the satellites failed an hour before, re-pointing on.
     Case("after-recovery", "three", "old-random", duration_s=0, repoint=True, acquisition_s=30.0),
 ]
+BY_HAND: list[Case] = []
 
 
 def run_failures(
@@ -2366,7 +2400,15 @@ def run_case(case: Case, exe: Path | None, args, work: Path) -> list[str]:
     if exe is None:
         return []
     _, out = run_failures(exe, snapshot, args.ground, cities_path, case, failures_path, work)
-    problems = compare_events(out["events"], lanes, world.ids, s.end_s)
+    counts = {name: len(rows) for name, rows in out.items()}
+    print(f"  program rows compared: {counts}")
+    expected = {
+        "events": s.end_s > 0.0,
+        "floods": any(f.flood_nodes for f in model.facts),
+    }
+    empty = [name for name, n in counts.items() if n == 0 and expected.get(name, True)]
+    problems = [f"the program wrote no {name} rows" for name in empty]
+    problems += compare_events(out["events"], lanes, world.ids, s.end_s)
     fact_problems, numbers = compare_facts(out["facts"], model.facts, world.ids, model.flooding)
     problems += fact_problems
     problems += compare_floods(out["floods"], numbers, world.ids)
