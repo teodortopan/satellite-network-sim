@@ -84,6 +84,7 @@ struct Scene {
                                             .acquisition_s = 30.0,
                                             .repoint = false};
   bool replan_on_report = false;
+  std::int64_t slot_ns = 10'000'000'000;
   satsim::routing_app::EngineNetwork network;
   std::vector<satsim::routing::Strategy> strategies = {satsim::routing::Strategy{}};
   Timeline timeline;
@@ -124,7 +125,7 @@ struct Scene {
             satsim::routing_app::EngineSettings{.strategies = strategies,
                                                 .step_ns = 1'000'000'000,
                                                 .replan_ns = 10'000'000'000,
-                                                .slot_ns = 10'000'000'000,
+                                                .slot_ns = slot_ns,
                                                 .planner = satsim::routing_app::Planner::kStart,
                                                 .serving = {},
                                                 .backup = false,
@@ -182,8 +183,25 @@ struct Expect {
   std::optional<double> delay_s = std::nullopt;
 };
 
+// Every interval of a lane, one per line, for a failure message.
+std::string describe(const std::vector<Interval>& got) {
+  std::string out;
+  for (const Interval& iv : got) {
+    out += "[" + std::to_string(iv.start_s) + ", " + std::to_string(iv.end_s) + ") " +
+           std::string(satsim::failures_app::name_of(iv.status.state)) + " route";
+    for (const std::size_t node : iv.status.route) {
+      out += " " + std::to_string(node);
+    }
+    if (iv.status.element) {
+      out += " element " + std::to_string(iv.status.element->index);
+    }
+    out += "\n";
+  }
+  return out;
+}
+
 void expect_intervals(const std::vector<Interval>& got, const std::vector<Expect>& want) {
-  ASSERT_EQ(got.size(), want.size());
+  ASSERT_EQ(got.size(), want.size()) << describe(got);
   for (std::size_t i = 0; i < want.size(); ++i) {
     SCOPED_TRACE(i);
     EXPECT_NEAR(got[i].start_s, want[i].start_s, 1e-12);
@@ -516,6 +534,115 @@ TEST(LoopTest, RealisticDishRepairSharedByTwoDirections) {
                      {{0.0, 5.0, DirectionState::kDelivered, before},
                       {5.0, 10.0, DirectionState::kBlackHole, before, satellite(0)},
                       {10.0, kEnd, DirectionState::kDelivered, after}});
+  }
+  EXPECT_EQ(scene.lane(LaneKind::kLocalRepair, 0)[2].serving, std::optional<std::size_t>(4));
+  EXPECT_EQ(scene.loop->repairs(), 2U);
+  EXPECT_EQ(scene.loop->checks().total(), 0U);
+}
+
+// The bug of a plan on a report made before the dish's repair at the same instant. As
+// RealisticDishRepairSharedByTwoDirections, but gateway g1 also sees satellite 0 (at 2800 km:
+// 0 g1 is 3300 km against 0 1 5 g0's 3000, so the routes before are unchanged), and
+// --replan-on-report is on. Satellite 0 fails at 5 s; g1 detects it at 5.1 s and its report
+// takes no time, so the planner knows at 5.1 s, the instant the dish repairs. At one instant
+// local repairs come before a plan on a report: at 5.1 s the dish picks 4 and both directions
+// continue 4 g1; the plan on the report then finds the dish on 4, its planning graph lacks the
+// dead hop (dish to 0), and plans as usual: the same routes. The later reports (0-1 from 1,
+// 0-4 from 4) plan the same again. The bug: the plan came first, found no route (the dish still
+// on 0, which the view has down) and cleared both routes; the repair then left the lanes with
+// no route until the slot start at 10 s.
+TEST(LoopTest, PlanOnAReportAtTheInstantOfADishRepairComesAfterTheRepair) {
+  Scene scene(EndpointModel::kRealistic);
+  make_realistic(scene);
+  scene.geometry.base.gateway_visible[1] = {seen(0, 2800.0), seen(4, 900.0)};
+  scene.replan_on_report = true;
+  scene.run({failure_at(ElementKind::kSatellite, 0, 5.0)});
+  ASSERT_EQ(known(scene.timeline, satellite(0)), 5.0 + 0.1);
+  for (std::size_t d = 0; d < 2; ++d) {
+    SCOPED_TRACE(d);
+    const std::size_t end = 30 + d;
+    expect_intervals(scene.lane(LaneKind::kLocalRepair, d),
+                     {{0.0, 5.0, DirectionState::kDelivered, {32, 0, 1, 5, 28, end}},
+                      {5.0, 5.1, DirectionState::kBlackHole, {32, 0, 1, 5, 28, end}, satellite(0)},
+                      {5.1, kEnd, DirectionState::kDelivered, {32, 4, 29, end}}});
+  }
+  EXPECT_EQ(scene.loop->checks().total(), 0U);
+}
+
+// The order itself, in the same run: the plans on the reports of local repair (at 5.1 s and at
+// the later reports) all find a route, since the dish was repaired first; the planner's plan at
+// 5.1 s, with its dish still on the dead 0, finds none (and so do its later plans on reports,
+// until the slot start at 10 s).
+TEST(LoopTest, PlanOnAReportAtTheInstantOfADishRepairFindsARoute) {
+  Scene scene(EndpointModel::kRealistic);
+  make_realistic(scene);
+  scene.geometry.base.gateway_visible[1] = {seen(0, 2800.0), seen(4, 900.0)};
+  scene.replan_on_report = true;
+  scene.run({failure_at(ElementKind::kSatellite, 0, 5.0)});
+  for (std::size_t d = 0; d < 2; ++d) {
+    SCOPED_TRACE(d);
+    const auto& repair = scene.loop->engine(scene.engine_of(LaneKind::kLocalRepair)).measures();
+    const auto& planner = scene.loop->engine(scene.engine_of(LaneKind::kPlanner)).measures();
+    EXPECT_EQ(repair.at(d).no_route, 0U);
+    EXPECT_GE(planner.at(d).no_route, 1U);
+  }
+  EXPECT_EQ(scene.loop->checks().total(), 0U);
+}
+
+// The same at a step instant: detection 0.5 s, satellite 0 failing at 4.5 s, so the dish repairs
+// and the planner learns (from g1) at 5 s, a step that is no regular plan.
+TEST(LoopTest, PlanOnAReportAtAStepInstantOfADishRepairComesAfterTheRepair) {
+  Scene scene(EndpointModel::kRealistic);
+  make_realistic(scene);
+  scene.geometry.base.gateway_visible[1] = {seen(0, 2800.0), seen(4, 900.0)};
+  scene.times.detection_s = 0.5;
+  scene.replan_on_report = true;
+  scene.run({failure_at(ElementKind::kSatellite, 0, 4.5)});
+  ASSERT_EQ(known(scene.timeline, satellite(0)), 5.0);
+  for (std::size_t d = 0; d < 2; ++d) {
+    SCOPED_TRACE(d);
+    const std::size_t end = 30 + d;
+    expect_intervals(scene.lane(LaneKind::kLocalRepair, d),
+                     {{0.0, 4.5, DirectionState::kDelivered, {32, 0, 1, 5, 28, end}},
+                      {4.5, 5.0, DirectionState::kBlackHole, {32, 0, 1, 5, 28, end}, satellite(0)},
+                      {5.0, kEnd, DirectionState::kDelivered, {32, 4, 29, end}}});
+    const auto& repair = scene.loop->engine(scene.engine_of(LaneKind::kLocalRepair)).measures();
+    EXPECT_EQ(repair.at(d).no_route, 0U);
+  }
+  EXPECT_EQ(scene.loop->checks().total(), 0U);
+}
+
+// The bug of a dish repair that skipped a lane holding no route. As
+// RealisticDishRepairSharedByTwoDirections, with g1 also seeing satellite 0 (at 2800 km),
+// detection 0.5 s and slot starts every 20 s (plans every 10 s). Satellite 0 fails at 9.5 s:
+// g1 detects at 10 s, so the planner's regular plan of 10 s (no slot start) knows 0 is down
+// while the dish still holds it: it finds no route and clears both lanes' routes. The dish
+// knows at 9.5 + 0.5 = 10 s (its traffic has passed 0 since 9.5 s, whatever route the lanes
+// hold) and picks again: satellite 4. Every lane of the city, with a route or not, continues
+// from 4 on the shortest path of the last planning graph avoiding 0: 4 g1, delivered from
+// 10 s. The bug: the lanes without a route were skipped (and the pass instant was taken from
+// the cleared route's interval, 10 s, so the repair came at 10.5 s), no route until 20 s.
+TEST(LoopTest, DishRepairGivesTheNewRouteToALaneThatAPlanLeftWithoutOne) {
+  Scene scene(EndpointModel::kRealistic);
+  make_realistic(scene);
+  scene.geometry.base.gateway_visible[1] = {seen(0, 2800.0), seen(4, 900.0)};
+  scene.times.detection_s = 0.5;
+  scene.slot_ns = 20'000'000'000;
+  scene.run({failure_at(ElementKind::kSatellite, 0, 9.5)});
+  ASSERT_EQ(known(scene.timeline, satellite(0)), 10.0);
+  for (std::size_t d = 0; d < 2; ++d) {
+    SCOPED_TRACE(d);
+    const std::size_t end = 30 + d;
+    expect_intervals(scene.lane(LaneKind::kLocalRepair, d),
+                     {{0.0, 9.5, DirectionState::kDelivered, {32, 0, 1, 5, 28, end}},
+                      {9.5, 10.0, DirectionState::kBlackHole, {32, 0, 1, 5, 28, end}, satellite(0)},
+                      {10.0, kEnd, DirectionState::kDelivered, {32, 4, 29, end}}});
+    // The planner's dish waits for the slot start at 20 s.
+    expect_intervals(scene.lane(LaneKind::kPlanner, d),
+                     {{0.0, 9.5, DirectionState::kDelivered, {32, 0, 1, 5, 28, end}},
+                      {9.5, 10.0, DirectionState::kBlackHole, {32, 0, 1, 5, 28, end}, satellite(0)},
+                      {10.0, 20.0, DirectionState::kBlackHole, {}, satellite(0)},
+                      {20.0, kEnd, DirectionState::kDelivered, {32, 4, 29, end}}});
   }
   EXPECT_EQ(scene.lane(LaneKind::kLocalRepair, 0)[2].serving, std::optional<std::size_t>(4));
   EXPECT_EQ(scene.loop->repairs(), 2U);

@@ -191,10 +191,16 @@ struct FloodLane {
   routing_app::Responsible responsible;
 };
 
-// A flooding dish (realistic).
+// A flooding dish (realistic). It knows only what it found out itself (and the old facts).
 struct FloodDish {
   /// When it picks again: it knows its serving satellite is dead, plus compute_s.
   std::optional<double> repick_s = std::nullopt;
+  /// When it knows that satellite is dead, and which it is.
+  std::optional<double> knows_s = std::nullopt;
+  std::optional<std::size_t> dead = std::nullopt;
+  /// Satellites it knows are dead -> the instant it starts using that (knowing + compute_s; 0
+  /// for an old fact). Never forgotten during a run: it does not learn of a return.
+  std::map<std::size_t, double> known_dead;
 };
 
 struct Slot {
@@ -210,6 +216,10 @@ struct Slot {
   network::Graph planning;
   std::vector<LaneRepair> repairs;
   std::vector<DishRepair> dishes;
+  /// Per dish: its serving satellite as last seen, and the instant it got it (the instant its
+  /// traffic first passes that satellite, whatever route its lanes hold).
+  std::vector<std::optional<std::size_t>> serving_seen;
+  std::vector<double> serving_since;
   /// The truth graph of the current instant, with this engine's serving satellites.
   network::Graph graph;
   // Flooding only: per lane (d * S + s, only the flooding strategy's used) and per dish.
@@ -372,10 +382,20 @@ FailureLoop::FailureLoop(const Timeline& timeline, routing_app::EngineNetwork ne
     slot.last_closed.assign(lanes, std::nullopt);
     slot.repairs.assign(lanes, LaneRepair{});
     slot.dishes.assign(slot.engine->layout().serving_dish_count(), DishRepair{});
+    slot.serving_seen.assign(slot.engine->layout().serving_dish_count(), std::nullopt);
+    slot.serving_since.assign(slot.engine->layout().serving_dish_count(), 0.0);
     slot.graph = network::Graph(slot.engine->layout().node_count());
     if (kind == LaneKind::kFlooding) {
       slot.flood.assign(lanes, FloodLane{});
       slot.flood_dishes.assign(slot.engine->layout().serving_dish_count(), FloodDish{});
+      // Old news every actor has from the first step.
+      for (const Fact& f : timeline.facts) {
+        if (f.old && f.down && f.subject.kind == SubjectKind::kSatellite) {
+          for (FloodDish& fd : slot.flood_dishes) {
+            fd.known_dead.emplace(f.subject.index, 0.0);
+          }
+        }
+      }
       st.flood_tables = std::make_unique<FloodTables>(timeline, slot.engine->layout());
     }
     st.slots.push_back(std::move(slot));
@@ -515,6 +535,7 @@ class LoopStep {
   }
   [[nodiscard]] std::optional<std::string> evaluate(Slot& slot, bool rebuild);
   [[nodiscard]] std::optional<std::string> repairs_at(double t);
+  void note_serving(Slot& slot, double t) const;
   [[nodiscard]] std::optional<RepairPlan> repair_plan(const Slot& slot, std::size_t d,
                                                       std::size_t s, double t) const;
   [[nodiscard]] double knowing_instant(const Subject& fact_subject, std::size_t control_node,
@@ -522,6 +543,7 @@ class LoopStep {
   void after_plan(std::size_t e, double t, bool plan, bool slot_start,
                   std::vector<routing_app::RouteRow>* rows);
   [[nodiscard]] std::optional<std::string> replan_on_report(double t);
+  [[nodiscard]] std::optional<std::string> plan_on_report_at(double t);
   void record(double t, bool at_step);
   void check(std::size_t e, std::size_t d, std::size_t s, const Status& status, double t);
   [[nodiscard]] std::optional<double> next_instant(double after, double before) const;
@@ -534,8 +556,8 @@ class LoopStep {
  private:
   [[nodiscard]] std::optional<std::size_t> actor_of(const Slot& slot, std::size_t node) const;
   [[nodiscard]] std::optional<std::string> flood_plan(Slot& slot, std::int64_t k);
-  [[nodiscard]] std::optional<std::size_t> flood_pick(Slot& slot, std::size_t dish,
-                                                      std::optional<std::size_t> leave_out);
+  [[nodiscard]] std::optional<std::size_t> flood_pick(Slot& slot, std::size_t dish, double t);
+  static void flood_learn(FloodDish& fd, double t);
   void flood_schedule(Slot& slot, std::size_t dish, double since);
   void flood_repicks(Slot& slot, double t);
   [[nodiscard]] std::optional<std::string> flood_evaluate(Slot& slot, double t);
@@ -629,7 +651,11 @@ std::optional<RepairPlan> LoopStep::repair_plan(const Slot& slot, std::size_t d,
       double failed_s = pass_s;
       (void)knowing_instant(element, nodes.node_count(), t, pass_s, failed_s);
       plan.failed_s = failed_s;
-      know = pass_s + st_->settings.times.detection_s;
+      // The dish's traffic has passed the dead satellite since it failed or since the dish got
+      // it, whichever is later, whatever route its lanes hold (a plan that found no route
+      // because of it changes nothing for the dish).
+      plan.pass_s = std::max(failed_s, slot.serving_since.at(dish));
+      know = plan.pass_s + st_->settings.times.detection_s;
     } else {
       const std::optional<std::size_t> at = node_at(l.satellite(element.index));
       if (!at || *at == 0) {
@@ -689,7 +715,7 @@ std::optional<RepairPlan> LoopStep::repair_plan(const Slot& slot, std::size_t d,
                            failed_s);
     plan.failed_s = failed_s;
   }
-  plan.at_s = std::max(know, pass_s);
+  plan.at_s = std::max(know, plan.pass_s);
   if (st_->hooks.repair_instant) {
     plan.at_s = st_->hooks.repair_instant(plan.at_s);
   }
@@ -734,19 +760,23 @@ std::optional<std::string> LoopStep::repairs_at(double t) {
             seen.city_visible = cities;
             const std::optional<std::size_t> pick =
                 slot.engine->pick_serving(st_->truth, seen, city);
+            // Every lane of the city continues from the new satellite, also one that holds no
+            // route (a plan that found none because of the dead serving satellite cleared it).
             for (std::size_t d2 = 0; d2 < st_->d_count(); ++d2) {
-              if (st_->network.directions[d2].from != city) {
+              if (st_->network.directions[d2].from != city ||
+                  !st_->network.directions[d2].has_home_pop) {
                 continue;
               }
               for (std::size_t s2 = 0; s2 < st_->s_count(); ++s2) {
                 LaneRepair& lr = slot.repairs[lane(d2, s2)];
                 lr.repaired = true;
-                if (!pick || slot.engine->lane_route(d2, s2).empty()) {
+                if (!pick) {
                   continue;
                 }
                 const std::size_t source = slot.engine->source_node(d2, s2);
                 const network::ShortestPaths paths = network::shortest_paths_avoiding(
-                    slot.planning, l.satellite(*pick), std::vector<std::size_t>{dead, source});
+                    slot.planning, l.satellite(*pick),
+                    std::vector<std::size_t>{l.satellite(dead), source});
                 const routing::Route tail = paths.path_to(slot.engine->target_node(d2));
                 if (tail.empty()) {
                   continue;
@@ -762,6 +792,7 @@ std::optional<std::string> LoopStep::repairs_at(double t) {
             if (pick) {
               slot.engine->set_serving(dish, pick);
               dr.serving = pick;
+              note_serving(slot, t);
             }
             continue;
           }
@@ -793,6 +824,16 @@ std::optional<std::string> LoopStep::repairs_at(double t) {
     }
   }
   return std::nullopt;
+}
+
+void LoopStep::note_serving(Slot& slot, double t) const {
+  for (std::size_t i = 0; i < slot.serving_seen.size(); ++i) {
+    const std::optional<std::size_t> serving = slot.engine->serving_of(i);
+    if (serving != slot.serving_seen[i]) {
+      slot.serving_seen[i] = serving;
+      slot.serving_since[i] = t;
+    }
+  }
 }
 
 void LoopStep::after_plan(std::size_t e, double t, bool plan, bool slot_start,
@@ -850,6 +891,22 @@ std::optional<std::string> LoopStep::replan_on_report(double t) {
     after_plan(e, t, true, false, nullptr);
   }
   return std::nullopt;
+}
+
+// The plan on a report at t (after the local repairs of t), the lanes evaluated again, then any
+// repair the plan made due at t.
+std::optional<std::string> LoopStep::plan_on_report_at(double t) {
+  if (auto error = replan_on_report(t)) {
+    return error;
+  }
+  for (Slot& slot : st_->slots) {
+    if (slot.kind == LaneKind::kPlanner || slot.kind == LaneKind::kLocalRepair) {
+      if (auto error = evaluate(slot, true)) {
+        return error;
+      }
+    }
+  }
+  return repairs_at(t);
 }
 
 void LoopStep::check(std::size_t e, std::size_t d, std::size_t s, const Status& status, double t) {
@@ -1129,29 +1186,57 @@ std::optional<std::string> LoopStep::flood_plan(Slot& slot, std::int64_t k) {
   return std::nullopt;
 }
 
-std::optional<std::size_t> LoopStep::flood_pick(Slot& slot, std::size_t dish,
-                                                std::optional<std::size_t> leave_out) {
+// The serving rule's pick of a flooding dish at t among what its city sees by geometry (the
+// step's visible list, failed satellites in it), leaving out only the satellites the dish
+// itself knows are dead and uses that by t. It may pick a dead satellite it cannot know about.
+std::optional<std::size_t> LoopStep::flood_pick(Slot& slot, std::size_t dish, double t) {
+  const FloodDish& fd = slot.flood_dishes.at(dish);
   const StepGround now = st_->truth.step(0);
   std::vector<std::vector<VisibleSatellite>> cities(now.city_visible.begin(),
                                                     now.city_visible.end());
-  if (leave_out) {
-    std::erase_if(cities.at(dish),
-                  [&](const VisibleSatellite& v) { return v.satellite == *leave_out; });
-  }
+  cities.at(dish) = st_->world->geometry(0).city_visible.at(dish);
+  std::erase_if(cities.at(dish), [&](const VisibleSatellite& v) {
+    const auto it = fd.known_dead.find(v.satellite);
+    return it != fd.known_dead.end() && it->second <= t;
+  });
   StepGround seen = now;
   seen.city_visible = cities;
   return slot.engine->pick_serving(st_->truth, seen, dish);
 }
 
+// What the dish has found out by t: its serving satellite dead, from knows_s on, used from
+// repick_s.
+void LoopStep::flood_learn(FloodDish& fd, double t) {
+  if (fd.knows_s && fd.dead && fd.repick_s && *fd.knows_s <= t) {
+    fd.known_dead.emplace(*fd.dead, *fd.repick_s);
+  }
+}
+
 void LoopStep::flood_schedule(Slot& slot, std::size_t dish, double since) {
   FloodDish& fd = slot.flood_dishes.at(dish);
   fd.repick_s.reset();
+  fd.knows_s.reset();
+  fd.dead.reset();
   const std::optional<std::size_t> serving = slot.engine->serving_of(dish);
   if (!serving) {
     return;
   }
-  // The first failure of it from `since` on that it is still in at the detection instant.
+  // Picked while the dish already knows it is dead but does not use that yet: it picks again
+  // when it does.
+  if (const auto it = fd.known_dead.find(*serving); it != fd.known_dead.end()) {
+    fd.dead = serving;
+    fd.repick_s = std::max(it->second, since);
+    return;
+  }
+  // It knows at the first instant, from `since` on, at which it has been sending to a dead
+  // satellite for the detection time and the satellite is still down: the pick instant if the
+  // satellite was already down then, else the instant of a later failure, plus detection_s.
+  const double detection_s = st_->settings.times.detection_s;
   std::optional<double> knows_s;
+  if (failure::satellite_down(st_->timeline->schedule, *serving, since) &&
+      failure::satellite_down(st_->timeline->schedule, *serving, since + detection_s)) {
+    knows_s = since + detection_s;
+  }
   for (const Fact& f : st_->timeline->facts) {
     if (f.subject != Subject{.kind = SubjectKind::kSatellite, .index = *serving} || !f.down ||
         f.t_s < since) {
@@ -1164,6 +1249,8 @@ void LoopStep::flood_schedule(Slot& slot, std::size_t dish, double since) {
     }
   }
   if (knows_s) {
+    fd.knows_s = knows_s;
+    fd.dead = serving;
     fd.repick_s = *knows_s + st_->settings.times.compute_s;
   }
 }
@@ -1174,8 +1261,9 @@ void LoopStep::flood_repicks(Slot& slot, double t) {
     if (!fd.repick_s || *fd.repick_s > t) {
       continue;
     }
+    flood_learn(fd, t);
     fd.repick_s.reset();
-    const std::optional<std::size_t> pick = flood_pick(slot, i, slot.engine->serving_of(i));
+    const std::optional<std::size_t> pick = flood_pick(slot, i, t);
     if (pick) {
       slot.engine->set_serving(i, pick);
       flood_schedule(slot, i, t);
@@ -1466,7 +1554,8 @@ std::optional<std::string> LoopStep::at_step(
         if (slot_start) {
           for (std::size_t i = 0; i < slot.flood_dishes.size(); ++i) {
             if (i < st_->sending.size() && st_->sending[i] != 0) {
-              slot.engine->set_serving(i, flood_pick(slot, i, std::nullopt));
+              flood_learn(slot.flood_dishes[i], t);
+              slot.engine->set_serving(i, flood_pick(slot, i, t));
               flood_schedule(slot, i, t);
             }
           }
@@ -1478,6 +1567,9 @@ std::optional<std::string> LoopStep::at_step(
     }
     if (error) {
       return error;
+    }
+    if (slot.kind == LaneKind::kLocalRepair) {
+      note_serving(slot, t);
     }
   }
   st_->baseline_ideal.assign(st_->d_count(), std::nullopt);
@@ -1501,21 +1593,17 @@ std::optional<std::string> LoopStep::at_step(
       return error;
     }
   }
-  if (st_->settings.replan_on_report && !plan &&
-      std::binary_search(st_->learning.begin(), st_->learning.end(), t)) {
-    if (auto error = replan_on_report(t)) {
-      return error;
-    }
-    for (Slot& slot : st_->slots) {
-      if (slot.kind == LaneKind::kPlanner || slot.kind == LaneKind::kLocalRepair) {
-        if (auto error = evaluate(slot, true)) {
-          return error;
-        }
-      }
-    }
-  }
+  // At one instant local repairs come before a plan on a report (spec 4.5 Details), which then
+  // sees the repaired dishes and routes; a repair the plan makes due (a route handed through an
+  // element its node knows is dead) is made after it.
   if (auto error = repairs_at(t)) {
     return error;
+  }
+  if (st_->settings.replan_on_report && !plan &&
+      std::binary_search(st_->learning.begin(), st_->learning.end(), t)) {
+    if (auto error = plan_on_report_at(t)) {
+      return error;
+    }
   }
   for (Slot& slot : st_->slots) {
     if (slot.kind == LaneKind::kFlooding) {
@@ -1590,14 +1678,6 @@ std::optional<std::string> LoopStep::at_step(
     now = flood_only ? flood.value_or(now) : others.value_or(now);
     st_->truth.bind_truth(world, now);
     if (!flood_only) {
-      const bool learns = st_->settings.replan_on_report &&
-                          std::binary_search(st_->learning.begin(), st_->learning.end(), now);
-      if (learns) {
-        st_->view.bind_view(world, view_at(*st_->timeline, st_->knowledge, now));
-        if (auto error = replan_on_report(now)) {
-          return error;
-        }
-      }
       for (Slot& slot : st_->slots) {
         if (slot.kind != LaneKind::kBaseline && slot.kind != LaneKind::kFlooding) {
           if (auto error = evaluate(slot, true)) {
@@ -1605,8 +1685,16 @@ std::optional<std::string> LoopStep::at_step(
           }
         }
       }
+      // Local repairs first, then a plan on a report (as at a step instant).
       if (auto error = repairs_at(now)) {
         return error;
+      }
+      if (st_->settings.replan_on_report &&
+          std::binary_search(st_->learning.begin(), st_->learning.end(), now)) {
+        st_->view.bind_view(world, view_at(*st_->timeline, st_->knowledge, now));
+        if (auto error = plan_on_report_at(now)) {
+          return error;
+        }
       }
     }
     for (Slot& slot : st_->slots) {
