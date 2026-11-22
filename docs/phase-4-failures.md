@@ -301,6 +301,9 @@ Details:
   edge from the repairing node to the old route's next node): that planner has not heard, and
   would only choose the dead element again. The plan is recorded as `kept`. At the first plan
   whose planning graph lacks that hop the route is planned as usual.
+- At one instant, local repairs are made before a plan on a report. A gateway's report takes
+  no time, so the planner can learn of a dead satellite at the very instant the node next to
+  it repairs.
 - With `--replan-on-report on`, a plan on a report is made for `planner` and `local-repair`,
   not for the baseline or the reference. It is a plan like any other, on the geometry of its
   step; the `whole-interval` planner looks one re-plan interval ahead from that step.
@@ -327,8 +330,12 @@ own view and its own table.
 - Between plans, traffic follows the tables hop by hop from the sending dish. With every node
   on the same view this is the planned route. While views differ it may reach a dead element
   or a node with no next hop (a black hole) or pass a node twice (a loop).
-- In the realistic model the sending dish, on learning that its serving satellite is dead,
-  picks again by its serving rule among the satellites its view says work.
+- In the realistic model a dish knows only what it found out itself: that a satellite that
+  was its serving satellite is dead, one detection time after the failure, or after picking
+  it if it was already dead. At a slot start it picks by its serving rule among the
+  satellites its city sees, leaving out those it knows are dead; so it can pick a dead one it
+  has not met, and its traffic is then a black hole until it knows and, one compute time
+  later, picks again. It does not learn that a satellite has returned.
 - "Up again" facts and new repair links are flooded the same way.
 
 ### 4.6 What a direction experiences
