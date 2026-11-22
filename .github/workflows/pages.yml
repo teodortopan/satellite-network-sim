@@ -1,0 +1,49 @@
+name: Pages
+
+# Publishes the dashboard (docs/phase-5-dashboard.md 4.9). Started by hand only, and only
+# from main: going public is the owner's decision each time.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v7
+      - uses: docker/setup-buildx-action@v4
+      - uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: docker/Dockerfile
+          tags: satsim-ci
+          load: true
+          cache-from: type=gha
+      # The engine, the full export, the data check and the built page, as scripts/ci.sh
+      # runs them anywhere.
+      - run: docker run --rm -v "$PWD":/work -w /work satsim-ci scripts/ci.sh dashboard-site
+      - uses: actions/upload-pages-artifact@v5
+        with:
+          path: dashboard/dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v5
