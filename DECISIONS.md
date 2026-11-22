@@ -390,3 +390,95 @@ Which satellite does a dish use?
 - **Why:** No published failure study gives both its setup and its numbers, and a published number only proves something under a matching setup. The exact checks can be exact: a flood has to reach each satellite at the shortest path time, and after recovery every satellite's routes have to match the planner's.
 
 - **Tradeoff:** Nothing outside the project confirms the failure numbers. That's weaker than Phases 2 and 3.
+
+## Phase 5: Dashboard
+
+### 1. What Is the Dashboard For?
+
+- **Options:** A free explorer where the visitor clicks around, a guided explainer with fixed stories, or stories that can also be explored freely.
+
+- **Chosen:** An explainer with guided stories that can also be explored freely.
+
+- **Why:** A free explorer shows dots on a globe and nobody learns anything from it. The stories carry the results of Phases 2 to 4, and exploring is how a visitor checks them.
+
+- **Tradeoff:** More work than either one alone. The visitor can only explore what the stories exported.
+
+### 2. Where Does the Data Come From?
+
+- **Options:** The engine compiled to WebAssembly and run in the browser, a server that runs the engine, or playback of runs the engine saved.
+
+- **Chosen:** Playback of saved runs. No engine in the browser, no server.
+
+- **Why:** The page then shows exactly what the checked engine computed, and it can be hosted anywhere for free. A server costs money and has to be kept running. WebAssembly would be a second build of the engine to prove right.
+
+- **Tradeoff:** The visitor can't invent a failure. Only the exported scenarios exist.
+
+### 3. How Do Satellite Positions Get to the Browser?
+
+- **Options:** Every position at 1 s steps, sampled positions with interpolation in the browser, or SGP4 in the browser through WebAssembly.
+
+- **Chosen:** Sampled positions from `propagate`, interpolated in the browser, with the interpolation error measured and stated. WebAssembly is the fallback if the files are too heavy.
+
+- **Why:** Two hours at 1 s is about 725 MB. Sampled files are tens of megabytes at most, and the error can be measured against the engine.
+
+- **Tradeoff:** Positions between samples are approximations, even if small ones. It's the one thing the browser computes.
+
+### 4. What Draws the Globe?
+
+- **Options:** CesiumJS, deck.gl, three.js.
+
+- **Chosen:** three.js.
+
+- **Why:** It draws 16,000 to 25,000 points and lines without trouble, it's small, and it needs no account or map token. Cesium is heavy and built around map tiles we don't need.
+
+- **Tradeoff:** The globe, the camera and the coastlines are ours to build.
+
+### 5. Which Stories?
+
+- **Options:** (a) the constellation, shells and laser patterns, (b) one route through time under the four strategies, (c) one failure under the three reaction modes side by side, (d) the network falling apart.
+
+- **Chosen:** All four, built in the order c, b, a, d.
+
+- **Why:** The failure story is the one nobody else shows and the hardest, so it goes first. If time runs out, the last ones are the easiest to drop.
+
+- **Tradeoff:** Four stories is a lot of interface for one page.
+
+### 6. How Is Time Shown?
+
+- **Options:** One fixed speed, a speed slider, or a slider plus automatic slow motion around a failure.
+
+- **Chosen:** A speed slider plus automatic slow motion around a failure, clearly marked.
+
+- **Why:** An orbit takes 95 minutes and a flood takes a fifth of a second. No single speed shows both.
+
+- **Tradeoff:** Slow motion can mislead about how fast things are, so it has to be labelled every time.
+
+### 7. Where Does the Dashboard's Data Live?
+
+- **Options:** Committed to git, stored with Git LFS, or built at deploy time.
+
+- **Chosen:** Built at deploy time by an export script. Not in git.
+
+- **Why:** Tens of megabytes of binary files don't belong in the repo, and everything can be regenerated from the committed snapshot.
+
+- **Tradeoff:** A deploy has to build the engine and run the export first, which takes minutes.
+
+### 8. Where Is It Hosted?
+
+- **Options:** GitHub Pages, Cloudflare Pages, Vercel or Netlify.
+
+- **Chosen:** GitHub Pages, deployed from `main` only when I say so. Every data file stays under 25 MiB so Cloudflare's free plan remains an option.
+
+- **Why:** It's free for a public repo and lives next to the code. The 25 MiB limit costs nothing now and keeps the way out open.
+
+- **Tradeoff:** GitHub Pages can't set the headers that threaded WebAssembly needs, so the WebAssembly fallback would be single-threaded there.
+
+### 9. Proof of Correctness
+
+- **Options:** Checking the page by eye, tests of the page's code only, or tests plus a check of the exported data against the engine.
+
+- **Chosen:** Type check, lint, unit tests, a browser test, and a data check that compares every exported number with the engine's CSV files. All of it is one new step of the check command.
+
+- **Why:** A dashboard can look right and be wrong. The data check makes sure every number shown came from the engine, and the browser test makes sure the page actually loads and draws.
+
+- **Tradeoff:** Whether the picture explains things well can't be tested. That stays a judgment.
