@@ -7,7 +7,7 @@
 satsim_add_test(satsim_failures_app_tests
   SOURCES ../topology/ideal.cpp ../failure/fixture.cpp ../topology_app/fixture.cpp
     fake_geometry.cpp world.cpp settings_test.cpp control_graph_test.cpp timeline_test.cpp
-    view_test.cpp repoint_test.cpp snapshot_geometry_test.cpp loop_test.cpp
+    view_test.cpp repoint_test.cpp snapshot_geometry_test.cpp loop_test.cpp flooding_test.cpp
     arguments_test.cpp run_test.cpp
   DEPS satsim::failures_app satsim::topology_app satsim::test_support satsim::routing_app
     satsim::app_inputs satsim::failure satsim::network satsim::topology satsim::constellation

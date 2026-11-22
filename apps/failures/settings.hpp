@@ -35,7 +35,7 @@ struct ReactionTimes {
 enum class Reaction : std::uint8_t {
   kPlanner,      ///< "planner": the planner only, at its re-plan instants.
   kLocalRepair,  ///< "local-repair": the planner, and the node before a dead element.
-  kFlooding,     ///< "flooding": every node, from its own view (not available yet).
+  kFlooding,     ///< "flooding": every node, from its own view.
 };
 
 inline constexpr std::array<Reaction, 3> kAllReactions = {

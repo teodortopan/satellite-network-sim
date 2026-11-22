@@ -5,7 +5,7 @@
 # lanes stepped through the run (loop.hpp), the measures (measures.hpp), the reports
 # (reports.hpp) and the program (arguments.hpp, run.hpp). The executable is only main().
 satsim_add_library(failures_app
-  SOURCES settings.cpp geometry.cpp control_graph.cpp timeline.cpp view.cpp loop.cpp
+  SOURCES settings.cpp geometry.cpp control_graph.cpp timeline.cpp view.cpp flooding.cpp loop.cpp
     measures.cpp reports.cpp arguments.cpp run.cpp
   DEPS satsim::routing_app satsim::app_inputs satsim::app_common satsim::failure satsim::network
     satsim::routing satsim::topology satsim::constellation satsim::ground satsim::orbit

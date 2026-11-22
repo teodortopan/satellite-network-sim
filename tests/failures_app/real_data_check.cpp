@@ -1,9 +1,10 @@
 // Spec 6.2 on the committed snapshot and ground data: with no failure file, the baseline,
 // reference, planner and local-repair rows of the failures program equal the routing program's
-// (status, drop cause, route, plan, delays to 1e-9 ms), 120 s at 1 s from 2026-11-18T21:15:00,
-// the study pairs, lowest-delay and keep-until-broken, both endpoint models and both planners.
-// Then one run with a failure: the first satellite of New York to London's route at 20 s. Built
-// only without sanitizers and not run under Valgrind, like the other snapshot checks.
+// (status, drop cause, route, plan, delays to 1e-9 ms), and the flooding rows its lowest-delay
+// rows, 120 s at 1 s from 2026-11-18T21:15:00, the study pairs, lowest-delay and
+// keep-until-broken, both endpoint models and both planners. Then one run with a failure: the
+// first satellite of New York to London's route at 20 s. Built only without sanitizers and not
+// run under Valgrind, like the other snapshot checks.
 
 #include <gtest/gtest.h>
 
@@ -13,6 +14,8 @@
 #include <filesystem>
 #include <fstream>
 #include <iostream>
+#include <map>
+#include <optional>
 #include <sstream>
 #include <string>
 #include <string_view>
@@ -58,7 +61,7 @@ std::vector<std::string> args(std::string_view model, std::string_view planner) 
           "--planner",    std::string(planner),
           "--roles",      "study",
           "--out",        "-",
-          "--reactions",  "planner,local-repair"};
+          "--reactions",  "planner,local-repair,flooding"};
 }
 
 fa::FailureRun prepare(const std::vector<std::string>& a) {
@@ -101,11 +104,26 @@ void check(std::string_view model, std::string_view planner) {
   std::ostringstream routing_csv;
   ASSERT_FALSE(ra::write_routes(std::get<ra::PreparedRun>(rp), routing_csv).error.has_value());
   const Rows g = parse_csv(routing_csv.str());
-  ASSERT_EQ(f.rows.size() - 1, 4 * (g.size() - 1));
+  // Four lanes per strategy, and flooding under lowest-delay.
+  ASSERT_EQ(f.rows.size() - 1, 4 * (g.size() - 1) + (g.size() - 1) / 2);
+  // utc, from, to, strategy -> the routing program's row.
+  std::map<std::vector<std::string>, std::vector<std::string>> routing_rows;
+  for (std::size_t i = 1; i < g.size(); ++i) {
+    routing_rows[{g[i][col("utc")], g[i][col("from")], g[i][col("to")], g[i][col("strategy")]}] =
+        g[i];
+  }
   std::size_t ok = 0;
+  std::size_t flooding = 0;
   for (std::size_t i = 1; i < f.rows.size(); ++i) {
     const auto& a = f.rows[i];
-    const auto& b = g.at(1 + (i - 1) / 4);
+    const auto found =
+        routing_rows.find({a[col("utc")], a[col("from")], a[col("to")], a[col("strategy")]});
+    ASSERT_NE(found, routing_rows.end()) << i;
+    const auto& b = found->second;
+    if (a[ra::kRoutesColumns.size()] == "flooding") {
+      ++flooding;
+      ASSERT_EQ(a[col("strategy")], "lowest-delay") << i;
+    }
     for (const std::string_view name :
          {"utc", "from", "to", "strategy", "status", "drop_cause", "route", "plan", "laser_hops",
           "serving_norad_cat_id", "gateway"}) {
@@ -122,6 +140,7 @@ void check(std::string_view model, std::string_view planner) {
     ok += b[col("status")] == "ok" ? 1U : 0U;
   }
   EXPECT_GT(ok, 0U);
+  EXPECT_EQ(flooding, (g.size() - 1) / 2);
 }
 
 TEST(FailuresRealDataCheck, NoFailureEqualsRoutingBestCaseStart) { check("best-case", "start"); }
@@ -134,7 +153,8 @@ TEST(FailuresRealDataCheck, NoFailureEqualsRoutingRealisticWholeInterval) {
 }
 
 // The first satellite of New York to London's lowest-delay route at 20 s (from the baseline
-// rows) fails then: the checks pass, and the planner lane is a black hole and then delivered.
+// rows) fails then: the checks pass, and the planner and flooding lanes are a black hole and
+// then delivered; the flooding lane settles on the reference's route.
 TEST(FailuresRealDataCheck, OneFailure) {
   std::vector<std::string> a = args("best-case", "whole-interval");
   const Outcome clean = run(prepare(a));
@@ -165,23 +185,41 @@ TEST(FailuresRealDataCheck, OneFailure) {
   const fa::FailureRun r = prepare(a);
   const Outcome failed = run(r);
   EXPECT_TRUE(failed.stats.passed());
-  bool black_hole = false;
-  bool back = false;
-  for (const fa::Interval& iv : failed.stats.intervals) {
-    const auto& pd = r.run.directions.at(iv.direction);
-    if (r.run.cities[pd.from].site.name != "New York" ||
-        r.run.cities[pd.to].site.name != "London" || iv.strategy != 0 ||
-        failed.stats.kinds.at(iv.engine) != fa::LaneKind::kPlanner) {
-      continue;
+  for (const fa::LaneKind kind : {fa::LaneKind::kPlanner, fa::LaneKind::kFlooding}) {
+    SCOPED_TRACE(std::string(fa::name_of(kind)));
+    bool black_hole = false;
+    bool back = false;
+    std::optional<std::size_t> direction;
+    for (const fa::Interval& iv : failed.stats.intervals) {
+      const auto& pd = r.run.directions.at(iv.direction);
+      if (r.run.cities[pd.from].site.name != "New York" ||
+          r.run.cities[pd.to].site.name != "London" || iv.strategy != 0 ||
+          failed.stats.kinds.at(iv.engine) != kind) {
+        continue;
+      }
+      direction = iv.direction;
+      if (iv.status.state == fa::DirectionState::kBlackHole && iv.start_s == 20.0) {
+        black_hole = true;
+      } else if (black_hole && iv.status.state == fa::DirectionState::kDelivered) {
+        back = true;
+      }
     }
-    if (iv.status.state == fa::DirectionState::kBlackHole && iv.start_s == 20.0) {
-      black_hole = true;
-    } else if (black_hole && iv.status.state == fa::DirectionState::kDelivered) {
-      back = true;
+    EXPECT_TRUE(black_hole);
+    EXPECT_TRUE(back);
+    ASSERT_TRUE(direction.has_value());
+    const std::size_t d_count = r.run.directions.size();
+    const std::size_t s_count = r.run.options.strategies.size();
+    for (std::size_t e = 0; e < failed.stats.kinds.size(); ++e) {
+      if (failed.stats.kinds[e] == kind) {
+        const fa::LaneMeasures& m =
+            failed.stats.measures.at((e * d_count + direction.value_or(0)) * s_count);
+        EXPECT_TRUE(m.settle_s.has_value());
+        EXPECT_TRUE(m.restore_s.has_value());
+      }
     }
   }
-  EXPECT_TRUE(black_hole);
-  EXPECT_TRUE(back);
+  EXPECT_EQ(failed.stats.failures.settled_differs, 0U);
+  EXPECT_EQ(failed.stats.failures.settled_tables_differ, 0U);
 }
 
 }  // namespace

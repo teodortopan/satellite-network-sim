@@ -31,7 +31,7 @@ struct Options {
   /// --acquisition-s and --repoint.
   ReactionTimes times{};
   /// --events-out, --facts-out, --floods-out, --measures-out, --network-out: not written when
-  /// unset (--floods-out is accepted and not written yet: flooding is not available).
+  /// unset (--floods-out has rows only with flooding).
   std::optional<std::filesystem::path> events_out = std::nullopt;
   std::optional<std::filesystem::path> facts_out = std::nullopt;
   std::optional<std::filesystem::path> floods_out = std::nullopt;
@@ -54,7 +54,7 @@ struct ParsedArguments {
 /// empty --events-out, --facts-out, --floods-out, --measures-out or --network-out or one of "-", a
 /// --lock-on-s other than 0 (the acquisition time is this program's lock-on) and --serving
 /// with-route (that rule gives every strategy a dish of its own; the reaction modes share one dish
-/// per city). `flooding` is accepted here; the run refuses it (run_main).
+/// per city). Flooding without lowest-delay in --strategies is refused by the run (refused).
 [[nodiscard]] ParsedArguments parse_arguments(std::span<const std::string_view> args);
 
 /// The --help text.

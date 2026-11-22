@@ -16,6 +16,7 @@
 #include <utility>
 #include <vector>
 
+#include "failures/flooding.hpp"
 #include "failures/geometry.hpp"
 #include "failures/settings.hpp"
 #include "failures/timeline.hpp"
@@ -23,8 +24,12 @@
 #include "routing/engine.hpp"
 #include "routing/graph.hpp"
 #include "routing/settings.hpp"
+#include "satsim/failure/schedule.hpp"
 #include "satsim/network/graph.hpp"
+#include "satsim/network/path.hpp"
+#include "satsim/network/paths_to.hpp"
 #include "satsim/network/shortest_path.hpp"
+#include "satsim/routing/forwarding.hpp"
 #include "satsim/routing/planner.hpp"
 #include "satsim/routing/strategy.hpp"
 #include "satsim/topology/ground_links.hpp"
@@ -174,6 +179,24 @@ bool has_edge(const network::Graph& graph, std::size_t from, std::size_t to) {
                      [&](const network::Edge& e) { return e.to == to; });
 }
 
+// A flooding lane (one per direction, of the flooding strategy).
+struct FloodLane {
+  /// The traffic's walk now (routing::walk); empty without a walk from the source.
+  routing::Route walk;
+  /// The walk at the last step instant (the plan column compares with it).
+  routing::Route step_walk;
+  /// The control nodes whose use of a fact can change the walk: the actors of its nodes.
+  std::vector<std::size_t> actors;
+  /// What Engine::evaluate named for the last drop it judged.
+  routing_app::Responsible responsible;
+};
+
+// A flooding dish (realistic).
+struct FloodDish {
+  /// When it picks again: it knows its serving satellite is dead, plus compute_s.
+  std::optional<double> repick_s = std::nullopt;
+};
+
 struct Slot {
   LaneKind kind = LaneKind::kBaseline;
   std::unique_ptr<Engine> engine;
@@ -189,6 +212,9 @@ struct Slot {
   std::vector<DishRepair> dishes;
   /// The truth graph of the current instant, with this engine's serving satellites.
   network::Graph graph;
+  // Flooding only: per lane (d * S + s, only the flooding strategy's used) and per dish.
+  std::vector<FloodLane> flood;
+  std::vector<FloodDish> flood_dishes;
 };
 
 }  // namespace
@@ -217,6 +243,8 @@ std::string_view name_of(LaneKind kind) noexcept {
       return "planner";
     case LaneKind::kLocalRepair:
       return "local-repair";
+    case LaneKind::kFlooding:
+      return "flooding";
   }
   return "?";
 }
@@ -246,6 +274,19 @@ struct FailureLoop::State {
   std::optional<double> settled_s;
   const StepWorld* world = nullptr;
   std::int64_t k = 0;
+  // Flooding.
+  std::optional<std::size_t> flood_strategy;
+  std::unique_ptr<FloodKnowledge> flood_knowledge;
+  std::unique_ptr<FloodTables> flood_tables;
+  ViewState all_in_force;
+  /// The current plan's window with every run link in force (the superset network).
+  std::vector<OverlaidStep> flood_window;
+  /// The window's steps at which a serving dish edge is tested.
+  std::size_t flood_serving_steps = 1;
+  /// Per city: whether some direction sends from it.
+  std::vector<char> sending;
+  /// The settled instant of the flooding lanes.
+  std::optional<double> flood_settled_s;
 
   State(const Timeline& tl, routing_app::EngineNetwork net, LoopSettings s, LoopHooks h)
       : timeline(&tl),
@@ -263,6 +304,11 @@ struct FailureLoop::State {
   }
   [[nodiscard]] double step_time(std::int64_t step) const {
     return static_cast<double>(step) * step_s;
+  }
+  /// Whether lane strategy s of `slot` is one the loop runs (the flooding engine's only its
+  /// strategy).
+  [[nodiscard]] bool active(const Slot& slot, std::size_t s) const {
+    return slot.kind != LaneKind::kFlooding || flood_strategy == s;
   }
 };
 
@@ -301,6 +347,18 @@ FailureLoop::FailureLoop(const Timeline& timeline, routing_app::EngineNetwork ne
       kinds.push_back(LaneKind::kPlanner);
     } else if (r == Reaction::kLocalRepair) {
       kinds.push_back(LaneKind::kLocalRepair);
+    } else if (r == Reaction::kFlooding) {
+      for (std::size_t s = 0; s < st.s_count() && !st.flood_strategy; ++s) {
+        if (st.settings.engine.strategies[s].kind == routing::StrategyKind::kLowestDelay) {
+          st.flood_strategy = s;
+        }
+      }
+      // Without lowest-delay or floods there is no flooding lane (the program refuses that).
+      if (st.flood_strategy && st.settings.floods != nullptr) {
+        kinds.push_back(LaneKind::kFlooding);
+      } else {
+        st.flood_strategy.reset();
+      }
     }
   }
   const std::size_t lanes = st.d_count() * st.s_count();
@@ -315,9 +373,43 @@ FailureLoop::FailureLoop(const Timeline& timeline, routing_app::EngineNetwork ne
     slot.repairs.assign(lanes, LaneRepair{});
     slot.dishes.assign(slot.engine->layout().serving_dish_count(), DishRepair{});
     slot.graph = network::Graph(slot.engine->layout().node_count());
+    if (kind == LaneKind::kFlooding) {
+      slot.flood.assign(lanes, FloodLane{});
+      slot.flood_dishes.assign(slot.engine->layout().serving_dish_count(), FloodDish{});
+      st.flood_tables = std::make_unique<FloodTables>(timeline, slot.engine->layout());
+    }
     st.slots.push_back(std::move(slot));
   }
   step_delays_.assign(st.slots.size() * lanes, {});
+  if (st.flood_strategy) {
+    st.flood_knowledge = std::make_unique<FloodKnowledge>(
+        timeline, *st.settings.floods, st.settings.times.compute_s, st.hooks.flood_use);
+    st.all_in_force = all_in_force_view(timeline);
+    st.sending.assign(st.network.city_count, 0);
+    for (const routing_app::EngineDirection& dir : st.network.directions) {
+      st.sending.at(dir.from) = 1;
+    }
+    // Settled once every fact that is not old has a flood, every change of the truth is made
+    // and every node uses all it will learn; then the first regular plan (realistic: also a
+    // slot start).
+    bool flooded = true;
+    for (std::size_t f = 0; f < timeline.facts.size(); ++f) {
+      if (!timeline.facts[f].old && st.settings.floods->facts.at(f).learn_s.empty()) {
+        flooded = false;
+      }
+    }
+    if (flooded) {
+      double last = timeline.changes.empty() ? 0.0 : timeline.changes.back();
+      last = std::max(last, st.flood_knowledge->last_use().value_or(0.0));
+      const std::int64_t every =
+          st.realistic() ? std::lcm(st.replan_steps, st.slot_steps) : st.replan_steps;
+      std::int64_t k = first_step_at_or_after(last, st.step_s);
+      k = (k + every - 1) / every * every;
+      if (k < st.settings.step_count) {
+        st.flood_settled_s = st.step_time(k);
+      }
+    }
+  }
 
   // The settled instant of the settled check: every fact the planner learns, learnt; every
   // change of the truth made; then the first regular plan (realistic: also a slot start).
@@ -431,9 +523,28 @@ class LoopStep {
                   std::vector<routing_app::RouteRow>* rows);
   [[nodiscard]] std::optional<std::string> replan_on_report(double t);
   void record(double t, bool at_step);
-  void check(std::size_t e, std::size_t d, std::size_t s, const Status& status);
+  void check(std::size_t e, std::size_t d, std::size_t s, const Status& status, double t);
   [[nodiscard]] std::optional<double> next_instant(double after, double before) const;
   void put(std::size_t e, std::size_t d, std::size_t s, const Status& status, double t);
+
+ public:
+  // Flooding.
+  [[nodiscard]] std::size_t flood_next(Slot& slot, std::size_t node, std::size_t target, double t);
+
+ private:
+  [[nodiscard]] std::optional<std::size_t> actor_of(const Slot& slot, std::size_t node) const;
+  [[nodiscard]] std::optional<std::string> flood_plan(Slot& slot, std::int64_t k);
+  [[nodiscard]] std::optional<std::size_t> flood_pick(Slot& slot, std::size_t dish,
+                                                      std::optional<std::size_t> leave_out);
+  void flood_schedule(Slot& slot, std::size_t dish, double since);
+  void flood_repicks(Slot& slot, double t);
+  [[nodiscard]] std::optional<std::string> flood_evaluate(Slot& slot, double t);
+  [[nodiscard]] Status flood_status(Slot& slot, std::size_t d, std::size_t s, double t,
+                                    const StepGround& now);
+  void flood_rows(Slot& slot, bool plan);
+  void flood_check(std::size_t e, std::size_t d, std::size_t s, const Status& status, double t);
+  void flood_settled(Slot& slot, double t);
+  [[nodiscard]] std::optional<double> next_flood_instant(double after, double before) const;
 
   FailureLoop::State* st_;
   std::vector<Interval>* intervals_;
@@ -741,8 +852,12 @@ std::optional<std::string> LoopStep::replan_on_report(double t) {
   return std::nullopt;
 }
 
-void LoopStep::check(std::size_t e, std::size_t d, std::size_t s, const Status& status) {
+void LoopStep::check(std::size_t e, std::size_t d, std::size_t s, const Status& status, double t) {
   const Slot& slot = st_->slots[e];
+  if (slot.kind == LaneKind::kFlooding && status.state != DirectionState::kDelivered) {
+    flood_check(e, d, s, status, t);
+    return;
+  }
   const StepGround now = st_->truth.step(0);
   const GraphLayout& l = slot.engine->layout();
   const routing_app::EngineDirection& dir = st_->network.directions[d];
@@ -884,6 +999,9 @@ void LoopStep::record(double t, bool at_step) {
     }
     for (std::size_t d = 0; d < st_->d_count(); ++d) {
       for (std::size_t s = 0; s < st_->s_count(); ++s) {
+        if (!st_->active(slot, s)) {
+          continue;
+        }
         Status& status = slot.status[lane(d, s)];
         if (st_->hooks.before_checks) {
           st_->hooks.before_checks(e, d, s, status);
@@ -891,7 +1009,7 @@ void LoopStep::record(double t, bool at_step) {
         const std::optional<Interval>& open = slot.open[lane(d, s)];
         const bool starts = !open || !open->status.same_interval(status);
         if (slot.kind != LaneKind::kBaseline && (at_step || starts)) {
-          check(e, d, s, status);
+          check(e, d, s, status, t);
         }
         put(e, d, s, status, t);
       }
@@ -935,6 +1053,385 @@ std::optional<double> LoopStep::next_instant(double after, double before) const 
   return best;
 }
 
+std::optional<std::size_t> LoopStep::actor_of(const Slot& slot, std::size_t node) const {
+  const ControlNodes& nodes = st_->timeline->nodes;
+  const NodeMeaning m = slot.engine->layout().meaning(node);
+  switch (m.kind) {
+    case NodeKind::kSatellite:
+      return nodes.satellite(m.index);
+    case NodeKind::kOpenDish:
+    case NodeKind::kReceivingDish:
+    case NodeKind::kServingDish:  // Serving dish i is city i's (with-route is refused).
+      return nodes.dish(m.index);
+    case NodeKind::kGateway:
+      return nodes.gateway(m.index);
+    case NodeKind::kEnd:
+      break;
+  }
+  return std::nullopt;
+}
+
+std::size_t LoopStep::flood_next(Slot& slot, std::size_t node, std::size_t target, double t) {
+  const std::optional<std::size_t> actor = actor_of(slot, node);
+  if (!actor) {
+    return network::kNoNode;
+  }
+  FloodKnowledge& knowledge = *st_->flood_knowledge;
+  FloodTables& tables = *st_->flood_tables;
+  const std::vector<std::size_t>& facts = knowledge.facts_at(*actor, t);
+  const NodeMeaning m = slot.engine->layout().meaning(node);
+  if (m.kind != NodeKind::kServingDish) {
+    return tables.tree(facts, target).next.at(node);
+  }
+  // A serving dish's one uplink: its serving satellite, if the planning graph would have that
+  // edge, its view does not take it as down and it reaches the target.
+  const std::optional<std::size_t> serving = slot.engine->serving_of(m.index);
+  if (!serving) {
+    return network::kNoNode;
+  }
+  for (std::size_t j = 0; j < st_->flood_serving_steps && j < st_->flood_window.size(); ++j) {
+    if (routing_app::find_visible(st_->flood_window[j].city_visible.at(m.index), *serving) ==
+        nullptr) {
+      return network::kNoNode;
+    }
+  }
+  if (marked(tables.view(facts).satellite_down, *serving)) {
+    return network::kNoNode;
+  }
+  return tables.tree(facts, target).reachable(*serving) ? *serving : network::kNoNode;
+}
+
+std::optional<std::string> LoopStep::flood_plan(Slot& slot, std::int64_t k) {
+  const StepWorld& world = *st_->world;
+  const bool whole = st_->settings.engine.planner == routing_app::Planner::kWholeInterval;
+  const std::size_t n =
+      whole ? std::min(static_cast<std::size_t>(st_->replan_steps), world.known_steps()) : 1;
+  st_->flood_window.clear();
+  st_->flood_window.reserve(n);
+  for (std::size_t j = 0; j < n; ++j) {
+    st_->flood_window.push_back(
+        overlay_view(world.geometry(j), world.geometric(j), *st_->timeline, st_->all_in_force));
+  }
+  std::vector<StepGround> grounds;
+  grounds.reserve(n);
+  for (const OverlaidStep& step : st_->flood_window) {
+    grounds.push_back(step.ground());
+  }
+  const std::size_t rest =
+      whole ? static_cast<std::size_t>(st_->slot_steps - k % st_->slot_steps) : 1;
+  network::Graph superset(slot.engine->layout().node_count());
+  if (auto error =
+          slot.engine->builder().build(grounds, serving_list(slot), rest, false, superset)) {
+    return error;
+  }
+  st_->flood_serving_steps = std::min(n, rest);
+  st_->flood_tables->plan(std::move(superset));
+  return std::nullopt;
+}
+
+std::optional<std::size_t> LoopStep::flood_pick(Slot& slot, std::size_t dish,
+                                                std::optional<std::size_t> leave_out) {
+  const StepGround now = st_->truth.step(0);
+  std::vector<std::vector<VisibleSatellite>> cities(now.city_visible.begin(),
+                                                    now.city_visible.end());
+  if (leave_out) {
+    std::erase_if(cities.at(dish),
+                  [&](const VisibleSatellite& v) { return v.satellite == *leave_out; });
+  }
+  StepGround seen = now;
+  seen.city_visible = cities;
+  return slot.engine->pick_serving(st_->truth, seen, dish);
+}
+
+void LoopStep::flood_schedule(Slot& slot, std::size_t dish, double since) {
+  FloodDish& fd = slot.flood_dishes.at(dish);
+  fd.repick_s.reset();
+  const std::optional<std::size_t> serving = slot.engine->serving_of(dish);
+  if (!serving) {
+    return;
+  }
+  // The first failure of it from `since` on that it is still in at the detection instant.
+  std::optional<double> knows_s;
+  for (const Fact& f : st_->timeline->facts) {
+    if (f.subject != Subject{.kind = SubjectKind::kSatellite, .index = *serving} || !f.down ||
+        f.t_s < since) {
+      continue;
+    }
+    const double t = f.t_s + st_->settings.times.detection_s;
+    if (failure::satellite_down(st_->timeline->schedule, *serving, t) &&
+        (!knows_s || t < *knows_s)) {
+      knows_s = t;
+    }
+  }
+  if (knows_s) {
+    fd.repick_s = *knows_s + st_->settings.times.compute_s;
+  }
+}
+
+void LoopStep::flood_repicks(Slot& slot, double t) {
+  for (std::size_t i = 0; i < slot.flood_dishes.size(); ++i) {
+    FloodDish& fd = slot.flood_dishes[i];
+    if (!fd.repick_s || *fd.repick_s > t) {
+      continue;
+    }
+    fd.repick_s.reset();
+    const std::optional<std::size_t> pick = flood_pick(slot, i, slot.engine->serving_of(i));
+    if (pick) {
+      slot.engine->set_serving(i, pick);
+      flood_schedule(slot, i, t);
+    }
+  }
+}
+
+std::optional<std::string> LoopStep::flood_evaluate(Slot& slot, double t) {
+  const StepGround now = st_->truth.step(0);
+  if (auto error = slot.engine->builder().build(std::span(&now, 1), serving_list(slot), 1, false,
+                                                slot.graph)) {
+    return error;
+  }
+  const std::size_t s = st_->flood_strategy.value_or(0);
+  for (std::size_t d = 0; d < st_->d_count(); ++d) {
+    slot.status[lane(d, s)] = flood_status(slot, d, s, t, now);
+  }
+  return std::nullopt;
+}
+
+Status LoopStep::flood_status(Slot& slot, std::size_t d, std::size_t s, double t,
+                              const StepGround& now) {
+  Engine& engine = *slot.engine;
+  const GraphLayout& l = engine.layout();
+  FloodLane& fl = slot.flood[lane(d, s)];
+  const std::size_t source = engine.source_node(d, s);
+  const std::size_t target = engine.target_node(d);
+  fl.walk.clear();
+  fl.actors.clear();
+  fl.responsible = {};
+  // What the engine names for `held` held as a route, shown as `shown`.
+  const auto by_engine = [&](routing::Route held, const routing::Route& shown) {
+    engine.hold_route(d, s, std::move(held));
+    const routing_app::LaneState ls = engine.evaluate(d, s, now, slot.graph);
+    fl.responsible = ls.responsible;
+    return status_of(false, std::nullopt, ls.cause, ls.responsible, shown);
+  };
+  if (st_->realistic() && !st_->network.directions[d].has_home_pop) {
+    return by_engine({}, {});  // no_service
+  }
+  const routing::Walk walk = routing::walk(
+      source, target, [&](std::size_t node) { return flood_next(slot, node, target, t); });
+  for (const std::size_t node : walk.path) {
+    if (const std::optional<std::size_t> actor = actor_of(slot, node)) {
+      fl.actors.push_back(*actor);
+    }
+  }
+  std::sort(fl.actors.begin(), fl.actors.end());
+  fl.actors.erase(std::unique(fl.actors.begin(), fl.actors.end()), fl.actors.end());
+  const routing::Route& path = walk.path;
+  if (walk.outcome == routing::WalkOutcome::kDeadEnd && path.size() == 1) {
+    // No way on from the source.
+    Status status = by_engine({}, {});
+    if (!status.cause) {
+      status.state = DirectionState::kNoRoute;
+      status.cause = st_->realistic() ? DropCause::kNoGateway : DropCause::kNoPath;
+    }
+    return status;
+  }
+  fl.walk = path;
+  for (std::size_t i = 0; i + 1 < path.size(); ++i) {
+    const std::size_t u = path[i];
+    const std::size_t v = path[i + 1];
+    if (has_edge(slot.graph, u, v)) {
+      continue;
+    }
+    // The first hop that is not up: a failed element there, or another reason.
+    const NodeMeaning mu = l.meaning(u);
+    const NodeMeaning mv = l.meaning(v);
+    std::optional<std::pair<DropCause, Subject>> failed;
+    if (mv.kind == NodeKind::kSatellite && marked(now.satellite_down, mv.index)) {
+      failed = std::pair{DropCause::kFailedSatellite,
+                         Subject{.kind = SubjectKind::kSatellite, .index = mv.index}};
+    } else if (mv.kind == NodeKind::kGateway && marked(now.gateway_down, mv.index)) {
+      failed = std::pair{DropCause::kFailedGateway,
+                         Subject{.kind = SubjectKind::kGateway, .index = mv.index}};
+    } else if (mu.kind == NodeKind::kSatellite && mv.kind == NodeKind::kSatellite &&
+               !marked(now.satellite_down, mu.index)) {
+      const auto it = st_->link_of.find(std::minmax(mu.index, mv.index));
+      if (it != st_->link_of.end() && now.links != nullptr &&
+          it->second < now.links->states.size() &&
+          now.links->states[it->second].down_reason == topology::LinkDownReason::kFailed) {
+        failed = std::pair{DropCause::kFailedLink,
+                           Subject{.kind = SubjectKind::kLink, .index = it->second}};
+      }
+    }
+    if (failed) {
+      Status status;
+      status.state = DirectionState::kBlackHole;
+      status.cause = failed->first;
+      status.element = failed->second;
+      status.route.assign(path.begin(), path.begin() + static_cast<std::ptrdiff_t>(i + 1));
+      return status;
+    }
+    Status status = by_engine(path, path);
+    if (status.cause && is_failure_cause(*status.cause)) {
+      // A failure further along: the cause of the walk up to the missing hop.
+      status = by_engine(
+          routing::Route(path.begin(), path.begin() + static_cast<std::ptrdiff_t>(i + 2)), path);
+    }
+    status.state = DirectionState::kNoRoute;
+    status.element.reset();
+    return status;
+  }
+  Status status;
+  status.route = path;
+  switch (walk.outcome) {
+    case routing::WalkOutcome::kDelivered:
+      status.state = DirectionState::kDelivered;
+      status.delay_s = network::path_delay_s(slot.graph, path);
+      break;
+    case routing::WalkOutcome::kDeadEnd:
+      status.state = DirectionState::kBlackHole;  // A later node with no next hop.
+      break;
+    case routing::WalkOutcome::kLoop:
+      status.state = DirectionState::kLoop;
+      break;
+  }
+  return status;
+}
+
+void LoopStep::flood_rows(Slot& slot, bool plan) {
+  const std::size_t lanes = st_->d_count() * st_->s_count();
+  slot.rows.assign(lanes, routing_app::RouteRow{});
+  const std::vector<routing_app::RouteRow>& reference = st_->slots.at(1).rows;
+  for (std::size_t d = 0; d < st_->d_count(); ++d) {
+    for (std::size_t s = 0; s < st_->s_count(); ++s) {
+      routing_app::RouteRow& row = slot.rows[lane(d, s)];
+      row.direction = d;
+      row.strategy = s;
+      row.ideal_s = reference.at(lane(d, s)).ideal_s;
+      if (!st_->active(slot, s)) {
+        continue;
+      }
+      FloodLane& fl = slot.flood[lane(d, s)];
+      row.responsible = fl.responsible;
+      if (plan) {
+        row.plan = fl.walk.empty() ? routing::PlanOutcome::kNone
+                                   : (fl.walk == fl.step_walk ? routing::PlanOutcome::kKept
+                                                              : routing::PlanOutcome::kReplaced);
+      }
+      fl.step_walk = fl.walk;
+    }
+  }
+}
+
+void LoopStep::flood_check(std::size_t e, std::size_t d, std::size_t s, const Status& status,
+                           double t) {
+  Slot& slot = st_->slots[e];
+  const GraphLayout& l = slot.engine->layout();
+  const StepGround now = st_->truth.step(0);
+  const FloodLane& fl = slot.flood[lane(d, s)];
+  const routing::Route& route = status.route;
+  if (status.state == DirectionState::kLoop) {
+    const bool repeated = route.size() >= 2 && std::find(route.begin(), route.end() - 1,
+                                                         route.back()) != route.end() - 1;
+    if (!repeated) {
+      ++checks_->loop_not_repeated;
+    }
+    return;
+  }
+  if (status.state != DirectionState::kBlackHole) {
+    return;
+  }
+  const std::size_t target = slot.engine->target_node(d);
+  bool ok = false;
+  if (status.element) {
+    const Subject& el = *status.element;
+    // Where the traffic goes after the route.
+    const bool walked = !route.empty() && fl.walk.size() > route.size() &&
+                        std::equal(route.begin(), route.end(), fl.walk.begin());
+    const std::size_t last = walked ? route.back() : network::kNoNode;
+    const std::size_t next = walked ? fl.walk[route.size()] : network::kNoNode;
+    switch (el.kind) {
+      case SubjectKind::kSatellite:
+        ok = marked(now.satellite_down, el.index) &&
+             ((walked && next == l.satellite(el.index)) ||
+              (route.empty() && st_->realistic() &&
+               slot.engine->serving_of(slot.engine->dish_of(d, s)) == el.index));
+        break;
+      case SubjectKind::kGateway:
+        ok = marked(now.gateway_down, el.index) && walked && next == l.gateway(el.index);
+        break;
+      case SubjectKind::kLink:
+        if (walked && el.index < st_->timeline->links.size() && now.links != nullptr &&
+            el.index < now.links->states.size()) {
+          const topology::PlannedLink& link = st_->timeline->links[el.index];
+          ok = now.links->states[el.index].down_reason == topology::LinkDownReason::kFailed &&
+               std::minmax(last, next) ==
+                   std::minmax(l.satellite(link.satellite_a), l.satellite(link.satellite_b));
+        }
+        break;
+    }
+  } else {
+    // A node with no next hop, recomputed from its table.
+    ok = !route.empty() && route.back() != target &&
+         flood_next(slot, route.back(), target, t) == network::kNoNode;
+  }
+  if (!ok) {
+    ++checks_->black_hole_not_failed;
+  }
+}
+
+void LoopStep::flood_settled(Slot& slot, double t) {
+  const std::size_t s = st_->flood_strategy.value_or(0);
+  for (std::size_t d = 0; d < st_->d_count(); ++d) {
+    const Status& a = slot.status[lane(d, s)];
+    const Status& b = st_->slots.at(1).status[lane(d, s)];
+    if (a.state != b.state || a.route != b.route) {
+      ++checks_->settled_differs;
+    }
+    if (a.state != DirectionState::kDelivered) {
+      continue;
+    }
+    // Following the tables from every node of the route gives the rest of it.
+    const std::size_t target = slot.engine->target_node(d);
+    for (std::size_t i = 0; i + 1 < a.route.size(); ++i) {
+      const routing::Walk rest = routing::walk(
+          a.route[i], target, [&](std::size_t node) { return flood_next(slot, node, target, t); });
+      if (!std::equal(rest.path.begin(), rest.path.end(),
+                      a.route.begin() + static_cast<std::ptrdiff_t>(i), a.route.end())) {
+        ++checks_->settled_tables_differ;
+        break;
+      }
+    }
+  }
+}
+
+std::optional<double> LoopStep::next_flood_instant(double after, double before) const {
+  std::optional<double> best;
+  const auto offer = [&](double t) {
+    if (t > after && t < before && (!best || t < *best)) {
+      best = t;
+    }
+  };
+  for (const Slot& slot : st_->slots) {
+    if (slot.kind != LaneKind::kFlooding) {
+      continue;
+    }
+    const std::size_t s = st_->flood_strategy.value_or(0);
+    for (std::size_t d = 0; d < st_->d_count(); ++d) {
+      for (const std::size_t actor : slot.flood[lane(d, s)].actors) {
+        if (const std::optional<double> t = st_->flood_knowledge->next_use(actor, after)) {
+          offer(*t);
+        }
+      }
+    }
+    for (const FloodDish& fd : slot.flood_dishes) {
+      if (fd.repick_s) {
+        offer(*fd.repick_s);
+      }
+    }
+  }
+  return best;
+}
+
 std::optional<std::string> LoopStep::at_step(
     std::int64_t k, std::vector<LaneRow>& rows,
     std::vector<std::vector<std::optional<double>>>& delays) {
@@ -964,6 +1461,20 @@ std::optional<std::string> LoopStep::at_step(
           after_plan(e, t, plan, slot_start, &slot.rows);
         }
         break;
+      case LaneKind::kFlooding:
+        flood_repicks(slot, t);
+        if (slot_start) {
+          for (std::size_t i = 0; i < slot.flood_dishes.size(); ++i) {
+            if (i < st_->sending.size() && st_->sending[i] != 0) {
+              slot.engine->set_serving(i, flood_pick(slot, i, std::nullopt));
+              flood_schedule(slot, i, t);
+            }
+          }
+        }
+        if (plan) {
+          error = flood_plan(slot, k);
+        }
+        break;
     }
     if (error) {
       return error;
@@ -981,6 +1492,10 @@ std::optional<std::string> LoopStep::at_step(
         slot.status[lane(row.direction, row.strategy)] =
             status_of(row.ok, row.ok ? std::optional(row.delay_s) : std::nullopt, row.cause,
                       row.responsible, row.route);
+      }
+    } else if (slot.kind == LaneKind::kFlooding) {
+      if (auto error = flood_evaluate(slot, t)) {
+        return error;
       }
     } else if (auto error = evaluate(slot, slot.kind == LaneKind::kLocalRepair)) {
       return error;
@@ -1002,6 +1517,11 @@ std::optional<std::string> LoopStep::at_step(
   if (auto error = repairs_at(t)) {
     return error;
   }
+  for (Slot& slot : st_->slots) {
+    if (slot.kind == LaneKind::kFlooding) {
+      flood_rows(slot, plan);
+    }
+  }
   record(t, true);
 
   // The rows of the step's instant.
@@ -1010,6 +1530,9 @@ std::optional<std::string> LoopStep::at_step(
   for (std::size_t i = 0; i < lanes; ++i) {
     for (std::size_t e = 0; e < st_->slots.size(); ++e) {
       const Slot& slot = st_->slots[e];
+      if (!st_->active(slot, i % st_->s_count())) {
+        continue;
+      }
       LaneRow out{.engine = e, .row = slot.rows.at(i), .status = slot.status[i]};
       routing_app::RouteRow& r = out.row;
       const Status& status = out.status;
@@ -1045,31 +1568,54 @@ std::optional<std::string> LoopStep::at_step(
       }
     }
   }
+  if (st_->flood_settled_s && t >= *st_->flood_settled_s) {
+    for (Slot& slot : st_->slots) {
+      if (slot.kind == LaneKind::kFlooding) {
+        flood_settled(slot, t);
+      }
+    }
+  }
 
   // The instants inside the step.
   // The run ends at its last step's instant: nothing is worked out after it.
+  // An instant of the flooding lanes alone changes nothing else.
   double now = t;
-  while (const std::optional<double> instant =
-             k + 1 < st_->settings.step_count ? next_instant(now, next) : std::nullopt) {
-    now = *instant;
+  while (k + 1 < st_->settings.step_count) {
+    const std::optional<double> others = next_instant(now, next);
+    const std::optional<double> flood = next_flood_instant(now, next);
+    if (!others && !flood) {
+      break;
+    }
+    const bool flood_only = !others || (flood && *flood < *others);
+    now = flood_only ? flood.value_or(now) : others.value_or(now);
     st_->truth.bind_truth(world, now);
-    const bool learns = st_->settings.replan_on_report &&
-                        std::binary_search(st_->learning.begin(), st_->learning.end(), now);
-    if (learns) {
-      st_->view.bind_view(world, view_at(*st_->timeline, st_->knowledge, now));
-      if (auto error = replan_on_report(now)) {
+    if (!flood_only) {
+      const bool learns = st_->settings.replan_on_report &&
+                          std::binary_search(st_->learning.begin(), st_->learning.end(), now);
+      if (learns) {
+        st_->view.bind_view(world, view_at(*st_->timeline, st_->knowledge, now));
+        if (auto error = replan_on_report(now)) {
+          return error;
+        }
+      }
+      for (Slot& slot : st_->slots) {
+        if (slot.kind != LaneKind::kBaseline && slot.kind != LaneKind::kFlooding) {
+          if (auto error = evaluate(slot, true)) {
+            return error;
+          }
+        }
+      }
+      if (auto error = repairs_at(now)) {
         return error;
       }
     }
     for (Slot& slot : st_->slots) {
-      if (slot.kind != LaneKind::kBaseline) {
-        if (auto error = evaluate(slot, true)) {
+      if (slot.kind == LaneKind::kFlooding) {
+        flood_repicks(slot, now);
+        if (auto error = flood_evaluate(slot, now)) {
           return error;
         }
       }
-    }
-    if (auto error = repairs_at(now)) {
-      return error;
     }
     record(now, false);
   }
@@ -1081,6 +1627,9 @@ std::optional<std::string> LoopStep::at_step(
 }
 
 void LoopStep::finish(double end_s) {
+  if (st_->flood_knowledge) {
+    checks_->table_fact_early = st_->flood_knowledge->early();
+  }
   for (Slot& slot : st_->slots) {
     for (std::optional<Interval>& open : slot.open) {
       if (open) {
@@ -1109,6 +1658,20 @@ std::optional<std::string> FailureLoop::step(std::int64_t k, const StepWorld& wo
 void FailureLoop::finish() {
   LoopStep step(*state_, intervals_, checks_, repairs_);
   step.finish(end_s());
+}
+
+std::optional<std::size_t> FailureLoop::flooding_strategy() const noexcept {
+  return state_->flood_strategy;
+}
+
+std::size_t FailureLoop::flooding_next_hop(std::size_t node, std::size_t target, double t) {
+  for (Slot& slot : state_->slots) {
+    if (slot.kind == LaneKind::kFlooding) {
+      LoopStep step(*state_, intervals_, checks_, repairs_);
+      return step.flood_next(slot, node, target, t);
+    }
+  }
+  return network::kNoNode;
 }
 
 }  // namespace satsim::failures_app

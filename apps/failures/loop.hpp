@@ -10,6 +10,7 @@
 #include <string_view>
 #include <vector>
 
+#include "failures/flooding.hpp"
 #include "failures/geometry.hpp"
 #include "failures/settings.hpp"
 #include "failures/timeline.hpp"
@@ -68,6 +69,47 @@
 // planned as usual and may repair again. A dish's repaired satellite is given back at a slot
 // start that picks the dead one again.
 //
+// Flooding (spec 4.5, 4.6; the program's options: lowest-delay only). One more engine, whose
+// lanes of the lowest-delay strategy are the flooding lanes (its other lanes stay unused); it
+// never plans: its routing_app::Engine only names causes (evaluate), holds the dishes' serving
+// satellites and numbers the nodes. Every node answers from its own table (flooding.hpp):
+//  - Plans. At every regular re-plan instant the superset planning graph is built: the
+//    GraphBuilder graph of the plan's window (the step for the start planner; for the
+//    whole-interval planner every step of the interval the world knows, the serving dish edges
+//    tested over the rest of the slot), on overlay_view of all_in_force_view, with the
+//    flooding dishes' serving satellites. It is the baseline's planning graph when nothing has
+//    failed.
+//  - The actor of a graph node: a satellite or gateway is itself; a city's dish nodes are the
+//    city's dish; an end node is a target. Its table at t is FloodTables::tree of the facts it
+//    uses at t (FloodKnowledge::facts_at).
+//  - A realistic serving dish sends to its serving satellite S, if S is in the window's lists
+//    of its city at each of the steps the planning graph tests a serving dish edge at (the
+//    edge the graph would have with S as serving satellite), S is not down in its view and S's
+//    table reaches the target; else it has no next hop. Its serving satellite: at every slot
+//    start the serving rule (Engine::pick_serving) among what its city sees in the truth; and
+//    when S, serving since instant u, goes down at t_f >= u, the dish knows at
+//    t_f + detection_s (if S is still down then) and picks again by the rule at that instant
+//    plus compute_s among what its city sees in the truth, S left out; with nothing else to
+//    pick it keeps S.
+//  - At an instant the traffic follows routing::walk from the lane's source node to its
+//    target, then is judged against the truth graph (the truth at the instant with the
+//    flooding dishes' serving satellites): every hop up and delivered: delivered, delay
+//    network::path_delay_s. Else at the first hop that is not up: a down satellite or gateway
+//    after it, or a failed laser link with both ends working: black_hole with that element
+//    and its failed_* cause, the route up to the hop's first node; any other missing hop:
+//    no_route with the walk as the route and the cause Engine::evaluate gives the walk held as
+//    a route (Phase 3's rule for a broken route), or, if that names a failure further along,
+//    the cause it gives the walk up to the missing hop. All hops up and a dead end: at the
+//    source, the cause of Engine::evaluate with no route held (realistic serving satellite
+//    down: a black hole on it; no_service, no_coverage, serving_left_view), else no_path (best
+//    case) or no_gateway (realistic), with no route; at a later node a black_hole with no
+//    cause nor element, the route up to it. All hops up and a loop: loop, the walk as route.
+//  - Rows: at a re-plan instant the plan is none without a walk from the source, kept when
+//    the walk is the previous step's, else replaced; the ideal is the reference's.
+//  - The lanes are evaluated at every step instant, every instant of the other lanes, and
+//    every instant inside a step at which a node of the lane's current walk (its source
+//    included) starts using a fact or a flooding dish picks again.
+//
 // Intervals (spec 4.6, 4.10). Per lane, the open interval (state, route, cause, element) is
 // closed and a new one opened when one of them changes; an interval that would last zero
 // seconds is not kept. The run ends at its last step's instant, (step_count - 1) * step_s,
@@ -79,7 +121,7 @@ namespace satsim::failures_app {
 enum class DirectionState : std::uint8_t {
   kDelivered,  ///< Its route works: the engine says ok.
   kBlackHole,  ///< Its route reaches a failed element (a failed_* drop cause).
-  kLoop,       ///< It passes a node twice (flooding only; never produced here).
+  kLoop,       ///< It passes a node twice (flooding only).
   kNoRoute,    ///< Any other drop.
 };
 
@@ -87,9 +129,9 @@ enum class DirectionState : std::uint8_t {
 [[nodiscard]] std::string_view name_of(DirectionState state) noexcept;
 
 /// The lanes of a direction and strategy, in output order.
-enum class LaneKind : std::uint8_t { kBaseline, kReference, kPlanner, kLocalRepair };
+enum class LaneKind : std::uint8_t { kBaseline, kReference, kPlanner, kLocalRepair, kFlooding };
 
-/// "baseline", "reference", "planner", "local-repair".
+/// "baseline", "reference", "planner", "local-repair", "flooding".
 [[nodiscard]] std::string_view name_of(LaneKind kind) noexcept;
 
 /// The geometry of the current step and the steps after it, as the loop reads it.
@@ -155,7 +197,9 @@ struct FailureChecks {
   /// one, a hop of a kind the graph has not (rechecked from the truth, not from the graph).
   std::size_t delivered_not_up = 0;
   /// A black-hole lane whose element is not down in the truth at that instant or is not on its
-  /// route (nor, realistic, the dish's serving satellite).
+  /// route (nor, realistic, the dish's serving satellite); in flooding, one whose element is
+  /// not down in the truth or is not where the walk goes after the route, or, without an
+  /// element, whose route's last node has a next hop.
   std::size_t black_hole_not_failed = 0;
   /// A plan of the planner or local-repair engine made on a view that differs from the one the
   /// facts give with the planner's knowing instants (Fact::planner_known_s) at the plan instant:
@@ -172,21 +216,39 @@ struct FailureChecks {
   /// With re-pointing off, a delivered delay below the baseline's ideal at that step (or a
   /// delivered lane at a step where the baseline has no ideal).
   std::size_t below_baseline_ideal = 0;
+  /// Flooding: a loop interval whose route does not end at a node it already passed.
+  std::size_t loop_not_repeated = 0;
+  /// Flooding: a table used at an instant before the node's learning instant of one of its
+  /// facts plus compute_s (FloodKnowledge::early).
+  std::size_t table_fact_early = 0;
+  /// Flooding: a flood that missed a node its messages graph joins to a detector
+  /// (Floods::unreached; the program adds it).
+  std::size_t flood_unreached = 0;
+  /// Flooding, once settled (the first regular plan instant, realistic also a slot start, at
+  /// or after the last change of the truth and the last instant any node starts using a fact,
+  /// every fact that is not old having a flood): a step whose state or route is not the
+  /// reference's (counted in settled_differs), or a delivered route from one of whose nodes
+  /// the tables do not give the rest of it (counted here).
+  std::size_t settled_tables_differ = 0;
 
   [[nodiscard]] std::size_t total() const noexcept {
     return delivered_not_up + black_hole_not_failed + fact_used_early + repair_too_early +
-           settled_differs + below_baseline_ideal;
+           settled_differs + below_baseline_ideal + loop_not_repeated + table_fact_early +
+           flood_unreached + settled_tables_differ;
   }
 };
 
 struct LoopSettings {
   routing_app::EngineSettings engine{};
-  /// The reaction modes, each once: planner and local-repair only.
+  /// The reaction modes, each once. With flooding, engine.strategies must hold lowest-delay
+  /// and `floods` must be set.
   std::vector<Reaction> reactions;
   bool replan_on_report = false;
   ReactionTimes times{};
   /// Steps of the run (>= 1).
   std::int64_t step_count = 1;
+  /// Flooding: every fact's flood (flood_facts on the same timeline); must outlive the loop.
+  const Floods* floods = nullptr;
 };
 
 /// Test seams; never set by the program.
@@ -200,6 +262,8 @@ struct LoopHooks {
   std::function<double(double)> repair_instant;
   /// Given to every engine (routing_app::BeforeChecks).
   routing_app::BeforeChecks engine_before_checks;
+  /// Changes a flooding node's use instant of a fact (FloodKnowledge::UseHook).
+  FloodKnowledge::UseHook flood_use;
 };
 
 /// One row of the routes CSV: an engine's RouteRow at a step, with the lane's status at the
@@ -216,8 +280,8 @@ class FailureLoop {
   /// Everything the loop keeps between steps (loop.cpp).
   struct State;
 
-  /// `network` without its plan (the loop's own, of timeline.links, is used). settings.reactions
-  /// must not hold flooding. `timeline` must outlive the loop.
+  /// `network` without its plan (the loop's own, of timeline.links, is used). `timeline` must
+  /// outlive the loop.
   FailureLoop(const Timeline& timeline, routing_app::EngineNetwork network, LoopSettings settings,
               LoopHooks hooks = {});
   ~FailureLoop();
@@ -227,8 +291,8 @@ class FailureLoop {
   FailureLoop& operator=(FailureLoop&&) = delete;
 
   /// Step k (from 0, in order), then the instants inside it. Writes the rows of the step's
-  /// instant, ordered by direction, strategy, then engine. Returns an error only if a graph
-  /// cannot be built.
+  /// instant, ordered by direction, strategy, then engine (the flooding engine's only under
+  /// its strategy). Returns an error only if a graph cannot be built.
   [[nodiscard]] std::optional<std::string> step(std::int64_t k, const StepWorld& world,
                                                 std::vector<LaneRow>& rows);
 
@@ -236,7 +300,7 @@ class FailureLoop {
   /// engine, then start; finishes every engine.
   void finish();
 
-  /// The engines, in output order: baseline, reference, then the reaction modes.
+  /// The engines, in output order: baseline, reference, then the reaction modes as listed.
   [[nodiscard]] std::size_t engine_count() const noexcept;
   [[nodiscard]] LaneKind kind(std::size_t engine) const;
   [[nodiscard]] const routing_app::Engine& engine(std::size_t engine) const;
@@ -256,6 +320,11 @@ class FailureLoop {
   [[nodiscard]] double end_s() const noexcept;
   /// The local repairs made (one per lane changed; a dish's once per lane).
   [[nodiscard]] std::size_t repairs() const noexcept { return repairs_; }
+  /// The strategy of the flooding lanes (the first lowest-delay one); nullopt without flooding.
+  [[nodiscard]] std::optional<std::size_t> flooding_strategy() const noexcept;
+  /// Flooding: the next hop node `node` gives towards `target` at `t` from its own table
+  /// (network::kNoNode for none), as the walks ask it. Precondition: flooding, a step done.
+  [[nodiscard]] std::size_t flooding_next_hop(std::size_t node, std::size_t target, double t);
 
  private:
   std::unique_ptr<State> state_;

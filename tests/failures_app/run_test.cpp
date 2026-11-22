@@ -37,6 +37,7 @@ namespace fs = std::filesystem;
 namespace fixture = satsim::topology_app::testing;
 namespace fa = satsim::failures_app;
 namespace ra = satsim::routing_app;
+using satsim::propagate::testing::number;
 using satsim::propagate::testing::parse_csv;
 using satsim::propagate::testing::read_file;
 using satsim::propagate::testing::ScratchDir;
@@ -179,6 +180,67 @@ TEST(FailuresRunTest, NoFailureEveryLaneEqualsTheRoutingProgram) {
   }
 }
 
+// With no failure file the flooding rows are the routing program's lowest-delay rows (spec
+// 6.2), in both models and with both planners (the whole-interval planner over three steps of
+// 5 s); every other lane's rows still are the routing program's, and flooding has a row only
+// under lowest-delay.
+TEST(FailuresRunTest, NoFailureFloodingEqualsLowestDelay) {
+  for (const std::string_view model : {"realistic", "best-case"}) {
+    for (const std::string_view planner : {"start", "whole-interval"}) {
+      SCOPED_TRACE(std::string(model) + " " + std::string(planner));
+      std::vector<std::string> a = args("-", model);
+      a.back() = "planner,local-repair,flooding";
+      a.insert(a.end(), {"--planner", std::string(planner)});
+      if (planner == "whole-interval") {
+        const auto step = std::find(a.begin(), a.end(), "--step-s");
+        ASSERT_NE(step, a.end());
+        *(step + 1) = "5";
+      }
+      const fa::Options o = options_of(a);
+      const fa::FailureRun r = prepare(o);
+      std::ostringstream routes;
+      const fa::FailureOutcome outcome = fa::write_failure_routes(r, routes, nullptr);
+      ASSERT_FALSE(outcome.error.has_value()) << outcome.error.value_or("");
+      EXPECT_TRUE(outcome.statistics.passed());
+      EXPECT_EQ(outcome.statistics.failures.total(), 0U);
+
+      ra::PreparedRunOrError rp = ra::prepare_run(o.routing);
+      ASSERT_TRUE(std::holds_alternative<ra::PreparedRun>(rp));
+      std::ostringstream routing_csv;
+      ASSERT_FALSE(ra::write_routes(std::get<ra::PreparedRun>(rp), routing_csv).error.has_value());
+      const Rows g = parse_csv(routing_csv.str());
+      // utc, from, to, strategy -> the routing program's row.
+      std::map<std::vector<std::string>, std::vector<std::string>> routing_rows;
+      for (std::size_t i = 1; i < g.size(); ++i) {
+        routing_rows[{g[i][0], g[i][1], g[i][2], g[i][6]}] = g[i];
+      }
+      const Rows f = parse_csv(routes.str());
+      std::map<std::string, std::size_t> lanes;
+      std::size_t ok = 0;
+      for (std::size_t i = 1; i < f.size(); ++i) {
+        const std::vector<std::string>& row = f[i];
+        const std::string& reaction = row[ra::kRoutesColumns.size()];
+        ++lanes[reaction];
+        if (reaction == "flooding") {
+          EXPECT_EQ(row[6], "lowest-delay") << i;
+          ok += row[7] == "ok" ? 1U : 0U;
+        }
+        const std::vector<std::string> phase3(
+            row.begin(), row.begin() + static_cast<std::ptrdiff_t>(ra::kRoutesColumns.size()));
+        EXPECT_EQ(phase3, routing_rows.at({row[0], row[1], row[2], row[6]}))
+            << i << " " << reaction;
+      }
+      const std::size_t per_strategy = (g.size() - 1) / 2;
+      EXPECT_EQ(lanes, (std::map<std::string, std::size_t>{{"baseline", g.size() - 1},
+                                                           {"flooding", per_strategy},
+                                                           {"local-repair", g.size() - 1},
+                                                           {"planner", g.size() - 1},
+                                                           {"reference", g.size() - 1}}));
+      EXPECT_GT(ok, 0U);
+    }
+  }
+}
+
 // One satellite fails: the first satellite of the first direction's lowest-delay route at
 // 15 s. The program writes every file in its format, its checks pass, the planner lane is a
 // black hole from 15 s to the plan at 30 s and the local-repair lane from 15 s to 15.1 s.
@@ -274,8 +336,8 @@ TEST(FailuresRunTest, OneFailureEveryFile) {
   ASSERT_EQ(measures.size(), 1U + 6 * 2 * 2);
   EXPECT_EQ(measures[1][6], "planner");
   EXPECT_EQ(measures[1][7], "15");
-  EXPECT_EQ(measures[1][8], "15");    // Black hole until the plan at 30 s.
-  EXPECT_EQ(measures[1][9], "none");  // No loop without flooding.
+  EXPECT_EQ(measures[1][8], "15");  // Black hole until the plan at 30 s.
+  EXPECT_EQ(measures[1][9], "0");   // No loop without flooding.
   EXPECT_EQ(measures[2][6], "local-repair");
   EXPECT_EQ(measures[2][8], "0.09999999999999964");  // 15.1 - 15.
 
@@ -294,12 +356,116 @@ TEST(FailuresRunTest, OneFailureEveryFile) {
             header_of(ra::kRoutesColumns) + ",reaction,state,failed_element");
 }
 
+// The same failure with flooding: the checks pass; the flooding lane is a black hole from
+// 15 s until the node before the dead satellite uses what it detected (15.1 + 0.1 s), and
+// delivered again later; the facts CSV has the flood columns, the floods CSV one row per node
+// that learns (the detectors at 15.1 s), the measures one flooding row per direction (under
+// lowest-delay only), with no reports and every flood's messages.
+TEST(FailuresRunTest, OneFailureWithFlooding) {
+  ScratchDir dir;
+  std::vector<std::string> clean_args = args("-", "best-case");
+  const fa::FailureRun clean = prepare(options_of(clean_args));
+  std::ostringstream clean_routes;
+  ASSERT_FALSE(fa::write_failure_routes(clean, clean_routes, nullptr).error.has_value());
+  const Rows c = parse_csv(clean_routes.str());
+  std::string first;
+  for (std::size_t i = 1; i < c.size(); ++i) {
+    if (c[i][0] == "2026-11-18T12:00:15" && c[i][6] == "lowest-delay" && c[i][21] == "baseline") {
+      first = c[i][13];
+      break;
+    }
+  }
+  ASSERT_FALSE(first.empty());
+  const fs::path failures = dir.path() / "failures.csv";
+  {
+    std::ofstream file(failures);
+    file << "kind,norad_cat_id_a,norad_cat_id_b,gateway,start_utc,length_s\n"
+         << "satellite," << first << ",,,2026-11-18T12:00:15,\n";
+  }
+  std::vector<std::string> a = args(dir.path() / "routes.csv", "best-case");
+  a.back() = "planner,flooding";
+  for (const std::string& extra :
+       {std::string("--failures"), failures.string(), std::string("--events-out"),
+        (dir.path() / "events.csv").string(), std::string("--facts-out"),
+        (dir.path() / "facts.csv").string(), std::string("--floods-out"),
+        (dir.path() / "floods.csv").string(), std::string("--measures-out"),
+        (dir.path() / "measures.csv").string()}) {
+    a.push_back(extra);
+  }
+  std::string err;
+  ASSERT_EQ(run_main(a, &err), 0) << err;
+  EXPECT_NE(err.find("  checks: PASSED"), std::string::npos) << err;
+  EXPECT_NE(err.find("    floods: "), std::string::npos) << err;
+
+  const Rows events = parse_csv(read_file(dir.path() / "events.csv"));
+  Rows flooding;
+  for (std::size_t i = 1; i < events.size(); ++i) {
+    if (events[i][2] == c[1][1] && events[i][3] == c[1][2] && events[i][8] == "flooding") {
+      EXPECT_EQ(events[i][7], "lowest-delay");
+      flooding.push_back(events[i]);
+    }
+  }
+  const auto from15 = std::find_if(flooding.begin(), flooding.end(),
+                                   [](const auto& row) { return row[0] == "15"; });
+  ASSERT_NE(from15, flooding.end());
+  EXPECT_EQ((*from15)[9], "black_hole");
+  EXPECT_EQ((*from15)[10], "failed_satellite");
+  EXPECT_EQ((*from15)[11], "satellite:" + first);
+  EXPECT_GE(number((*from15)[1]), 15.2);
+  EXPECT_EQ(flooding.back()[9], "delivered");
+
+  const Rows facts = parse_csv(read_file(dir.path() / "facts.csv"));
+  const Rows floods = parse_csv(read_file(dir.path() / "floods.csv"));
+  ASSERT_GE(floods.size(), 2U);
+  EXPECT_EQ(floods[0], (std::vector<std::string>{"fact", "node", "learn_s"}));
+  std::size_t sent = 0;
+  for (std::size_t i = 1; i < facts.size(); ++i) {
+    const std::string fact = facts[i][0];
+    std::size_t rows = 0;
+    for (std::size_t j = 1; j < floods.size(); ++j) {
+      if (floods[j][0] == fact) {
+        ++rows;
+        EXPECT_GE(number(floods[j][2]), 15.1);
+      }
+    }
+    EXPECT_EQ(facts[i][9], std::to_string(rows)) << i;
+    if (facts[i][1].substr(0, 5) == "link:") {
+      EXPECT_GT(rows, 1U);
+      // Its detectors learn at their detection instant.
+      const std::string detector = facts[i][5].substr(0, facts[i][5].find('@'));
+      EXPECT_NE(
+          std::find(floods.begin(), floods.end(), std::vector<std::string>{fact, detector, "15.1"}),
+          floods.end())
+          << detector;
+      EXPECT_NE(facts[i][10], "never");
+    }
+    sent += static_cast<std::size_t>(std::stoul(facts[i][11]));
+  }
+  const Rows measures = parse_csv(read_file(dir.path() / "measures.csv"));
+  // Six directions: planner under both strategies, flooding under lowest-delay.
+  ASSERT_EQ(measures.size(), 1U + 6 * 3);
+  EXPECT_EQ(measures[1][6], "planner");
+  EXPECT_EQ(measures[2][6], "flooding");
+  EXPECT_EQ(measures[2][5], "lowest-delay");
+  EXPECT_EQ(measures[2][17], "none");
+  EXPECT_EQ(measures[2][18], std::to_string(sent));
+  EXPECT_EQ(measures[3][6], "planner");
+  EXPECT_EQ(measures[3][5], "keep-until-broken");
+}
+
 TEST(FailuresRunTest, RefusalsOfTheRun) {
   std::vector<std::string> a = args("-", "best-case");
+  // Flooding's lanes are lowest-delay's: refused without that strategy, run with it.
   a.back() = "planner,flooding";
+  const auto strategies = std::find(a.begin(), a.end(), "--strategies");
+  ASSERT_NE(strategies, a.end());
+  *(strategies + 1) = "keep-until-broken";
   std::string err;
   EXPECT_EQ(run_main(a, &err), 2);
-  EXPECT_NE(err.find("flooding is not available yet"), std::string::npos) << err;
+  EXPECT_NE(err.find("--reactions flooding needs lowest-delay in --strategies"), std::string::npos)
+      << err;
+  *(strategies + 1) = "lowest-delay";
+  EXPECT_EQ(run_main(a, &err), 0) << err;
   a.back() = "planner";
   a.insert(a.end(), {"--failures", "/nonexistent/failures.csv"});
   EXPECT_EQ(run_main(a, &err), 2);
