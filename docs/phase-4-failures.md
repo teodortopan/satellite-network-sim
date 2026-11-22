@@ -1,6 +1,7 @@
 # Phase 4: Failures
 
-**Status:** specified 2026-11-21. Not implemented.
+**Status:** specified 2026-11-21, implemented 2026-11-22. Results:
+[phase-4-results.md](phase-4-results.md).
 
 Sources opened on 2026-11-21:
 [SDA Optical Communications Terminal Standard v3.2.0](https://www.sda.mil/wp-content/uploads/2025/04/SDA-OCT-Standard-v3.2.0_FINAL.pdf),
