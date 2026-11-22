@@ -13,7 +13,8 @@ Only Docker is needed on the host.
 ```sh
 scripts/check.sh            # every step; exit 0 only if all pass
 scripts/check.sh valgrind   # one step: format, python-lint, asan-gcc, asan-clang, valgrind, tidy,
-                            # validate, validate-topology or validate-routing
+                            # validate, validate-topology, validate-routing or
+                            # validate-failures
 ```
 
 Build trees go to `build/<step>` (for example `build/asan-clang`), including the GoogleTest
@@ -35,6 +36,7 @@ from 215 s to 60 s and clang-tidy from 19 minutes to 8.
 | `tidy` | clang-tidy `bugprone-*`, `performance-*`, most of `modernize-*` and `cppcoreguidelines-*`, and a set of `readability-*` checks on every `.cpp` in `src/`, `apps/` and `tests/`; any finding is an error | Catches suspicious code patterns the compiler accepts |
 | `validate-topology` | `topology` and `constellation` output on an ideal shell that disagrees with an independent Python model: a satellite in the wrong plane or slot, an element set from the wrong file, a wrong count of satellites, planes or laser links, a laser left without a partner, a different laser grid, elevation mask, ground link or shortest path (any row's status, laser hops, first or last satellite, or a one-way delay more than 1e-6 ms off). Builds both programs optimised without sanitizers and runs `python/validate_topology.py` | The unit tests check each piece of the topology on small hand-made cases; this checks the whole program on a full 1,584-satellite shell against code written separately (positions from python-sgp4 and Skyfield, the +Grid built from plane and slot indices, its own Dijkstra), and checks that model against the round-trip times the Hypatia paper published. Tolerances and measured values: `docs/phase-2-results.md` |
 | `validate-routing` | `routing` output on two ideal published shells that disagrees with an independent Python model: any row's status, drop cause, route (every satellite in order), plan (kept, replaced, none), laser hops, first or last satellite, or a one-way or ideal delay more than 1e-9 ms off; or a summary count of bad changes, delay increases, breaks or recoveries. Covers `lowest-delay`, `keep-until-broken` and `longest-lived`, routes held between plans, link files, `--max-ground-range-km`, `--min-elevation-deg`, `--hop-delay-ms`, sub-second steps and `--directions forward`. Builds `routing` optimised without sanitizers and runs `python/validate_routing.py` | The unit tests check each strategy on small hand-worked graphs; this checks the whole program on full 1,584-satellite shells against a re-plan loop, graph and Dijkstra written separately from the spec (positions from python-sgp4 with its own TEME to ITRF, checked against Skyfield). It is the comparison the published reproductions rest on (`docs/phase-3-routing.md` 6.3) |
+| `validate-failures` | `failures` output on Hypatia's ideal shell that disagrees with an independent Python model: any interval of the events CSV (state, route, drop cause, failed element, start and end to 1e-9 s, delay to 1e-9 ms), any fact (subject, down or up, instant, old news, detectors and their instants, when the planner knew, reports and their hops, flood nodes, last learning instant, messages), any node's learning instant in a flood, any routes CSV row (state, cause, element, route, delay, ideal delay, plan), any measure of a lane to 1e-9, or any network row (working satellites, pieces, largest piece). Covers satellite and laser-link failures, permanent, transient and old news, the three reaction modes and the baseline and reference lanes, `lowest-delay` and `keep-until-broken`, the `start` and `whole-interval` planners, `--replan-on-report`, re-pointing with in-plane and cross-plane repair links, and both a +Grid and a `three` link file. Runs the model's own self-tests first. Builds `failures` optimised without sanitizers and runs `python/validate_failures.py` | The unit tests check each piece of the failure engine on hand-made geometry; this checks the whole program on a full 1,584-satellite shell against detection, reports, floods, views, the five lanes and re-matching written separately from the spec. It is the proof of Phase 4 (`docs/phase-4-failures.md` 6.3) |
 | `validate` | `propagate` output that disagrees with Skyfield on real data: wrong time since epoch, GMST, UT1, polar motion, geodetic conversion or J2000 chain, a wrong element set chosen, a row missing or extra. Builds `propagate` optimised without sanitizers (tests off, so nothing is downloaded) and runs `python/validate_against_reference.py` on a fixed sample of the committed snapshot | The unit tests check each piece against printed references; this checks the whole program against an independent implementation, row by row, on the data it is meant for. Tolerances and measured values: `docs/phase-1-results.md` |
 
 Every build also compiles our code with
@@ -103,6 +105,32 @@ The model takes positions from python-sgp4 on the elements by construction, with
 TEME to ITRF (checked against Skyfield to 1 mm; measured 0.003 mm), and shares no code with the
 program. The routes must be identical and the delays within 1e-9 ms (measured: 1.1e-12 ms at
 most). It takes about 20 seconds after the build, reads only local files (any network
+connection raises) and runs with `--network none` in the GitHub job.
+
+## The validate-failures step
+
+`python/make_ideal_shell.py` writes Hypatia's shell into a temporary directory with two
+four-column link files (the laser side at each end): its +Grid, and a `three` plan made by
+the Python planner written from Phase 2 spec 4.3 (2,376 links, no laser without a partner).
+`python/validate_failures.py` first runs its self-tests (hand-worked cases on tiny made-up
+networks, and the no-failure baseline against `validate_routing.py`'s model), then runs
+`failures` (best case, Hypatia's ground range, New York to London and Frankfurt to Singapore
+one way, `lowest-delay` and `keep-until-broken`, all three reaction modes) on six cases and
+recomputes every output. The failures are picked from the baseline route at 7 s, after a
+re-plan at 0 s and before the next at 15 s:
+
+| Case | Links | Failure | Settings |
+|---|---|---|---|
+| `satellite-three` | `three` | the route's middle satellite, permanent | 40 s, `whole-interval` |
+| `laser-grid` | +Grid | the route's middle laser link, permanent | 40 s, `whole-interval` |
+| `transient-three` | `three` | the middle laser link for 10 s | acquisition 5 s |
+| `repoint-three` | `three` | two satellites whose cross-plane partners face each other | `--repoint on`, acquisition 2 s |
+| `report-three` | `three` | the route's middle satellite | `--replan-on-report on`, `start`, 25 s |
+| `after-recovery` | `three` | 3% of the satellites, an hour before the start | one step, `--repoint on` |
+
+The model shares no code with the program; positions come from the same python-sgp4 code as
+`validate-routing`. Instants must agree to 1e-9 s and delays to 1e-9 ms. It takes about a
+minute after the build (measured 53 s on 4 cores), reads only local files (any network
 connection raises) and runs with `--network none` in the GitHub job.
 
 ## Deliberately deferred

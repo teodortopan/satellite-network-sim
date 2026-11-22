@@ -23,13 +23,15 @@ glossary of every orbital term used here.
   Python lint, ASan + UBSan tests with GCC and with Clang, Valgrind,
   clang-tidy, `validate` (the `propagate` program against Skyfield on the
   committed snapshot), `validate-topology` (the `topology` program against an
-  independent Python model on Hypatia's ideal shell) and `validate-routing` (the
+  independent Python model on Hypatia's ideal shell), `validate-routing` (the
   `routing` program against an independent Python model on Hypatia's and the
-  Bariloche paper's shells, `python/validate_routing.py`). Exit 0 only if all pass.
+  Bariloche paper's shells, `python/validate_routing.py`) and `validate-failures`
+  (the `failures` program against an independent Python model on Hypatia's shell with
+  a +Grid and a `three` plan, `python/validate_failures.py`). Exit 0 only if all pass.
   It needs only Docker on the host.
 - `scripts/check.sh <step>` runs one step (`format`, `python-lint`,
   `asan-gcc`, `asan-clang`, `valgrind`, `tidy`, `validate`, `validate-topology`,
-  `validate-routing`).
+  `validate-routing`, `validate-failures`).
   Measured in a cloud session (x86-64, 4 cores, 2026-11-21): the full check takes
   about 7 minutes once the build trees exist, and longer on a session's first run,
   which compiles everything. clang-tidy is the longest step (about 8 minutes when

@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 # CI steps. Runs inside the satsim-ci Docker image, from the repo root.
-# Usage: scripts/ci.sh <format|python-lint|asan-gcc|asan-clang|valgrind|tidy|validate|validate-topology|validate-routing|all>
+# Usage: scripts/ci.sh <format|python-lint|asan-gcc|asan-clang|valgrind|tidy|validate|validate-topology|validate-routing|validate-failures|all>
 set -euo pipefail
 
 usage() {
-  echo "usage: $0 <format|python-lint|asan-gcc|asan-clang|valgrind|tidy|validate|validate-topology|validate-routing|all>" >&2
+  echo "usage: $0 <format|python-lint|asan-gcc|asan-clang|valgrind|tidy|validate|validate-topology|validate-routing|validate-failures|all>" >&2
 }
 
 # Our C++ sources (not third-party code under build/).
@@ -125,6 +125,19 @@ step_validate_routing() {
   python3 python/validate_routing.py --routing "$dir/bin/routing"
 }
 
+# The failures program, optimised and without sanitizers, on Hypatia's shell with its +Grid
+# and with a `three` plan made in Python (python/make_ideal_shell.py, written into a temporary
+# directory): the model's own self-tests, then every interval, fact, flood, route, measure and
+# network row of six short failure runs against an independent Python model
+# (python/validate_failures.py). No network needed.
+step_validate_failures() {
+  local dir=build/validate
+  CC=gcc CXX=g++ cmake --preset valgrind -B "$dir" -DSATSIM_BUILD_TESTS=OFF
+  cmake --build "$dir" --target failures
+  python3 python/validate_failures.py --self-test
+  python3 python/validate_failures.py --failures-program "$dir/bin/failures"
+}
+
 run_step() {
   echo "==> $1"
   case "$1" in
@@ -137,6 +150,7 @@ run_step() {
     validate) step_validate ;;
     validate-topology) step_validate_topology ;;
     validate-routing) step_validate_routing ;;
+    validate-failures) step_validate_failures ;;
     *)
       usage
       exit 2
@@ -156,7 +170,7 @@ main() {
   fi
 
   local steps=(format python-lint asan-gcc asan-clang valgrind tidy validate validate-topology
-    validate-routing)
+    validate-routing validate-failures)
   local failed=() s
   for s in "${steps[@]}"; do
     # Separate process so one failing step does not stop the others. (A subshell in an
