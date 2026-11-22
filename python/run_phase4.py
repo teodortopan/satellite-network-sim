@@ -763,7 +763,7 @@ def recount_times(lane, baseline, reference, t_f: float, end_s: float, reaction:
     return {
         "failure_s": t_f,
         "black_hole_s": black_hole,
-        "loop_s": loop if reaction == "flooding" else None,
+        "loop_s": loop,
         "lost_s": lost,
         "restore_s": restore,
         "settle_s": settle,
