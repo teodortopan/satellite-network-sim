@@ -35,8 +35,19 @@ one gives the same route. The program agrees row for row with an independent mod
 reproduces Hypatia's published median of path changes and comes within 8.1% of a second
 paper's counts.
 The numbers, the plots and the limits are in
-[docs/phase-3-results.md](docs/phase-3-results.md). Failures and the dashboard come in later
-phases.
+[docs/phase-3-results.md](docs/phase-3-results.md).
+
+Phase 4 (failures) is implemented. The `failures` program stops a satellite, a laser link or
+a gateway without warning and follows what each route goes through, under three ways of
+reacting: a planner on the ground that waits for reports, a node next to the failure that
+switches to a backup path at once, and satellites that tell each other and work out their own
+routes. One dead satellite costs the planner a median of 8.5 s without a route (the wait for
+its next plan), local repair 0.1 s and flooding 0.2 s, and flooding pays for it with about
+144,000 message sendings against 6 report hops. With 10% of the satellites failed at random
+every one of 4,950 city pairs still has a route; at 30%, 94% do, and 99.999% once freed
+lasers are re-pointed. The program agrees with an independent model on every interval, fact
+and flood on an ideal shell. The numbers, the plots and the limits are in
+[docs/phase-4-results.md](docs/phase-4-results.md). The dashboard comes in a later phase.
 
 This repository is the source of truth for the project.
 
@@ -44,8 +55,8 @@ This repository is the source of truth for the project.
 
 The only host requirement is Docker. The check builds the CI image and runs every step in it
 (formatting, Python lint, ASan/UBSan builds with GCC and Clang, Valgrind, clang-tidy, the
-comparison of `propagate` against Skyfield, and the comparisons of `topology` and `routing`
-against independent models):
+comparison of `propagate` against Skyfield, and the comparisons of `topology`, `routing` and
+`failures` against independent models):
 
 ```sh
 scripts/check.sh            # all steps
