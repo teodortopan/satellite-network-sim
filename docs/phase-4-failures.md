@@ -526,6 +526,7 @@ Details:
   `serving_norad_cat_id`, `gateway`. An interval ends when the state, the route, the cause or
   the element changes, and at the end of the run; the delay is the one at its start. Rows are
   ordered by direction, strategy, reaction, then start.
+- An interval of no length is not written, so a run of one step has no events rows.
 - An element is written `satellite:<catalogue number>`, `link:<a>-<b>` with the lower
   catalogue number first, or `gateway:<name>`.
 - **Facts CSV** columns: `fact` (its number, from 0, in the order the facts arise),
@@ -536,6 +537,10 @@ Details:
   joined by `;`. `reports` is the number of detectors whose report can reach a gateway and
   `report_hops` the hops of the report that arrives first. The three flood columns are empty
   unless `flooding` is listed. An instant that never comes is written `never`.
+  A detector is listed only if it detects within the run. An old fact has no detectors, its
+  planner instant is 0, and with `flooding` listed its flood columns read 0 nodes, `never`
+  and 0 messages. The instant of an old repair link's "up" fact is the failure instant plus
+  the acquisition time, which lies before the run's start.
 - A gateway that detects counts as one report with no hops. Of reports that arrive at the
   same instant the one with fewer hops is the first. A fact that nobody detects in the run has
   0 flood nodes, 0 messages and a last instant of `never`.
