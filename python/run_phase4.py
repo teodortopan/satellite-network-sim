@@ -174,11 +174,9 @@ TAIL_S = 300  # ... and ends this long after it.
 STRATEGY = "lowest-delay"
 MODELS = ("realistic", "best-case")
 
-# The reaction modes of the hand-picked runs. The program does not have flooding yet; add it
-# here once it does: ("planner", "local-repair", "flooding").
-REACTIONS = ("planner", "local-repair")
+# The reaction modes of the hand-picked runs.
 ALL_REACTIONS = ("planner", "local-repair", "flooding")
-assert set(REACTIONS) <= set(ALL_REACTIONS)
+REACTIONS = ALL_REACTIONS
 
 SHARES = (0.001, 0.003, 0.01, 0.03, 0.1, 0.3)
 SEEDS = 100
