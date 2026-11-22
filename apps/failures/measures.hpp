@@ -17,6 +17,8 @@ namespace satsim::failures_app {
 struct LaneMeasures {
   /// Seconds in black_hole from t_f to the end of the run.
   std::optional<double> black_hole_s = std::nullopt;
+  /// Seconds in loop from t_f to the end of the run.
+  std::optional<double> loop_s = std::nullopt;
   /// Seconds from t_f on in which the baseline is delivered and this lane is not.
   std::optional<double> lost_s = std::nullopt;
   /// From t_f to the first instant the lane is delivered again after it first stops being

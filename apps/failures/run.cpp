@@ -21,6 +21,7 @@
 #include "common/csv.hpp"
 #include "common/statistics.hpp"
 #include "failures/arguments.hpp"
+#include "failures/flooding.hpp"
 #include "failures/geometry.hpp"
 #include "failures/loop.hpp"
 #include "failures/measures.hpp"
@@ -185,6 +186,32 @@ std::string seconds_or_none(std::optional<double> s) {
   return s ? fixed(*s, 3) + " s" : std::string("none");
 }
 
+bool lists(const Options& o, Reaction reaction) {
+  return std::find(o.reactions.begin(), o.reactions.end(), reaction) != o.reactions.end();
+}
+
+// A control-graph node as the facts and floods CSVs write it.
+std::string node_text(const FailureRun& r, std::size_t node) {
+  const ControlNodes& nodes = r.timeline.nodes;
+  std::string text;
+  if (nodes.is_satellite(node)) {
+    text = "satellite:";
+    append_integer(text, r.run.working.satellites.at(node).norad_cat_id);
+  } else if (nodes.is_dish(node)) {
+    text = "city:" + r.run.cities.at(node - nodes.satellites).site.name;
+  } else {
+    text = "gateway:" + r.run.gateways.at(node - nodes.satellites - nodes.cities).site.name;
+  }
+  return text;
+}
+
+// Whether lane (engine kind, strategy) has a row in the measures and the summary.
+bool measured(const FailureStatistics& stats, std::size_t e, std::size_t s) {
+  const LaneKind kind = stats.kinds.at(e);
+  return kind == LaneKind::kPlanner || kind == LaneKind::kLocalRepair ||
+         (kind == LaneKind::kFlooding && stats.flooding_strategy == s);
+}
+
 }  // namespace
 
 std::string element_text(const FailureRun& r, const Subject& subject) {
@@ -211,10 +238,15 @@ std::string element_text(const FailureRun& r, const Subject& subject) {
   return text;
 }
 
-std::optional<std::string> not_available_yet(const Options& options) {
-  if (std::find(options.reactions.begin(), options.reactions.end(), Reaction::kFlooding) !=
-      options.reactions.end()) {
-    return std::string("--reactions: flooding is not available yet");
+std::optional<std::string> refused(const Options& options) {
+  if (lists(options, Reaction::kFlooding) &&
+      std::none_of(options.routing.strategies.begin(), options.routing.strategies.end(),
+                   [](const routing::Strategy& s) {
+                     return s.kind == routing::StrategyKind::kLowestDelay;
+                   })) {
+    return std::string(
+        "--reactions flooding needs lowest-delay in --strategies (the flooding lanes are "
+        "lowest-delay's, measured against its baseline and reference)");
   }
   return std::nullopt;
 }
@@ -232,7 +264,8 @@ FailureRunOrError prepare_failure_run(const Options& options) {
                .schedule = {},
                .timeline_settings = {},
                .timeline = {},
-               .reports = {}};
+               .reports = {},
+               .floods = {}};
   r.options.routing = r.run.options;
   std::vector<std::string> gateway_names;
   gateway_names.reserve(r.run.gateways.size());
@@ -259,6 +292,9 @@ FailureRunOrError prepare_failure_run(const Options& options) {
                                          .atmosphere_km = r.run.options.limits.atmosphere_km};
   r.timeline = build_timeline(r.run.working, r.run.plan, r.schedule, r.timeline_settings, geometry);
   r.reports = fact_reports(r.timeline, r.timeline_settings, geometry);
+  if (lists(options, Reaction::kFlooding)) {
+    r.floods = flood_facts(r.timeline, r.timeline_settings, geometry);
+  }
   if (const std::optional<std::string>& error = geometry.error()) {
     return *error;
   }
@@ -276,16 +312,12 @@ FailureOutcome write_failure_routes(const FailureRun& r, std::ostream& routes,
   const app::InputOptions inputs = app::input_options_of(o);
   const double step_s = step_seconds(o);
 
-  LoopSettings loop_settings{.engine = settings,
-                             .reactions = {},
-                             .replan_on_report = r.options.replan_on_report,
-                             .times = r.options.times,
-                             .step_count = run.time_count};
-  for (const Reaction reaction : r.options.reactions) {
-    if (reaction != Reaction::kFlooding) {
-      loop_settings.reactions.push_back(reaction);
-    }
-  }
+  const LoopSettings loop_settings{.engine = settings,
+                                   .reactions = r.options.reactions,
+                                   .replan_on_report = r.options.replan_on_report,
+                                   .times = r.options.times,
+                                   .step_count = run.time_count,
+                                   .floods = &r.floods};
   FailureLoop loop(r.timeline, routing_app::network_of(run), loop_settings, hooks.loop);
   for (std::size_t e = 0; e < loop.engine_count(); ++e) {
     stats.kinds.push_back(loop.kind(e));
@@ -457,6 +489,8 @@ FailureOutcome write_failure_routes(const FailureRun& r, std::ostream& routes,
     stats.other_routes.bad_route_shape += c.bad_route_shape;
   }
   stats.failures = loop.checks();
+  stats.failures.flood_unreached = r.floods.unreached;
+  stats.flooding_strategy = loop.flooding_strategy();
   stats.intervals = loop.intervals();
   stats.t_f = failure_instant(r.schedule);
   stats.measures =
@@ -534,7 +568,7 @@ bool write_events(const FailureRun& r, const FailureStatistics& stats, std::ostr
 
 bool write_facts(const FailureRun& r, std::ostream& out) {
   write_header(out, kFactsColumns);
-  const ControlNodes& nodes = r.timeline.nodes;
+  const bool flooding = lists(r.options, Reaction::kFlooding);
   std::string line;
   for (std::size_t f = 0; f < r.timeline.facts.size(); ++f) {
     const Fact& fact = r.timeline.facts[f];
@@ -550,15 +584,7 @@ bool write_facts(const FailureRun& r, std::ostream& out) {
       if (!detectors.empty()) {
         detectors.push_back(';');
       }
-      if (nodes.is_satellite(d.node)) {
-        detectors.append("satellite:");
-        append_integer(detectors, norad(r, d.node));
-      } else if (nodes.is_dish(d.node)) {
-        detectors.append("city:" + r.run.cities.at(d.node - nodes.satellites).site.name);
-      } else {
-        detectors.append("gateway:" +
-                         r.run.gateways.at(d.node - nodes.satellites - nodes.cities).site.name);
-      }
+      detectors.append(node_text(r, d.node));
       detectors.push_back('@');
       append_double(detectors, d.t_s);
     }
@@ -577,8 +603,46 @@ bool write_facts(const FailureRun& r, std::ostream& out) {
       append_integer(line, static_cast<std::int64_t>(*reports.first_hops));
     }
     // flood_nodes, flood_last_s, messages: flooding only.
-    line.append(",,,\n");
+    line.push_back(',');
+    if (flooding) {
+      const Flood& flood = r.floods.facts.at(f);
+      append_integer(line, static_cast<std::int64_t>(flood.nodes));
+      line.push_back(',');
+      if (flood.last_s) {
+        append_double(line, *flood.last_s);
+      } else {
+        line.append("never");
+      }
+      line.push_back(',');
+      append_integer(line, static_cast<std::int64_t>(flood.messages));
+    } else {
+      line.append(",,");
+    }
+    line.push_back('\n');
     write_text(out, line);
+  }
+  out.flush();
+  return static_cast<bool>(out);
+}
+
+bool write_floods(const FailureRun& r, std::ostream& out) {
+  write_header(out, kFloodsColumns);
+  std::string line;
+  for (std::size_t f = 0; f < r.floods.facts.size(); ++f) {
+    const std::vector<double>& learn = r.floods.facts[f].learn_s;
+    for (std::size_t node = 0; node < learn.size(); ++node) {
+      if (!std::isfinite(learn[node])) {
+        continue;
+      }
+      line.clear();
+      append_integer(line, static_cast<std::int64_t>(f));
+      line.push_back(',');
+      append_csv_field(line, node_text(r, node));
+      line.push_back(',');
+      append_double(line, learn[node]);
+      line.push_back('\n');
+      write_text(out, line);
+    }
   }
   out.flush();
   return static_cast<bool>(out);
@@ -598,9 +662,10 @@ bool write_measures(const FailureRun& r, const FailureStatistics& stats, std::os
   for (std::size_t d = 0; d < d_count; ++d) {
     for (std::size_t s = 0; s < s_count; ++s) {
       for (std::size_t e = 0; e < stats.kinds.size(); ++e) {
-        if (stats.kinds[e] != LaneKind::kPlanner && stats.kinds[e] != LaneKind::kLocalRepair) {
+        if (!measured(stats, e, s)) {
           continue;
         }
+        const bool flooding = stats.kinds[e] == LaneKind::kFlooding;
         const LaneMeasures& m = stats.measures.at((e * d_count + d) * s_count + s);
         const std::optional<app::Quantiles> q = app::quantiles(m.extra_ms);
         line.clear();
@@ -610,16 +675,20 @@ bool write_measures(const FailureRun& r, const FailureStatistics& stats, std::os
         line.push_back(',');
         line.append(name_of(stats.kinds[e]));
         for (const std::optional<double> v :
-             {stats.t_f, m.black_hole_s, std::optional<double>{}, m.lost_s, m.restore_s, m.settle_s,
+             {stats.t_f, m.black_hole_s, m.loop_s, m.lost_s, m.restore_s, m.settle_s,
               q ? std::optional(q->min) : std::nullopt, q ? std::optional(q->median) : std::nullopt,
               q ? std::optional(q->max) : std::nullopt, m.extra_settled_ms}) {
           line.push_back(',');
           append_optional(line, v);
         }
         line.push_back(',');
-        append_integer(line, static_cast<std::int64_t>(reports));
+        if (flooding) {
+          line.append("none");
+        } else {
+          append_integer(line, static_cast<std::int64_t>(reports));
+        }
         line.push_back(',');
-        append_integer(line, static_cast<std::int64_t>(messages));
+        append_integer(line, static_cast<std::int64_t>(flooding ? r.floods.messages() : messages));
         line.push_back('\n');
         write_text(out, line);
       }
@@ -693,6 +762,22 @@ void write_failure_summary(const FailureRun& r, const FailureStatistics& stats, 
   out << "    reports: " << reports << ", their hops " << messages
       << "; hops of the first report per fact: " << quantiles_text(first_hops, 0, "")
       << "; local repairs " << stats.repairs << '\n';
+  if (lists(o, Reaction::kFlooding)) {
+    std::size_t flooded = 0;
+    std::vector<double> nodes;
+    std::vector<double> sent;
+    for (const Flood& f : r.floods.facts) {
+      if (f.learn_s.empty()) {
+        continue;
+      }
+      ++flooded;
+      nodes.push_back(static_cast<double>(f.nodes));
+      sent.push_back(static_cast<double>(f.messages));
+    }
+    out << "    floods: " << flooded << " of " << r.floods.facts.size() << " facts, messages "
+        << r.floods.messages() << "; nodes per flood " << quantiles_text(nodes, 0, "")
+        << "; messages per flood " << quantiles_text(sent, 0, "") << '\n';
+  }
   out << "    measures from t_f (per direction, strategy and reaction mode):\n";
   const std::size_t d_count = r.run.directions.size();
   const std::size_t s_count = r.run.options.strategies.size();
@@ -702,7 +787,7 @@ void write_failure_summary(const FailureRun& r, const FailureStatistics& stats, 
         << '\n';
     for (std::size_t s = 0; s < s_count; ++s) {
       for (std::size_t e = 0; e < stats.kinds.size(); ++e) {
-        if (stats.kinds[e] != LaneKind::kPlanner && stats.kinds[e] != LaneKind::kLocalRepair) {
+        if (!measured(stats, e, s)) {
           continue;
         }
         const LaneMeasures& m = stats.measures.at((e * d_count + d) * s_count + s);
@@ -712,7 +797,7 @@ void write_failure_summary(const FailureRun& r, const FailureStatistics& stats, 
             << seconds_or_none(m.restore_s) << ", settle " << seconds_or_none(m.settle_s)
             << "; extra delay " << quantiles_text(m.extra_ms, 3, " ms") << ", once settled "
             << (m.extra_settled_ms ? fixed(*m.extra_settled_ms, 3) + " ms" : std::string("none"))
-            << "; loop none\n";
+            << "; loop " << seconds_or_none(m.loop_s) << '\n';
       }
     }
   }
@@ -720,7 +805,10 @@ void write_failure_summary(const FailureRun& r, const FailureStatistics& stats, 
   out << "    failure-check failures (must be 0): delivered_not_up " << c.delivered_not_up
       << ", black_hole_not_failed " << c.black_hole_not_failed << ", fact_used_early "
       << c.fact_used_early << ", repair_too_early " << c.repair_too_early << ", settled_differs "
-      << c.settled_differs << ", below_baseline_ideal " << c.below_baseline_ideal << '\n';
+      << c.settled_differs << ", below_baseline_ideal " << c.below_baseline_ideal
+      << ", loop_not_repeated " << c.loop_not_repeated << ", table_fact_early "
+      << c.table_fact_early << ", flood_unreached " << c.flood_unreached
+      << ", settled_tables_differ " << c.settled_tables_differ << '\n';
   const routing_app::RouteChecks& rc = stats.other_routes;
   out << "    route-check failures of the other lanes (must be 0): ok_route_not_in_graph "
       << rc.ok_route_not_in_graph << ", below_ideal " << rc.below_ideal << ", below_lower_bound "
@@ -747,8 +835,8 @@ int run_main(std::span<const std::string_view> args, std::ostream& out, std::ost
     return 2;
   }
   const Options& options = *parsed.options;
-  if (auto refused = not_available_yet(options)) {
-    err << "failures: " << *refused << '\n';
+  if (auto refusal = refused(options)) {
+    err << "failures: " << *refusal << '\n';
     return 2;
   }
   FailureRunOrError prepared = prepare_failure_run(options);
@@ -812,6 +900,7 @@ int run_main(std::span<const std::string_view> args, std::ostream& out, std::ost
           [&](std::ostream& s) { return routing_app::write_drops(r.run, stats.routing, s); }) ||
       !write_file(options.events_out, [&](std::ostream& s) { return write_events(r, stats, s); }) ||
       !write_file(options.facts_out, [&](std::ostream& s) { return write_facts(r, s); }) ||
+      !write_file(options.floods_out, [&](std::ostream& s) { return write_floods(r, s); }) ||
       !write_file(options.measures_out,
                   [&](std::ostream& s) { return write_measures(r, stats, s); })) {
     return 2;

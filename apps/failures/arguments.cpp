@@ -67,14 +67,17 @@ Options of the routing program, with the same meaning (see routing --help):
 Options of this program:
   --reactions <list>          comma-separated reaction modes: planner (the planner only),
                               local-repair (the node before a dead element switches to a
-                              backup), flooding (not available yet)
+                              backup), flooding (every node routes on its own view after
+                              flooding what it learns; lowest-delay, which --strategies
+                              must list)
   --failures <file>           the failure file (kind,norad_cat_id_a,norad_cat_id_b,gateway,
                               start_utc,length_s); without it nothing fails
   --replan-on-report <on|off> the planner re-plans every direction the instant it learns a
                               fact (default off)
   --repoint <on|off>          lasers whose link failed look for new partners (default off)
   --detection-s <s>           from a failure to a neighbour knowing it (default 0.1)
-  --hop-processing-s <s>      added for every hop of a report (default 0.001)
+  --hop-processing-s <s>      added for every hop of a report or a flooded fact (default
+                              0.001)
   --compute-s <s>             from a node learning a fact to its tables using it (flooding;
                               default 0.1)
   --planner-processing-s <s>  from a report reaching a gateway to the planner knowing
@@ -83,7 +86,7 @@ Options of this program:
                               traffic (default 30)
   --events-out <path>         events CSV: one row per interval of a direction's state
   --facts-out <path>          facts CSV: one row per fact, with its detectors and reports
-  --floods-out <path>         floods CSV (flooding; not written yet)
+  --floods-out <path>         floods CSV: one row per fact and node that learns it (flooding)
   --measures-out <path>       measures CSV: one row per direction, strategy and reaction mode
   --network-out <path>        network CSV: per step and shell, the pieces the working
                               satellites' laser links join them into

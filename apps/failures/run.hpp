@@ -11,6 +11,7 @@
 #include <vector>
 
 #include "failures/arguments.hpp"
+#include "failures/flooding.hpp"
 #include "failures/loop.hpp"
 #include "failures/measures.hpp"
 #include "failures/reports.hpp"
@@ -44,15 +45,22 @@ inline constexpr std::array<std::string_view, 16> kEventsColumns = {
     "drop_cause", "failed_element", "one_way_ms", "route",    "serving_norad_cat_id",
     "gateway"};
 
-/// The facts CSV (spec 4.10 Details); the three flood columns are empty (no flooding yet).
+/// The facts CSV (spec 4.10 Details); the three flood columns are empty unless flooding is
+/// listed: then flood_nodes is Flood::nodes, flood_last_s its last instant (never without one),
+/// messages Flood::messages.
 inline constexpr std::array<std::string_view, 12> kFactsColumns = {
     "fact",        "subject",     "state",           "t_s",
     "old",         "detectors",   "planner_known_s", "reports",
     "report_hops", "flood_nodes", "flood_last_s",    "messages"};
 
-/// The measures CSV (spec 4.10 Details): one row per direction, strategy and reaction mode.
-/// loop_s is none (no flooding yet); reports and messages are the run's: every fact's reports
-/// and the hops of all of them.
+/// The floods CSV (spec 4.10 Details, with flooding): one row per fact and node that learns it,
+/// by fact then node (satellites, cities, gateways), the node written as a detector is.
+inline constexpr std::array<std::string_view, 3> kFloodsColumns = {"fact", "node", "learn_s"};
+
+/// The measures CSV (spec 4.10 Details): one row per direction, strategy and reaction mode
+/// (flooding only under its strategy). For planner and local-repair, reports and messages are
+/// the run's: every fact's reports and the hops of all of them; for flooding reports is none and
+/// messages every sending of every flood.
 inline constexpr std::array<std::string_view, 19> kMeasuresColumns = {"from",
                                                                       "to",
                                                                       "role",
@@ -89,6 +97,8 @@ struct FailureRun {
   TimelineSettings timeline_settings;
   Timeline timeline;
   std::vector<FactReports> reports;
+  /// Every fact's flood when flooding is listed; empty otherwise.
+  Floods floods;
 };
 
 using FailureRunOrError = std::variant<FailureRun, std::string>;
@@ -109,6 +119,8 @@ struct FailureStatistics {
   std::vector<LaneMeasures> measures;
   std::optional<double> t_f;
   std::size_t repairs = 0;
+  /// The flooding lanes' strategy (FailureLoop::flooding_strategy).
+  std::optional<std::size_t> flooding_strategy;
 
   [[nodiscard]] bool passed() const noexcept {
     return routing.passed() && other_routes.total() == 0 && failures.total() == 0 &&
@@ -130,7 +142,8 @@ struct FailureHooks {
 /// Loads and checks everything: routing_app::prepare_run on options.routing, the reaction times,
 /// the failure file (failure::read_failure_schedule_file with the run's gateway names, start
 /// and step; none: an empty schedule), the timeline on the snapshot's geometry
-/// (SnapshotGeometry, build_timeline) and every fact's reports.
+/// (SnapshotGeometry, build_timeline) and every fact's reports; with flooding, every fact's flood
+/// (flood_facts).
 [[nodiscard]] FailureRunOrError prepare_failure_run(const Options& options);
 
 /// Steps through the run once for every lane; writes the routes CSV and, if `network` is set,
@@ -139,9 +152,10 @@ struct FailureHooks {
                                                   std::ostream* network,
                                                   const FailureHooks& hooks = {});
 
-/// The events, facts and measures CSVs. Each returns false if the stream fails.
+/// The events, facts, floods and measures CSVs. Each returns false if the stream fails.
 bool write_events(const FailureRun& run, const FailureStatistics& stats, std::ostream& out);
 bool write_facts(const FailureRun& run, std::ostream& out);
+bool write_floods(const FailureRun& run, std::ostream& out);
 bool write_measures(const FailureRun& run, const FailureStatistics& stats, std::ostream& out);
 
 /// The summary: the routing program's for the baseline lane, then the failures section, then
@@ -153,13 +167,15 @@ void write_failure_summary(const FailureRun& run, const FailureStatistics& stats
 /// gateway:<name> (not CSV-quoted).
 [[nodiscard]] std::string element_text(const FailureRun& run, const Subject& subject);
 
-/// The one place that refuses what is not available yet: a reaction list holding flooding.
-[[nodiscard]] std::optional<std::string> not_available_yet(const Options& options);
+/// What the run refuses besides the arguments: flooding without lowest-delay among the
+/// strategies (its lanes are lowest-delay, compared with that strategy's baseline and
+/// reference).
+[[nodiscard]] std::optional<std::string> refused(const Options& options);
 
 /// The whole program, as routing_app::run_main: the routes CSV to --out (or `out` for "-"),
 /// the other CSVs where asked, the summary to `out` (to `err` when the CSV goes to `out`).
-/// Returns 0, 1 if a check fails, 2 for invalid arguments or inputs, an unavailable reaction
-/// mode, or output that cannot be written.
+/// Returns 0, 1 if a check fails, 2 for invalid arguments or inputs, a refused run (refused),
+/// or output that cannot be written.
 [[nodiscard]] int run_main(std::span<const std::string_view> args, std::ostream& out,
                            std::ostream& err, const FailureHooks& hooks = {});
 

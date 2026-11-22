@@ -504,7 +504,8 @@ TEST(RepointTest, ThroughTheLoopABridgeCarriesTrafficOnceAcquiredAndKnown) {
                    .schedule = {},
                    .timeline_settings = settings,
                    .timeline = timeline,
-                   .reports = fa::fact_reports(timeline, settings, geometry)};
+                   .reports = fa::fact_reports(timeline, settings, geometry),
+                   .floods = {}};
   r.run.working = classification;
   r.run.cities.resize(2);
   r.run.cities[0].site.name = "A";

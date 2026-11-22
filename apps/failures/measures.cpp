@@ -80,6 +80,7 @@ std::vector<LaneMeasures> lane_measures(
       LaneMeasures& m = result[e * lanes + i];
 
       double black_hole = 0.0;
+      double loop = 0.0;
       std::optional<double> stopped;
       std::optional<double> back;
       for (const Interval* iv : lane) {
@@ -89,6 +90,8 @@ std::vector<LaneMeasures> lane_measures(
         const double start = std::max(iv->start_s, from);
         if (iv->status.state == DirectionState::kBlackHole) {
           black_hole += iv->end_s - start;
+        } else if (iv->status.state == DirectionState::kLoop) {
+          loop += iv->end_s - start;
         }
         const bool delivered = iv->status.state == DirectionState::kDelivered;
         if (!delivered && !stopped) {
@@ -98,6 +101,7 @@ std::vector<LaneMeasures> lane_measures(
         }
       }
       m.black_hole_s = black_hole;
+      m.loop_s = loop;
       m.restore_s =
           !stopped ? std::optional(0.0) : (back ? std::optional(*back - from) : std::nullopt);
 
