@@ -1472,7 +1472,14 @@ void LoopStep::flood_settled(Slot& slot, double t) {
   for (std::size_t d = 0; d < st_->d_count(); ++d) {
     const Status& a = slot.status[lane(d, s)];
     const Status& b = st_->slots.at(1).status[lane(d, s)];
-    if (a.state != b.state || a.route != b.route) {
+    // A realistic dish knows only what it found out itself, so it may serve another satellite
+    // than the reference's dish (a dead one it cannot know about yet, or the one it picked
+    // again inside a slot): its route is then its own, not a difference from the settled one.
+    const bool same_serving =
+        !st_->realistic() ||
+        slot.engine->serving_of(slot.engine->dish_of(d, s)) ==
+            st_->slots.at(1).engine->serving_of(st_->slots.at(1).engine->dish_of(d, s));
+    if (same_serving && (a.state != b.state || a.route != b.route)) {
       ++checks_->settled_differs;
     }
     if (a.state != DirectionState::kDelivered) {
@@ -1555,8 +1562,14 @@ std::optional<std::string> LoopStep::at_step(
           for (std::size_t i = 0; i < slot.flood_dishes.size(); ++i) {
             if (i < st_->sending.size() && st_->sending[i] != 0) {
               flood_learn(slot.flood_dishes[i], t);
-              slot.engine->set_serving(i, flood_pick(slot, i, t));
-              flood_schedule(slot, i, t);
+              // A dish that keeps its satellite has been sending to it since it got it: what
+              // it is due to find out about it stands.
+              const std::optional<std::size_t> before = slot.engine->serving_of(i);
+              const std::optional<std::size_t> pick = flood_pick(slot, i, t);
+              slot.engine->set_serving(i, pick);
+              if (pick != before) {
+                flood_schedule(slot, i, t);
+              }
             }
           }
         }
