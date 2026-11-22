@@ -43,7 +43,9 @@
 // which re-plans the planner and local-repair engines there), and a local repair. At each one the
 // truth at t (overlay_truth) is built with each engine's serving satellites and every lane of
 // every engine but the baseline is evaluated again (Engine::evaluate). The baseline changes only
-// at steps.
+// at steps. At one instant (a step's or one inside it) the local repairs due come before a plan
+// on a report (spec 4.5 Details), which then sees the repaired dishes and routes; the repairs
+// that plan makes due (a route handed through an element its node knows is dead) follow it.
 //
 // Local repair (spec 4.5). Right after every plan of the local-repair engine its planning graph
 // is copied; a backup is the shortest path in that copy (network::shortest_paths_avoiding) from
@@ -58,14 +60,17 @@
 // "satellite down"; the near end of a dead link: "link down"; an old fact: instant 0), else
 // t_pass + detection_s. The route becomes the old route up to that node, then its backup
 // (Engine::hold_route); no backup: nothing changes. One repair per lane between two plans.
-// Realistic, the dead element is the dish's serving satellite: at the earliest repair instant of
-// the city's lanes the dish picks again (Engine::pick_serving) among the satellites the city sees
-// in the truth, the dead one left out, and every lane of the city holding a route continues
-// from the new satellite on the shortest path in the copied planning graph that avoids the dead
-// one (no new satellite: nothing changes). A repaired route is kept at a plan whose planning
-// graph still has the dead hop (the edge from the repairing node to the old route's next node;
-// for a dish, from the dish to the dead satellite): after the engine planned, the repaired route
-// is held again and the plan written `kept`. At the first plan without that hop the lane is
+// Realistic, the dead element is the dish's serving satellite: its pass instant is the later of
+// the satellite's failure instant and the instant the dish got it (whatever route its lanes
+// hold), and at the earliest repair instant of the city's lanes the dish picks again
+// (Engine::pick_serving) among the satellites the city sees in the truth, the dead one left
+// out, and every lane of the city (of a direction with a home PoP), holding a route or not (a
+// plan that found none because of the dead serving satellite cleared it), continues from the
+// new satellite on the shortest path in the copied planning graph that avoids the dead one (no
+// new satellite, or no such path: nothing changes). A repaired route is kept at a plan whose
+// planning graph still has the dead hop (the edge from the repairing node to the old route's next
+// node; for a dish, from the dish to the dead satellite): after the engine planned, the repaired
+// route is held again and the plan written `kept`. At the first plan without that hop the lane is
 // planned as usual and may repair again. A dish's repaired satellite is given back at a slot
 // start that picks the dead one again.
 //
@@ -85,12 +90,17 @@
 //  - A realistic serving dish sends to its serving satellite S, if S is in the window's lists
 //    of its city at each of the steps the planning graph tests a serving dish edge at (the
 //    edge the graph would have with S as serving satellite), S is not down in its view and S's
-//    table reaches the target; else it has no next hop. Its serving satellite: at every slot
-//    start the serving rule (Engine::pick_serving) among what its city sees in the truth; and
-//    when S, serving since instant u, goes down at t_f >= u, the dish knows at
-//    t_f + detection_s (if S is still down then) and picks again by the rule at that instant
-//    plus compute_s among what its city sees in the truth, S left out; with nothing else to
-//    pick it keeps S.
+//    table reaches the target; else it has no next hop. A dish knows only what it found out
+//    itself (and the old facts, from instant 0). Its serving satellite: at every slot start the
+//    serving rule (Engine::pick_serving) among what its city sees by geometry (the step's
+//    visible list, failed satellites in it), leaving out only the satellites it knows are dead
+//    and uses that; so it may pick a dead satellite it cannot know about, a black hole on it.
+//    When S, serving since instant u, is down at u or goes down at t_f >= u, the dish knows at
+//    u + detection_s or t_f + detection_s (if S is still down then) and picks again by the rule
+//    at that instant plus compute_s, from which it uses that S is dead: among what its city
+//    sees by geometry, every satellite it uses as dead left out; with nothing else to pick it
+//    keeps S. It forgets nothing during a run: a satellite it knows as dead that returns is
+//    never tried again (it does not learn of the return; a consequence of the rule).
 //  - At an instant the traffic follows routing::walk from the lane's source node to its
 //    target, then is judged against the truth graph (the truth at the instant with the
 //    flooding dishes' serving satellites): every hop up and delivered: delivered, delay

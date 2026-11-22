@@ -202,8 +202,25 @@ struct Expect {
   std::optional<DropCause> cause = std::nullopt;
 };
 
+// Every interval of a lane, one per line, for a failure message.
+std::string describe(const std::vector<Interval>& got) {
+  std::string out;
+  for (const Interval& iv : got) {
+    out += "[" + std::to_string(iv.start_s) + ", " + std::to_string(iv.end_s) + ") " +
+           std::string(satsim::failures_app::name_of(iv.status.state)) + " route";
+    for (const std::size_t node : iv.status.route) {
+      out += " " + std::to_string(node);
+    }
+    if (iv.status.element) {
+      out += " element " + std::to_string(iv.status.element->index);
+    }
+    out += "\n";
+  }
+  return out;
+}
+
 void expect_intervals(const std::vector<Interval>& got, const std::vector<Expect>& want) {
-  ASSERT_EQ(got.size(), want.size());
+  ASSERT_EQ(got.size(), want.size()) << describe(got);
   for (std::size_t i = 0; i < want.size(); ++i) {
     SCOPED_TRACE(i);
     EXPECT_EQ(got[i].start_s, want[i].start_s);
@@ -528,6 +545,89 @@ TEST(FloodingTest, RealisticDishPicksAgain) {
     ASSERT_EQ(lane.size(), 3U);
     EXPECT_EQ(lane[0].serving, std::optional<std::size_t>(0));
     EXPECT_EQ(lane[2].serving, std::optional<std::size_t>(4));
+  }
+  EXPECT_EQ(scene.loop->checks().total(), 0U);
+}
+
+// The realistic world of RealisticDishPicksAgain.
+void make_realistic(Scene& scene) {
+  scene.geometry.base.city_visible = {{seen(0, 500.0), seen(4, 500.0)}, {}, {}};
+  scene.geometry.base.gateway_visible = {{seen(5, 500.0)}, {seen(4, 900.0)}};
+  scene.network.city_count = 3;
+  scene.network.gateway_count = 2;
+  scene.network.directions = {{.from = 0, .to = 1, .lower_bound_s = 0.001, .has_home_pop = true},
+                              {.from = 0, .to = 2, .lower_bound_s = 0.001, .has_home_pop = true}};
+  scene.network.end_delays_s = {0.001, 0.001, 0.001, 0.001};
+}
+
+// The bug of a flooding dish that never picked a dead satellite at a slot start. Realistic, as
+// RealisticDishPicksAgain; satellite 0 fails at 10 s, a slot start. The dish knows only what it
+// found out itself, so at 10 s it picks by its rule among what its city sees by geometry: 0
+// again (the lower catalogue number of two equal elevations), dead. Its uplink goes to the dead
+// satellite, a black hole on 0, until it knows (the failure instant, which is also the pick
+// instant, + 0.1 s) and picks again 0.1 s later: 4, then 4 g1. The bug: the dish picked among
+// what the truth shows, which leaves out every dead satellite, and so took 4 at once (0 s lost).
+TEST(FloodingTest, ADishPicksADeadSatelliteItCannotKnowAboutAtASlotStart) {
+  Scene scene(EndpointModel::kRealistic);
+  make_realistic(scene);
+  scene.run({failure_at(ElementKind::kSatellite, 0, 10.0)});
+  const double picks_again = (10.0 + 0.1) + 0.1;
+  for (std::size_t d = 0; d < 2; ++d) {
+    SCOPED_TRACE(d);
+    const std::size_t end = 30 + d;
+    const auto lane = scene.lane(LaneKind::kFlooding, d);
+    expect_intervals(lane, {{0.0, 10.0, DirectionState::kDelivered, {32, 0, 1, 5, 28, end}},
+                            {10.0,
+                             picks_again,
+                             DirectionState::kBlackHole,
+                             {32},
+                             satellite(0),
+                             DropCause::kFailedSatellite},
+                            {picks_again, kEnd, DirectionState::kDelivered, {32, 4, 29, end}}});
+    ASSERT_EQ(lane.size(), 3U);
+    EXPECT_EQ(lane[1].serving, std::optional<std::size_t>(0));
+    EXPECT_EQ(lane[2].serving, std::optional<std::size_t>(4));
+  }
+  EXPECT_EQ(scene.loop->checks().total(), 0U);
+}
+
+// The same bug when the dish picks again. City A also sees satellite 5 (500 km; 5 g0 is its
+// way). Satellites 0 and 4 both fail at 5 s. The dish knows 0 is dead at 5.1 s and picks again
+// at 5.1 + 0.1 s among what A sees by geometry, 0 left out: 4, which is dead too but which it
+// cannot know about: a black hole on 4. It knows at that pick instant + 0.1 s (4 was already
+// dead when picked) and picks again 0.1 s later, 0 and 4 left out: 5, delivered 5 g0. At the
+// slot starts of 10, 20 and 30 s it never tries 0 or 4 again (it forgets nothing; it would not
+// learn of their return either). The bug: the first pick again left out the dead 4 as well
+// and took 5 at once.
+TEST(FloodingTest, ADishPickingAgainMayPickAnotherDeadSatelliteItCannotKnowAbout) {
+  Scene scene(EndpointModel::kRealistic);
+  make_realistic(scene);
+  scene.geometry.base.city_visible[0] = {seen(0, 500.0), seen(4, 500.0), seen(5, 500.0)};
+  scene.run(
+      {failure_at(ElementKind::kSatellite, 0, 5.0), failure_at(ElementKind::kSatellite, 4, 5.0)});
+  const double picks_4 = kUses;
+  const double picks_5 = (picks_4 + 0.1) + 0.1;
+  for (std::size_t d = 0; d < 2; ++d) {
+    SCOPED_TRACE(d);
+    const std::size_t end = 30 + d;
+    const auto lane = scene.lane(LaneKind::kFlooding, d);
+    expect_intervals(lane, {{0.0, 5.0, DirectionState::kDelivered, {32, 0, 1, 5, 28, end}},
+                            {5.0,
+                             picks_4,
+                             DirectionState::kBlackHole,
+                             {32},
+                             satellite(0),
+                             DropCause::kFailedSatellite},
+                            {picks_4,
+                             picks_5,
+                             DirectionState::kBlackHole,
+                             {32},
+                             satellite(4),
+                             DropCause::kFailedSatellite},
+                            {picks_5, kEnd, DirectionState::kDelivered, {32, 5, 28, end}}});
+    ASSERT_EQ(lane.size(), 4U);
+    EXPECT_EQ(lane[2].serving, std::optional<std::size_t>(4));
+    EXPECT_EQ(lane[3].serving, std::optional<std::size_t>(5));
   }
   EXPECT_EQ(scene.loop->checks().total(), 0U);
 }
