@@ -19,6 +19,7 @@
 
 #include <gtest/gtest.h>
 
+#include <algorithm>
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
@@ -65,6 +66,7 @@ using satsim::failures_app::LoopHooks;
 using satsim::failures_app::LoopSettings;
 using satsim::failures_app::Reaction;
 using satsim::failures_app::Status;
+using satsim::failures_app::StepGeometry;
 using satsim::failures_app::Subject;
 using satsim::failures_app::SubjectKind;
 using satsim::failures_app::Timeline;
@@ -628,6 +630,74 @@ TEST(FloodingTest, ADishPickingAgainMayPickAnotherDeadSatelliteItCannotKnowAbout
     ASSERT_EQ(lane.size(), 4U);
     EXPECT_EQ(lane[2].serving, std::optional<std::size_t>(4));
     EXPECT_EQ(lane[3].serving, std::optional<std::size_t>(5));
+  }
+  EXPECT_EQ(scene.loop->checks().total(), 0U);
+}
+
+// The world of make_realistic in which city A sees only satellite 4 until 20 s, and from then
+// on 0 as well, which the rule prefers (the lower catalogue number of two equal elevations).
+void zero_rises_at_20(Scene& scene) {
+  make_realistic(scene);
+  // Gateway 0 sees satellite 0 too, so that its failure has a detector and is flooded.
+  scene.geometry.base.gateway_visible[0] = {seen(0, 900.0), seen(5, 500.0)};
+  StepGeometry early = scene.geometry.base;
+  early.city_visible[0] = {seen(4, 500.0)};
+  for (std::int64_t k = 0; k < 20; ++k) {
+    scene.geometry.steps.insert_or_assign(k, early);
+  }
+}
+
+// The black-hole intervals of a lane on satellite 0: where they start and end.
+std::pair<double, double> black_hole_on_0(const std::vector<Interval>& lane) {
+  double from = kInf;
+  double to = -kInf;
+  for (const Interval& iv : lane) {
+    if (iv.status.state == DirectionState::kBlackHole && iv.status.element == satellite(0)) {
+      from = std::min(from, iv.start_s);
+      to = std::max(to, iv.end_s);
+    }
+  }
+  return {from, to};
+}
+
+// The bug of the settled check counting a flooding dish that found a dead satellite late.
+// Satellite 0 fails at 5 s, when no dish serves it; the flood is over long before 20 s. At the
+// slot start of 20 s the dish picks 0, which it cannot know is dead (a dish knows only what it
+// found out itself): a black hole until 20 + 0.1 + 0.1 s, then 4 again. That is the rule, not a
+// difference from the settled route: the check compares a direction only while its dish serves
+// the satellite the reference's dish serves. The bug: settled_differs counted the step of 20 s.
+TEST(FloodingTest, ADishFindingADeadSatelliteAfterTheFloodIsNotASettledDifference) {
+  Scene scene(EndpointModel::kRealistic);
+  zero_rises_at_20(scene);
+  scene.run({failure_at(ElementKind::kSatellite, 0, 5.0)});
+  for (std::size_t d = 0; d < 2; ++d) {
+    SCOPED_TRACE(d);
+    const auto [from, to] = black_hole_on_0(scene.lane(LaneKind::kFlooding, d));
+    EXPECT_EQ(from, 20.0);
+    EXPECT_EQ(to, (20.0 + 0.1) + 0.1);
+  }
+  EXPECT_EQ(scene.loop->checks().total(), 0U);
+}
+
+// The bug of a slot start putting back the clock of a dish that keeps its satellite. As above
+// with a detection time of 12 s, longer than the 10 s slot. The dish picks the dead 0 at 20 s
+// and again at 30 s (it does not know yet). It has been sending to 0 since 20 s, so it knows at
+// 32 s and picks again 0.1 s later: 4. The bug: the pick of 30 s started the 12 s again, so the
+// dish never knew within the run.
+TEST(FloodingTest, ASlotStartThatKeepsTheSatelliteDoesNotRestartDetection) {
+  Scene scene(EndpointModel::kRealistic);
+  scene.times.detection_s = 12.0;
+  zero_rises_at_20(scene);
+  scene.run({failure_at(ElementKind::kSatellite, 0, 5.0)});
+  for (std::size_t d = 0; d < 2; ++d) {
+    SCOPED_TRACE(d);
+    const auto lane = scene.lane(LaneKind::kFlooding, d);
+    const auto [from, to] = black_hole_on_0(lane);
+    EXPECT_EQ(from, 20.0);
+    EXPECT_EQ(to, (20.0 + 12.0) + 0.1);
+    ASSERT_FALSE(lane.empty());
+    EXPECT_EQ(lane.back().status.state, DirectionState::kDelivered);
+    EXPECT_EQ(lane.back().serving, std::optional<std::size_t>(4));
   }
   EXPECT_EQ(scene.loop->checks().total(), 0U);
 }

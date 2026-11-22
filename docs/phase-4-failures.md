@@ -335,7 +335,8 @@ own view and its own table.
   it if it was already dead. At a slot start it picks by its serving rule among the
   satellites its city sees, leaving out those it knows are dead; so it can pick a dead one it
   has not met, and its traffic is then a black hole until it knows and, one compute time
-  later, picks again. It does not learn that a satellite has returned.
+  later, picks again. A slot start at which it keeps its satellite does not start the
+  detection time again. It does not learn that a satellite has returned.
 - "Up again" facts and new repair links are flooded the same way.
 
 ### 4.6 What a direction experiences
@@ -640,7 +641,9 @@ run on the baseline and on every `delivered` interval. New:
   fact.
 - Once a failure is settled, the route in every reaction mode is the route a planner with
   full knowledge holds, and in `flooding` following the tables from every node of that route
-  gives the rest of it.
+  gives the rest of it. A realistic `flooding` direction is compared only while its dish
+  serves the satellite that planner's dish serves: a dish that meets a dead satellite late,
+  or picks again inside a slot, holds a route of its own until the next slot start.
 - With re-pointing off, no delivered delay is below the baseline's ideal at that step: taking
   elements away never shortens the shortest path.
 - At every step each laser is in at most one link that is not failed, every repair link joins
