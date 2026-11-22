@@ -123,8 +123,9 @@ A 32-bit float holds a position of 7,000 km to about half a metre. That is far b
 screen can show and is counted in the measured error.
 
 **Window.** The full export covers two hours from the plan time of Phases 3 and 4, at a
-sample step of 60 s. The small export (`--small`) covers five minutes of the same start and
-runs each story's shortest scenario; it is what the tests and CI use. Both are settings of
+sample step of 60 s. The small export (`--small`) covers seven minutes starting where the
+failure story's run starts, so that every story has positions, and runs each story's
+shortest scenario; it is what the tests and CI use. Both are settings of
 the export and are written into the manifest.
 
 ### 4.3 Interpolation
@@ -178,11 +179,15 @@ side on one clock.
   the engine gives it for the clock's time: delivered, black hole (drawn up to the point
   where traffic is lost) or loop. The baseline route (no failure) is drawn faintly beneath.
 - **News.** For flooding, each satellite changes colour at the instant the flood reached it.
-  For planner and local-repair, the report's path to the planner and the instant the new plan
-  takes effect are shown. A list beside the lanes names each fact and when each actor learned
-  it.
-- **Slow motion.** From the failure instant until the last lane has settled, with a pause
-  before the failure. The span and its speed are in the story file.
+  For planner and local-repair, the satellites that detected the failure are marked when
+  they detect it, and the instant the planner knew and the instant the new plan takes effect
+  are shown, with the number of reports and the hops of the first one. The satellites a
+  report passes on its way are not shown, because no program writes them. A list beside the
+  lanes names each fact and when each actor learned it.
+- **Slow motion.** Two spans, after a pause just before the failure. The first second after
+  the failure plays at 0.02x, because the flood and the first repairs are milliseconds
+  apart. From there until the last lane has settled the clock plays at no more than 2x. The
+  spans and their speeds are in the story file.
 - **Measures panel.** For each mode: time lost, time to restore, time to settle, extra delay,
   reports and messages, exactly the values in the run's `measures.csv`.
 - **Context chart.** The distribution of time lost per mode over all of Phase 4's main runs
@@ -190,8 +195,10 @@ side on one clock.
 
 ### 4.6 Story: a route through time
 
-Replays a `routing` run with Phase 3's main settings over the window, for the six study
-pairs and the four strategies.
+Replays a `routing` run with Phase 3's main settings on the best-case model over the window,
+for the six study pairs and the four strategies (the threshold strategy at 2 ms). The
+realistic model is not used here: five of the six pairs have no laser hop in it, so all
+strategies give the same route.
 
 - A menu for the pair and the direction, and a switch for each strategy.
 - The route of each chosen strategy on the globe at the clock's time, one colour per
@@ -219,8 +226,10 @@ the route stays the same, the delay at each engine step, and the drops with thei
   lasers, the attack, each pattern, with and without re-pointing; and the size of the largest
   connected part against the failed share.
 - A globe view for a menu of failed shares (1%, 10%, 30% random satellites, and the attack at
-  30%), one seed each: the failed satellites are greyed out, the working laser links are
-  drawn, and for the six study pairs the route after recovery or "no route". These come from
+  30%), one seed each: the failed satellites are greyed out, the planned laser links that did
+  not fail are drawn (labelled as such: a planned link can also be out of sight at an
+  instant, and no program writes that), and for the six study pairs the route after recovery
+  or "no route". These come from
   one-step `failures` runs made by the export with Phase 4's settings.
 
 ### 4.9 Deploying
@@ -241,11 +250,11 @@ The export makes these engine runs, all on the snapshot of Phases 1 to 4:
 
 | For | Program | Full export | Small export |
 |---|---|---|---|
-| Positions | `propagate` | two hours, 60 s step | five minutes, 60 s step |
-| Positions for the error measurement | `propagate` | the first ten minutes at 1 s | the five minutes at 1 s |
+| Positions | `propagate` | two hours, 60 s step | seven minutes, 60 s step |
+| Positions for the error measurement | `propagate` | the first ten minutes at 1 s | the seven minutes at 1 s |
 | Satellites | `constellation` | once | once |
 | Laser links | `topology --links-out` | three patterns | three patterns |
-| Route through time | `routing` | two hours, six pairs, four strategies | five minutes, one pair |
+| Route through time | `routing` | two hours, six pairs, four strategies | seven minutes, one pair |
 | One failure | `failures` | three scenarios, one pair, realistic | one scenario |
 | Falling apart | `failures`, one step | four failed shares | one failed share |
 
