@@ -2,6 +2,10 @@ name: Pages
 
 # Publishes the dashboard (docs/phase-5-dashboard.md 4.9). Started by hand only, and only
 # from main: going public is the owner's decision each time.
+#
+# The repository's Pages setting has to be Source: "GitHub Actions". With "Deploy from a
+# branch", GitHub also publishes the repository's files on every push to main, and the README
+# replaces what this workflow deployed.
 on:
   workflow_dispatch:
 
