@@ -2,7 +2,8 @@
 
 All checks run inside one Docker image (`docker/Dockerfile`, Ubuntu 24.04 with GCC 13,
 Clang 18, CMake, Ninja, Valgrind, clang-format, clang-tidy, and Python 3 with the packages
-pinned in `python/requirements.txt`: ruff, pyerfa, Skyfield, python-sgp4, matplotlib). GitHub
+pinned in `python/requirements.txt`: ruff, pyerfa, Skyfield, python-sgp4, matplotlib; and for
+the dashboard Node 22 and the Chromium build of one pinned Playwright release). GitHub
 Actions and the local check run the same `scripts/ci.sh` steps in that image, so a green
 local run means the same commands pass in CI. Local runs on an Apple silicon Mac are linux/arm64; CI is x86_64.
 
@@ -13,8 +14,8 @@ Only Docker is needed on the host.
 ```sh
 scripts/check.sh            # every step; exit 0 only if all pass
 scripts/check.sh valgrind   # one step: format, python-lint, asan-gcc, asan-clang, valgrind, tidy,
-                            # validate, validate-topology, validate-routing or
-                            # validate-failures
+                            # validate, validate-topology, validate-routing,
+                            # validate-failures or dashboard
 ```
 
 Build trees go to `build/<step>` (for example `build/asan-clang`), including the GoogleTest
@@ -37,6 +38,7 @@ from 215 s to 60 s and clang-tidy from 19 minutes to 8.
 | `validate-topology` | `topology` and `constellation` output on an ideal shell that disagrees with an independent Python model: a satellite in the wrong plane or slot, an element set from the wrong file, a wrong count of satellites, planes or laser links, a laser left without a partner, a different laser grid, elevation mask, ground link or shortest path (any row's status, laser hops, first or last satellite, or a one-way delay more than 1e-6 ms off). Builds both programs optimised without sanitizers and runs `python/validate_topology.py` | The unit tests check each piece of the topology on small hand-made cases; this checks the whole program on a full 1,584-satellite shell against code written separately (positions from python-sgp4 and Skyfield, the +Grid built from plane and slot indices, its own Dijkstra), and checks that model against the round-trip times the Hypatia paper published. Tolerances and measured values: `docs/phase-2-results.md` |
 | `validate-routing` | `routing` output on two ideal published shells that disagrees with an independent Python model: any row's status, drop cause, route (every satellite in order), plan (kept, replaced, none), laser hops, first or last satellite, or a one-way or ideal delay more than 1e-9 ms off; or a summary count of bad changes, delay increases, breaks or recoveries. Covers `lowest-delay`, `keep-until-broken` and `longest-lived`, routes held between plans, link files, `--max-ground-range-km`, `--min-elevation-deg`, `--hop-delay-ms`, sub-second steps and `--directions forward`. Builds `routing` optimised without sanitizers and runs `python/validate_routing.py` | The unit tests check each strategy on small hand-worked graphs; this checks the whole program on full 1,584-satellite shells against a re-plan loop, graph and Dijkstra written separately from the spec (positions from python-sgp4 with its own TEME to ITRF, checked against Skyfield). It is the comparison the published reproductions rest on (`docs/phase-3-routing.md` 6.3) |
 | `validate-failures` | `failures` output on Hypatia's ideal shell that disagrees with an independent Python model: any interval of the events CSV (state, route, drop cause, failed element, start and end to 1e-9 s, delay to 1e-9 ms), any fact (subject, down or up, instant, old news, detectors and their instants, when the planner knew, reports and their hops, flood nodes, last learning instant, messages), any node's learning instant in a flood, any routes CSV row (state, cause, element, route, delay, ideal delay, plan), any measure of a lane to 1e-9, or any network row (working satellites, pieces, largest piece). Covers satellite and laser-link failures, permanent, transient and old news, the three reaction modes and the baseline and reference lanes, `lowest-delay` and `keep-until-broken`, the `start` and `whole-interval` planners, `--replan-on-report`, re-pointing with in-plane and cross-plane repair links, and both a +Grid and a `three` link file. Runs the model's own self-tests first. Builds `failures` optimised without sanitizers and runs `python/validate_failures.py` | The unit tests check each piece of the failure engine on hand-made geometry; this checks the whole program on a full 1,584-satellite shell against detection, reports, floods, views, the five lanes and re-matching written separately from the spec. It is the proof of Phase 4 (`docs/phase-4-failures.md` 6.3) |
+| `dashboard` | An exported number that differs from the engine's CSV files, a position sample that differs from `propagate`, an interpolation error over 1 km, a data file of 25 MiB or more (the data check, `python/check_dashboard_data.py`); TypeScript type errors and ESLint findings in `dashboard/`; a loader that accepts a file of the wrong size or shape, wrong interpolation, a wrong clock, a wrong state at a time (121 unit tests); a story that does not load or draw, a console error, a number on screen that differs from the engine's CSV, a clock bar lying over a globe (10 browser tests in Chromium without a screen) | A page can look right and be wrong. The data check ties every number the page loads to the engine, and the browser test ties what the page shows to the same files (`docs/phase-5-dashboard.md` 6) |
 | `validate` | `propagate` output that disagrees with Skyfield on real data: wrong time since epoch, GMST, UT1, polar motion, geodetic conversion or J2000 chain, a wrong element set chosen, a row missing or extra. Builds `propagate` optimised without sanitizers (tests off, so nothing is downloaded) and runs `python/validate_against_reference.py` on a fixed sample of the committed snapshot | The unit tests check each piece against printed references; this checks the whole program against an independent implementation, row by row, on the data it is meant for. Tolerances and measured values: `docs/phase-1-results.md` |
 
 Every build also compiles our code with
@@ -132,6 +134,29 @@ The model shares no code with the program; positions come from the same python-s
 `validate-routing`. Instants must agree to 1e-9 s and delays to 1e-9 ms. It takes about a
 minute after the build (measured 53 s on 4 cores), reads only local files (any network
 connection raises) and runs with `--network none` in the GitHub job.
+
+## The dashboard step
+
+`scripts/ci.sh dashboard` builds the five programs optimised, runs the small export
+(`python/export_dashboard.py --small`: seven minutes of the real snapshot, one scenario per
+story) into `dashboard/public/data/`, and runs the data check on it. It then installs the
+page's packages from `dashboard/package-lock.json` (`npm ci`, the only part that needs the
+network) and runs the type check, the lint, the unit tests, the build and the browser test.
+Measured in a cloud session (4 cores, 2026-11-23): 2 minutes 28 seconds once the programs are
+built.
+
+The step replaces whatever export was in `dashboard/public/data/`. That directory and
+`results/dashboard/` are not in git.
+
+The browser belongs to one Playwright release: `PLAYWRIGHT_VERSION` in `docker/Dockerfile`
+has to equal `@playwright/test` in `dashboard/package.json`, and the step stops with that
+message if they differ. Chromium has no graphics card in the image, so it draws WebGL in
+software (the flags are in `dashboard/playwright.config.ts`); the browser test sets the
+clock's time and never waits for playback.
+
+`scripts/ci.sh dashboard-site` is the published site: the full export, its data check and
+the built page in `dashboard/dist/`. It is not part of the check; `.github/workflows/pages.yml`
+runs it, and that workflow starts only by hand from `main`.
 
 ## Deliberately deferred
 
