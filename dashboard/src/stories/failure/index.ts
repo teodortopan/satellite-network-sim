@@ -6,11 +6,13 @@ import { ClockView } from '../../clock/clock-view';
 import { parseLinks, type CommonData } from '../../data/common';
 import { GlobeView } from '../../globe/globe-view';
 import { earth } from '../../globe/layers';
+import { siteScenePositions } from '../../globe/paths';
 import { SatelliteField } from '../../globe/satellite-field';
 import { THEME } from '../../theme';
+import { frameLoop, segmented } from '../../ui/controls';
 import type { Story, StoryContext } from '../story';
 import { MODES, parseFailureStory, type FailureStory, type Scenario } from './data';
-import { Lane, siteScenePositions } from './lane';
+import { Lane } from './lane';
 import { ContextChart, FactsPanel, measuresPanel } from './panels';
 import { intervalAt } from './state';
 
@@ -66,7 +68,6 @@ async function mount({ data, root }: StoryContext): Promise<() => void> {
         </div>
       </div>
       <div class="scenario-bar">
-        <div class="scenario-menu" role="radiogroup" aria-label="Scenario"></div>
         <p class="scenario-text"></p>
       </div>
       <div class="lanes"></div>
@@ -91,11 +92,10 @@ async function mount({ data, root }: StoryContext): Promise<() => void> {
   const earthGroup = earth({ earth: THEME.earth, land: THEME.land });
 
   let current: ScenarioView | null = null;
-  const menu = el('.scenario-menu');
   const show = (index: number): void => {
     current?.dispose();
     const scenario = story.scenarios[index] as Scenario;
-    menu.querySelectorAll('button').forEach((b, i) => b.setAttribute('aria-checked', String(i === index)));
+    menu.select(index);
     el('.scenario-text').textContent = SCENARIO_TITLES[scenario.scenario]?.text ?? '';
     root.querySelector('.story')?.setAttribute('data-scenario', scenario.scenario);
     current = new ScenarioView(scenario, story, data, field, sites, earthGroup, globe, {
@@ -104,29 +104,18 @@ async function mount({ data, root }: StoryContext): Promise<() => void> {
       panels: el('.panels'),
     });
   };
-  story.scenarios.forEach((scenario, i) => {
-    const button = document.createElement('button');
-    button.type = 'button';
-    button.setAttribute('role', 'radio');
-    button.dataset.scenario = scenario.scenario;
-    button.textContent = SCENARIO_TITLES[scenario.scenario]?.title ?? scenario.scenario;
-    button.addEventListener('click', () => show(i));
-    menu.append(button);
-  });
+  const menu = segmented(
+    'Scenario',
+    story.scenarios.map((s) => ({ value: s.scenario, text: SCENARIO_TITLES[s.scenario]?.title ?? s.scenario })),
+    show,
+  );
+  el('.scenario-bar').prepend(menu.element);
   show(0);
 
-  let frame = 0;
-  let last = performance.now();
-  const loop = (now: number): void => {
-    const real_s = Math.min((now - last) / 1000, 0.25);
-    last = now;
-    current?.frame(real_s);
-    frame = requestAnimationFrame(loop);
-  };
-  frame = requestAnimationFrame(loop);
+  const stop = frameLoop((real_s) => current?.frame(real_s));
 
   return () => {
-    cancelAnimationFrame(frame);
+    stop();
     current?.dispose();
     globe.dispose();
     root.replaceChildren();

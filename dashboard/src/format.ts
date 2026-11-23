@@ -44,3 +44,21 @@ export function formatClock(t: number, fine: boolean): string {
 export function formatSpeed(speed: number): string {
   return `${significant(speed, 3)}x`;
 }
+
+/** A share (0 to 1) as a percentage, 3 significant digits ("94.4%", "0.1%"), more when a
+ * share below one would otherwise read as 100% ("99.999%"). */
+export function formatShare(share: number | null): string {
+  if (share === null) return NONE;
+  if (share === 0) return '0%';
+  let digits = 3;
+  while (share < 1 && digits < 8 && Number((share * 100).toPrecision(digits)) >= 100) digits++;
+  return `${significant(share * 100, digits)}%`;
+}
+
+/** A span of the run in words: hours or minutes when whole, else seconds ("2 hours", "7 minutes"). */
+export function formatSpan(s: number): string {
+  const unit = (n: number, word: string): string => `${n.toLocaleString('en-US')} ${word}${n === 1 ? '' : 's'}`;
+  if (s > 0 && s % 3600 === 0) return unit(s / 3600, 'hour');
+  if (s > 0 && s % 60 === 0) return unit(s / 60, 'minute');
+  return formatSeconds(s);
+}

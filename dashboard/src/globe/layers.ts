@@ -195,6 +195,21 @@ export class ThickPath {
     this.object.visible = segments > 0;
     this.buffer.needsUpdate = true;
   }
+
+  /** Dashed (a broken route) or solid; dash and gap lengths in Earth radii. */
+  setDashed(dashed: boolean, dash = 0.014, gap = 0.012): void {
+    this.material.dashSize = dash;
+    this.material.gapSize = gap;
+    if (this.material.dashed === dashed) return;
+    this.material.dashed = dashed;
+    this.material.needsUpdate = true;
+  }
+
+  /** Lay the dashes along the points set now. It makes a new GPU buffer, so it is called when
+   * the path itself changes, not every frame; the dashes then slide a little as it moves. */
+  layDashes(): void {
+    this.object.computeLineDistances();
+  }
 }
 
 /** Points along the great circle from one site to another just above the ground (fibre). */

@@ -43,7 +43,10 @@ npm run e2e         # browser test (Playwright, headless Chromium) against dist/
 `npm run e2e` needs a build made with the data in `public/data/` and the engine's CSV files of
 the same export in `results/dashboard/<mode>/` (or set `SATSIM_RESULTS` to their directory). It
 stops at once with a message if `dist/data/manifest.json` is missing. With
-`SATSIM_SCREENSHOTS=1` it also writes the report's screenshots to `docs/img/phase-5/`. Chromium
+`SATSIM_SCREENSHOTS=1` it also writes the report's screenshots to `docs/img/phase-5/` (one wide
+shot per story, and the failure story on a phone). There is one spec file per story in `e2e/`;
+what they share (reading the engine's files, opening a story, moving the clock, counting a
+globe's colours, comparing a shown number with the engine's) is in `e2e/helpers.ts`. Chromium
 comes from `PLAYWRIGHT_BROWSERS_PATH` (`/opt/pw-browsers` in the CI image); the version of
 `@playwright/test` is pinned to match it.
 
@@ -58,10 +61,21 @@ listed in `package.json`.
 | `main.ts` | Loads the manifest and the shared files, builds the story menu, mounts a story |
 | `data/` | The checks (`check.ts`), the loader with the size check (`loader.ts`), `manifest.ts`, the shared files (`common.ts`) |
 | `clock/` | The clock's logic (`clock.ts`, no DOM) and its controls (`clock-view.ts`) |
-| `globe/` | Interpolation (`interpolation.ts`), ECEF and latitude/longitude to the scene (`coords.ts`), the renderer and views (`globe-view.ts`), what is drawn (`layers.ts`), the shared satellite positions (`satellite-field.ts`) |
+| `globe/` | Interpolation (`interpolation.ts`), ECEF and latitude/longitude to the scene (`coords.ts`), the renderer and views (`globe-view.ts`), what is drawn (`layers.ts`), the shared satellite positions and links (`satellite-field.ts`), sites and routes in the scene (`paths.ts`), one globe in one element (`stage.ts`) |
+| `charts/` | What every uPlot chart shares: the axis look, a chart that follows its element's width, line charts with a legend that reads the values under the cursor |
+| `ui/` | Shared controls: one-of-several buttons, switches, drop-down lists, the frame loop |
 | `stories/` | `story.ts` (the interface), `index.ts` (the registered stories), one folder per story |
 | `stories/failure/` | One failure, three reactions (spec 4.5) |
+| `stories/route/` | A route through time (spec 4.6) |
+| `stories/constellation/` | The constellation (spec 4.7) |
+| `stories/resilience/` | The network falling apart (spec 4.8) |
 | `format.ts`, `theme.ts`, `styles.css` | Number formatting, colours, the page's look |
+
+Each story folder has `data.ts` (its file, read and checked), `state.ts` (what is shown at a time
+or for a menu choice: lookups only), their unit tests on a hand-made `fixture.ts`, and
+`index.ts` (the view). Each routing strategy, laser pattern and kind of failure has one colour in
+`theme.ts`, used alike on the globe, in the charts and in the tables. The clock bar sits in the
+page flow right below the globes, never over them.
 
 A story implements `Story` in `stories/story.ts` and is added to `STORIES` in
 `stories/index.ts`; only registered stories appear in the menu.

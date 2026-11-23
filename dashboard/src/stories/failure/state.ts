@@ -1,6 +1,7 @@
 // "What is the state at time t" for the failure story: lookups in the exported intervals,
 // facts and plans. Nothing here computes a simulation value; it only picks one.
 
+import type { PathNode } from '../../globe/paths';
 import type { Element, Fact, Interval } from './data';
 
 /**
@@ -85,8 +86,6 @@ export function factAt(fact: Fact, t: number): FactView {
     floodDone: fact.flood_last_s !== null && t >= fact.flood_last_s,
   };
 }
-
-export type PathNode = { kind: 'site'; site: number } | { kind: 'sat'; sat: number };
 
 export interface DrawnPath {
   /** Up through the satellites: from the sending city on. */
