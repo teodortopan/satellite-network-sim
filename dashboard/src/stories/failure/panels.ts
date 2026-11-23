@@ -1,8 +1,8 @@
 // The panels beside the lanes: the facts and when each actor learned them, the run's measures,
 // and the context chart of time lost over Phase 4's main runs.
 
-import uPlot from 'uplot';
-import 'uplot/dist/uPlot.min.css';
+import type uPlot from 'uplot';
+import { AXIS, ResponsivePlot } from '../../charts/plot';
 import type { CommonData } from '../../data/common';
 import { formatCount, formatInstant, formatMs, formatSeconds } from '../../format';
 import { THEME } from '../../theme';
@@ -159,8 +159,7 @@ interface DotGroup {
  */
 export class ContextChart {
   readonly element: HTMLElement;
-  private plot: uPlot | null = null;
-  private readonly resize: ResizeObserver;
+  private readonly plot: ResponsivePlot;
 
   constructor(scenario: Scenario) {
     this.element = document.createElement('section');
@@ -201,24 +200,18 @@ export class ContextChart {
       ring: true,
     });
 
-    this.resize = new ResizeObserver(() => {
-      const width = Math.max(plotEl.clientWidth, 200);
-      if (this.plot === null) this.plot = build(plotEl, width, groups);
-      else this.plot.setSize({ width, height: this.plot.height });
-    });
-    this.resize.observe(plotEl);
+    const data = [null, ...groups.map((g) => [g.xs, g.ys])] as unknown as uPlot.AlignedData;
+    this.plot = new ResponsivePlot(plotEl, 220, (width, height) => options(width, height, groups), data);
   }
 
   dispose(): void {
-    this.resize.disconnect();
-    this.plot?.destroy();
+    this.plot.dispose();
   }
 }
 
 const DECADES = [0.001, 0.01, 0.1, 1, 10, 100, 1000, 10000];
 
-function build(el: HTMLElement, width: number, groups: DotGroup[]): uPlot {
-  const axis = { stroke: THEME.dim, grid: { stroke: THEME.rule, width: 1 }, ticks: { stroke: THEME.rule } };
+function options(width: number, height: number, groups: DotGroup[]): uPlot.Options {
   // Each group's dots, drawn by hand: uPlot's faceted mode leaves point drawing to the caller.
   const drawDots = (u: uPlot, seriesIdx: number): null => {
     const g = groups[seriesIdx - 1] as DotGroup;
@@ -237,13 +230,13 @@ function build(el: HTMLElement, width: number, groups: DotGroup[]): uPlot {
     ctx.restore();
     return null;
   };
-  const options: uPlot.Options = {
+  return {
     // Faceted: an x and a y list per series. uPlot types this and `distr` below as const
     // enums, which isolated modules cannot import, so the plain numbers are used.
     // eslint-disable-next-line @typescript-eslint/no-unsafe-enum-assignment
     mode: 2,
     width,
-    height: 220,
+    height,
     legend: { show: false },
     cursor: { show: false },
     series: [{}, ...groups.map(() => ({ paths: drawDots, points: { show: false } }))],
@@ -255,22 +248,20 @@ function build(el: HTMLElement, width: number, groups: DotGroup[]): uPlot {
     },
     axes: [
       {
-        ...axis,
+        ...AXIS,
         label: 'Time lost (log scale)',
         labelSize: 22,
         splits: (_u, _i, min, max) => DECADES.filter((v) => v >= min && v <= max),
         values: (_u, ticks) => ticks.map((v) => formatSeconds(v)),
       },
       {
-        ...axis,
+        ...AXIS,
         size: 96,
         splits: () => [0, 1, 2],
         values: (_u, ticks) => ticks.map((v) => MODE_TITLES[MODES[2 - v] as Mode]),
       },
     ],
   };
-  const data = [null, ...groups.map((g) => [g.xs, g.ys])];
-  return new uPlot(options, data as unknown as uPlot.AlignedData, el);
 }
 
 /** A fixed spread in [-0.3, 0.3] for the i-th dot of a row (golden-ratio steps, no randomness). */

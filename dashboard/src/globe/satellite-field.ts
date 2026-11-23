@@ -1,12 +1,12 @@
 // Every satellite's position at the clock's time, in scene coordinates, shared by all the views
 // of a story; and the index lists that leave out satellites (and their links) with no position.
 
-import { BufferAttribute, Color } from 'three';
+import { BufferAttribute, Color, type LineSegments, type Points, type ShaderMaterial } from 'three';
 import type { CommonData } from '../data/common';
 import { shellColor } from '../theme';
 import { ecefArrayToScene } from './coords';
 import { positionsAt, samplePair } from './interpolation';
-import { sharedPositions } from './layers';
+import { dotGeometry, dots, linkSegments, sharedPositions } from './layers';
 
 export class SatelliteField {
   readonly count: number;
@@ -27,12 +27,13 @@ export class SatelliteField {
 
   constructor(
     private readonly data: CommonData,
-    private readonly linkPairs: Uint32Array,
+    private linkPairs: Uint32Array,
+    linkCapacity = linkPairs.length,
   ) {
     this.count = data.satellites.norad.length;
     this.position = sharedPositions(this.count);
     this.pointIndex = new BufferAttribute(new Uint32Array(this.count), 1);
-    this.linkIndex = new BufferAttribute(new Uint32Array(linkPairs.length), 1);
+    this.linkIndex = new BufferAttribute(new Uint32Array(Math.max(linkCapacity, linkPairs.length)), 1);
     this.ecef = new Float32Array(this.count * 3);
     this.drawable = new Uint8Array(this.count);
     this.lastDrawable = new Uint8Array(this.count).fill(2);
@@ -69,6 +70,29 @@ export class SatelliteField {
     return this.drawable[sat] === 1;
   }
 
+  /** The links drawn from now on (satellite index pairs, at most the capacity given). */
+  setLinks(pairs: Uint32Array): void {
+    if (pairs.length > this.linkIndex.count) throw new RangeError('more links than the field was made for');
+    this.linkPairs = pairs;
+    this.updateLinks();
+  }
+
+  /** The satellites as one dots object with these colours and sizes, drawn when drawable. */
+  points(colors: Float32Array, sizes: Float32Array, material: ShaderMaterial, mark?: Float32Array, down?: Float32Array): Points {
+    const geometry = dotGeometry(this.position, colors, sizes, mark, down);
+    geometry.setIndex(this.pointIndex);
+    const object = dots(geometry, material);
+    object.onBeforeRender = () => geometry.setDrawRange(0, this.pointCount);
+    return object;
+  }
+
+  /** The links of setLinks (or the constructor) whose two ends are drawable, as segments. */
+  segments(color: string, opacity: number): LineSegments {
+    const lines = linkSegments(this.position, this.linkIndex, color, opacity);
+    lines.onBeforeRender = () => lines.geometry.setDrawRange(0, this.linkIndexCount);
+    return lines;
+  }
+
   private updateIndices(): void {
     if (this.drawable.every((d, i) => d === this.lastDrawable[i])) return;
     this.lastDrawable.set(this.drawable);
@@ -77,6 +101,10 @@ export class SatelliteField {
     for (let i = 0; i < this.count; i++) if (this.drawable[i] === 1) points[n++] = i;
     this.pointIndex.needsUpdate = true;
     this.pointCount = n;
+    this.updateLinks();
+  }
+
+  private updateLinks(): void {
     const links = this.linkIndex.array as Uint32Array;
     let m = 0;
     for (let k = 0; k < this.linkPairs.length; k += 2) {

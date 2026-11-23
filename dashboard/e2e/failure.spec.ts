@@ -2,117 +2,23 @@
 // globe draws something, moving the clock changes the state the page reports, and the numbers
 // on screen equal the engine's CSV files, which this test reads itself.
 //
-// The engine's CSV files are read from results/dashboard/<mode>/ (the export's mode, from the
-// manifest), or from SATSIM_RESULTS. With SATSIM_SCREENSHOTS=1 the test also writes the
-// report's screenshots to docs/img/phase-5/.
+// The files it reads and the helpers it uses are in helpers.ts.
 
-import { existsSync, mkdirSync, readFileSync } from 'node:fs';
+import { mkdirSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test } from '@playwright/test';
+import { colours, expectClockClear, expectShown, open as openStory, readCsv, readData, SCREENSHOTS, seek, watchErrors } from './helpers';
 
-const DATA = resolve('dist/data');
-const manifest = JSON.parse(readFileSync(resolve(DATA, 'manifest.json'), 'utf8')) as { settings: { mode: string } };
-const RESULTS = resolve(process.env.SATSIM_RESULTS ?? `../results/dashboard/${manifest.settings.mode}`);
-const SCREENSHOTS = resolve('../docs/img/phase-5');
 const MODES = ['planner', 'local-repair', 'flooding'] as const;
 
 interface StoryFile {
   scenarios: { scenario: string; failure_s: number; sources: { events: string; measures: string } }[];
 }
-const story = JSON.parse(readFileSync(resolve(DATA, 'story-failure.json'), 'utf8')) as StoryFile;
+const story = readData('story-failure.json') as StoryFile;
 const first = story.scenarios[0];
 if (first === undefined) throw new Error('story-failure.json has no scenario');
 
-/** A CSV file as rows of named fields (quoted fields may hold commas). */
-function readCsv(name: string): Record<string, string>[] {
-  const path = resolve(RESULTS, name);
-  if (!existsSync(path)) {
-    throw new Error(`${path} is missing: the browser test compares the page with the engine's CSV files there`);
-  }
-  const lines = readFileSync(path, 'utf8').trim().split('\n');
-  const split = (line: string): string[] => {
-    const out: string[] = [];
-    let field = '';
-    let quoted = false;
-    for (const ch of line) {
-      if (ch === '"') quoted = !quoted;
-      else if (ch === ',' && !quoted) {
-        out.push(field);
-        field = '';
-      } else field += ch;
-    }
-    out.push(field);
-    return out;
-  };
-  const header = split(lines[0] ?? '');
-  return lines.slice(1).map((line) => {
-    const cells = split(line);
-    return Object.fromEntries(header.map((h, i) => [h, cells[i] ?? '']));
-  });
-}
-
-/** Errors on the console or uncaught in the page, collected for the whole test. */
-function watchErrors(page: Page): string[] {
-  const errors: string[] = [];
-  page.on('console', (m) => {
-    if (m.type() === 'error') errors.push(m.text());
-  });
-  page.on('pageerror', (e) => errors.push(e.message));
-  return errors;
-}
-
-async function open(page: Page): Promise<void> {
-  await page.goto('./#failure');
-  await expect(page.locator('body')).toHaveAttribute('data-ready', 'true');
-  await expect(page.locator('body')).not.toHaveAttribute('data-error', 'true');
-}
-
-async function seek(page: Page, t: number): Promise<void> {
-  await page.locator('.clock-range').evaluate((el, value) => {
-    (el as HTMLInputElement).value = String(value);
-    el.dispatchEvent(new Event('input'));
-  }, t);
-  await expect(page.locator('.clock')).toHaveAttribute('data-t', String(t));
-}
-
-/** How many distinct colours each of the given page areas has, from one screenshot of the
- * window (decoded in the page; software WebGL makes every screenshot slow). */
-async function colours(page: Page, selectors: readonly string[]): Promise<number[]> {
-  const boxes = [];
-  for (const s of selectors) boxes.push(await page.locator(s).first().boundingBox());
-  const png = (await page.screenshot()).toString('base64');
-  return page.evaluate(
-    async ({ data, areas }) => {
-      const blob = await (await fetch(`data:image/png;base64,${data}`)).blob();
-      const bitmap = await createImageBitmap(blob);
-      const canvas = new OffscreenCanvas(bitmap.width, bitmap.height);
-      const ctx = canvas.getContext('2d') as OffscreenCanvasRenderingContext2D;
-      ctx.drawImage(bitmap, 0, 0);
-      return areas.map((box) => {
-        if (box === null || box.width < 1 || box.height < 1) return 0;
-        const pixels = ctx.getImageData(box.x, box.y, box.width, box.height).data;
-        const seen = new Set<number>();
-        for (let i = 0; i < pixels.length; i += 4) {
-          seen.add(((pixels[i] ?? 0) << 16) | ((pixels[i + 1] ?? 0) << 8) | (pixels[i + 2] ?? 0));
-        }
-        return seen.size;
-      });
-    },
-    { data: png, areas: boxes },
-  );
-}
-
-/** A number as shown ("100 ms", "8 s", "186,816") in the unit of the CSV column, and the
- * rounding the display allows (half a unit of its last digit). */
-function shown(text: string, csvUnit: 's' | 'ms' | 'count'): { value: number; tolerance: number } {
-  const match = /^(-?[\d,]+(?:\.(\d+))?)(?: (ms|s))?$/.exec(text.trim());
-  if (match === null) throw new Error(`"${text}" is not a number the page should show`);
-  const value = Number((match[1] ?? '').replaceAll(',', ''));
-  const decimals = match[2]?.length ?? 0;
-  const unit = match[3] ?? 'count';
-  const scale = unit === csvUnit || unit === 'count' ? 1 : unit === 'ms' ? 0.001 : 1000;
-  return { value: value * scale, tolerance: 0.5 * 10 ** -decimals * scale };
-}
+const open = (page: Parameters<typeof openStory>[0]): Promise<void> => openStory(page, 'failure');
 
 test('the failure story loads, draws, follows the clock and shows the engine numbers', async ({ page }) => {
   const errors = watchErrors(page);
@@ -171,10 +77,7 @@ test('the failure story loads, draws, follows the clock and shows the engine num
         expect(text, `${mode} ${column}`).toBe('none');
         continue;
       }
-      const { value, tolerance } = shown(text, unit);
-      expect(Math.abs(value - Number(csv)), `${mode} ${column}: page "${text}", CSV ${csv}`).toBeLessThanOrEqual(
-        tolerance * (1 + 1e-9),
-      );
+      expectShown(text, csv, unit, `${mode} ${column}`);
     }
   }
 
@@ -198,6 +101,13 @@ test('a file that is not the size the manifest gives is reported and nothing is 
   await expect(page.locator('body')).toHaveAttribute('data-error', 'true');
   await expect(page.locator('.status.error')).toContainText('The file story-failure.json could not be used');
   await expect(page.locator('.lanes')).toHaveCount(0);
+});
+
+test('the clock bar lies over no globe, wide and on a phone', async ({ page }) => {
+  await open(page);
+  await expectClockClear(page, ['.lanes']);
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expectClockClear(page, ['.lanes']);
 });
 
 test.describe('screenshots for the report', () => {

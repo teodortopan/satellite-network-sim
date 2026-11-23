@@ -15,9 +15,9 @@ import {
   type ShaderMaterial,
 } from 'three';
 import type { CommonData } from '../../data/common';
-import { latLonToScene } from '../../globe/coords';
 import type { View } from '../../globe/globe-view';
-import { dotGeometry, dotMaterial, dots, linkSegments, NEVER, surfaceArc, ThickPath } from '../../globe/layers';
+import { dotGeometry, dotMaterial, dots, NEVER, ThickPath } from '../../globe/layers';
+import { PathPlacer, type PathNode } from '../../globe/paths';
 import type { SatelliteField } from '../../globe/satellite-field';
 import { formatCount, formatInstant, formatMs } from '../../format';
 import { THEME } from '../../theme';
@@ -30,10 +30,8 @@ import {
   newPlanAt,
   satelliteDetections,
   type DrawnPath,
-  type PathNode,
 } from './state';
 
-const SITE_RADIUS = 1.002;
 const SAT_SIZE = 2.2;
 
 export const MODE_TITLES: Record<Mode, string> = {
@@ -62,13 +60,6 @@ const STATE_COLORS: Record<LaneState, string> = {
   no_route: THEME.dim,
 };
 
-/** Scene positions of every site, just above the ground. */
-export function siteScenePositions(data: CommonData): Float32Array {
-  const out = new Float32Array(data.sites.length * 3);
-  data.sites.forEach((s, i) => out.set(latLonToScene(s.lat_deg, s.lon_deg, SITE_RADIUS), 3 * i));
-  return out;
-}
-
 interface RouteLayer {
   space: ThickPath;
   ground: ThickPath;
@@ -88,16 +79,18 @@ export class Lane {
   private readonly lostPoint: Points;
   private readonly stateText: HTMLElement;
   private readonly news: { element: HTMLElement; t_s: number | null }[] = [];
+  private readonly placer: PathPlacer;
 
   constructor(
     readonly mode: Mode,
     private readonly scenario: Scenario,
     private readonly data: CommonData,
     private readonly field: SatelliteField,
-    private readonly sites: Float32Array,
+    sites: Float32Array,
     earth: Group,
     private readonly ends: { from: number; to: number },
   ) {
+    this.placer = new PathPlacer(field, sites);
     this.element = document.createElement('article');
     this.element.className = 'lane';
     this.element.dataset.mode = mode;
@@ -115,7 +108,7 @@ export class Lane {
     this.buildNews(this.element.querySelector('.lane-news') as HTMLElement);
 
     this.scene.add(earth.clone());
-    this.scene.add(this.linkLayer());
+    this.scene.add(field.segments(THEME.links, 0.1));
     this.scene.add(this.satelliteLayer());
     this.scene.add(this.siteLayer());
     this.baseline = this.routeLayer(THEME.baseline, 2, 0.35);
@@ -202,39 +195,18 @@ export class Lane {
   private place(layer: RouteLayer, iv: Interval | null): void {
     if (iv !== layer.shown) {
       layer.path = iv === null ? null : drawnPath(iv, this.ends.from, this.ends.to, this.scenario.home_pop);
-      const ground: number[] = [];
-      const g = layer.path?.ground ?? [];
-      for (let k = 1; k < g.length; k++) {
-        const arc = surfaceArc(this.site(g[k - 1] as number), this.site(g[k] as number), SITE_RADIUS);
-        ground.push(...(k === 1 ? arc : arc.slice(3)));
-      }
-      layer.ground.set(ground);
+      layer.ground.set(this.placer.ground(layer.path?.ground ?? []));
     }
-    const points: number[] = [];
-    for (const node of layer.path?.space ?? []) {
-      const p = this.nodePosition(node);
-      if (p !== null) points.push(...p);
-    }
-    layer.space.set(points);
+    layer.space.set(this.placer.points(layer.path?.space ?? []));
     if (layer === this.route) {
-      const lost = layer.path?.lost ?? null;
-      const p = lost === null ? null : this.nodePosition(lost);
+      const lost: PathNode | null = layer.path?.lost ?? null;
+      const p = lost === null ? null : this.placer.node(lost);
       this.lostPoint.visible = p !== null;
       if (p !== null) {
         this.lostPosition.set(p);
         this.lostPosition.needsUpdate = true;
       }
     }
-  }
-
-  private site(i: number): number[] {
-    return Array.from(this.sites.subarray(3 * i, 3 * i + 3));
-  }
-
-  private nodePosition(node: PathNode): number[] | null {
-    if (node.kind === 'site') return this.site(node.site);
-    if (!this.field.isDrawable(node.sat)) return null;
-    return Array.from((this.field.position.array as Float32Array).subarray(3 * node.sat, 3 * node.sat + 3));
   }
 
   private routeLayer(color: string, width: number, opacity: number): RouteLayer {
@@ -250,12 +222,6 @@ export class Lane {
     return layer;
   }
 
-  private linkLayer(): ReturnType<typeof linkSegments> {
-    const lines = linkSegments(this.field.position, this.field.linkIndex, THEME.links, 0.1);
-    lines.onBeforeRender = () => lines.geometry.setDrawRange(0, this.field.linkIndexCount);
-    return lines;
-  }
-
   /** Satellites by shell; failed ones turn red at the failure; news marks per mode. */
   private satelliteLayer(): Points {
     const n = this.field.count;
@@ -265,17 +231,13 @@ export class Lane {
       this.mode === 'flooding'
         ? Float32Array.from(this.scenario.flood.satellite_first_learn_s, (t) => t ?? NEVER)
         : satelliteDetections(this.scenario.facts, n, NEVER);
-    const geometry = dotGeometry(this.field.position, this.field.shellColors, new Float32Array(n).fill(SAT_SIZE), mark, down);
-    geometry.setIndex(this.field.pointIndex);
     const material = dotMaterial({
       markColor: THEME.news,
       markGrow: this.mode === 'flooding' ? 1.25 : 2.6,
       downColor: THEME.failed,
     });
     this.materials.push(material);
-    const points = dots(geometry, material);
-    points.onBeforeRender = () => geometry.setDrawRange(0, this.field.pointCount);
-    return points;
+    return this.field.points(this.field.shellColors, new Float32Array(n).fill(SAT_SIZE), material, mark, down);
   }
 
   /** The two cities, the gateways and the sender's home PoP. */
@@ -291,7 +253,7 @@ export class Lane {
     const down = new Float32Array(shown.length).fill(NEVER);
     const color = new Color();
     shown.forEach(({ s, i }, k) => {
-      (position.array as Float32Array).set(this.site(i), 3 * k);
+      (position.array as Float32Array).set(this.placer.site(i), 3 * k);
       color.set(s.kind === 'city' ? THEME.city : s.kind === 'pop' ? THEME.pop : THEME.gateway);
       colors.set([color.r, color.g, color.b], 3 * k);
       sizes[k] = s.kind === 'gateway' ? 3.2 : 7;
