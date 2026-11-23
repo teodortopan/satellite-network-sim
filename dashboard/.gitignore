@@ -1,0 +1,3 @@
+# Playwright's output (the browser test writes nothing else unless SATSIM_SCREENSHOTS=1).
+test-results/
+playwright-report/

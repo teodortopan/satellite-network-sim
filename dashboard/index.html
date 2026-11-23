@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content="Replays of a Starlink-like satellite network simulator on real orbital data: routes, laser links and failures." />
+    <meta name="color-scheme" content="dark" />
+    <title>Satellite network simulator</title>
+    <link rel="icon" href="data:," />
+  </head>
+  <body>
+    <header class="masthead">
+      <p class="mark">Satellite network simulator</p>
+      <nav id="story-menu" class="story-menu" aria-label="Stories"></nav>
+    </header>
+    <div id="status" class="status" aria-live="polite"></div>
+    <main id="story"></main>
+    <footer class="colophon">
+      <p id="about-data"></p>
+      <p>Every number on this page was computed by the simulator's engine and is replayed here as
+        it was saved; the page only moves satellites between saved positions and formats numbers.
+        Land outlines: Natural Earth, public domain.</p>
+    </footer>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
