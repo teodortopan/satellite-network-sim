@@ -59,7 +59,9 @@ glossary of every orbital term used here.
   seconds; the full export about 5 minutes) and `python/check_dashboard_data.py` checks it. In
   `dashboard/`: `npm run dev`, `build`, `typecheck`, `lint`, `test`, `e2e`. The file shapes are
   in `dashboard/data-format.md`. `scripts/ci.sh dashboard-site` builds the published site;
-  `.github/workflows/pages.yml` publishes it and starts only by hand.
+  `.github/workflows/pages.yml` publishes it and starts only by hand. The repository's Pages
+  source has to be "GitHub Actions": with "Deploy from a branch" every push to `main`
+  replaces the dashboard with the README.
 - `python/fetch_ground.py` downloads the ground data and
   `python/make_assumed_gateways.py` derives the assumed gateways; both by hand.
   `python/fetch_lens.py` downloads the LENS ping files (one request each, no

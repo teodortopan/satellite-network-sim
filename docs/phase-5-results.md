@@ -45,6 +45,11 @@ files, 20,567,793 bytes), each of the four stories loads with no error on the co
 failure story's measures equal the table in this report's screenshot (time lost: planner
 8 s, local repair 100 ms, flooding 407 ms), and the page asks no other site for anything.
 
+The repository's Pages setting has to be Settings → Pages → Source: **GitHub Actions**. With
+"Deploy from a branch", GitHub publishes the repository's own files on every push to `main`,
+and the README replaces the dashboard. That happened on 2026-11-23, 29 minutes after the
+first deploy, when a pull request merged.
+
 ## The parts
 
 | Part | Size | Job |
