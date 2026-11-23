@@ -47,7 +47,16 @@ its next plan), local repair 0.1 s and flooding 0.2 s, and flooding pays for it 
 every one of 4,950 city pairs still has a route; at 30%, 94% do, and 99.999% once freed
 lasers are re-pointed. The program agrees with an independent model on every interval, fact
 and flood on an ideal shell. The numbers, the plots and the limits are in
-[docs/phase-4-results.md](docs/phase-4-results.md). The dashboard comes in a later phase.
+[docs/phase-4-results.md](docs/phase-4-results.md).
+
+Phase 5 (the dashboard) is implemented. `dashboard/` is a web page that replays saved engine
+runs on a globe: one failure under the three ways of reacting side by side, a route through
+two hours under four strategies, the constellation with its shells and laser patterns, and
+the network falling apart as satellites fail. The browser simulates nothing. It only moves
+satellites between positions saved every 60 s (off by 12 m at most) and formats numbers, and
+a data check compares every number the page loads with the engine's own output. What was
+built, how it is checked and its limits are in
+[docs/phase-5-results.md](docs/phase-5-results.md).
 
 This repository is the source of truth for the project.
 

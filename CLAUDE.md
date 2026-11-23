@@ -27,13 +27,16 @@ glossary of every orbital term used here.
   `routing` program against an independent Python model on Hypatia's and the
   Bariloche paper's shells, `python/validate_routing.py`) and `validate-failures`
   (the `failures` program against an independent Python model on Hypatia's shell with
-  a +Grid and a `three` plan, `python/validate_failures.py`). Exit 0 only if all pass.
+  a +Grid and a `three` plan, `python/validate_failures.py`) and `dashboard` (the small
+  export of real engine runs, the data check that compares every exported number with the
+  engine's CSV files, then the page's type check, lint, unit tests, build and browser test).
+  Exit 0 only if all pass.
   It needs only Docker on the host.
 - `scripts/check.sh <step>` runs one step (`format`, `python-lint`,
   `asan-gcc`, `asan-clang`, `valgrind`, `tidy`, `validate`, `validate-topology`,
-  `validate-routing`, `validate-failures`).
+  `validate-routing`, `validate-failures`, `dashboard`).
   Measured in a cloud session (x86-64, 4 cores, 2026-11-21): the full check takes
-  about 7 minutes once the build trees exist, and longer on a session's first run,
+  about 10 minutes once the build trees exist, and longer on a session's first run,
   which compiles everything. clang-tidy is the longest step (about 8 minutes when
   the cores are shared with other work); the 805 sanitizer tests take under a minute
   with either compiler. Prefer `asan-clang` while iterating.
@@ -51,6 +54,12 @@ glossary of every orbital term used here.
   picks up where a stopped run left off; failure files from `python/make_failures.py`), its
   two comparisons (`python/compare_failures.py`) and `python/plot_phase4.py` are run by hand
   as well, with commands in `docs/phase-4-results.md`.
+- The dashboard (`dashboard/`, spec `docs/phase-5-dashboard.md`): `python/export_dashboard.py`
+  writes its data into `dashboard/public/data/` (not in git; `--small` for tests, about 30
+  seconds; the full export about 5 minutes) and `python/check_dashboard_data.py` checks it. In
+  `dashboard/`: `npm run dev`, `build`, `typecheck`, `lint`, `test`, `e2e`. The file shapes are
+  in `dashboard/data-format.md`. `scripts/ci.sh dashboard-site` builds the published site;
+  `.github/workflows/pages.yml` publishes it and starts only by hand.
 - `python/fetch_ground.py` downloads the ground data and
   `python/make_assumed_gateways.py` derives the assumed gateways; both by hand.
   `python/fetch_lens.py` downloads the LENS ping files (one request each, no
@@ -85,7 +94,8 @@ glossary of every orbital term used here.
 | `apps/common/` | Helpers every program shares: CSV, statistics, time steps, arguments |
 | `tests/<module>/` | GoogleTest per module, with small fixtures |
 | `tests/failures_app/` | The `failures` program's core on hand-made geometry, re-matching on ideal shells, the real geometry against `StepSource` |
-| `python/` | Snapshot and ground-data download, reference generation, validation (four independent models), SpaceX comparison, the Phase 2 runs, the Phase 3 reproductions, the Phase 4 failure files, runs and comparisons, plots |
+| `dashboard/` | The web page: loaders that validate every file, the clock, the globe (three.js), charts (uPlot), one module per story under `src/stories/`, unit tests beside the code, browser tests in `e2e/` |
+| `python/` | The dashboard's export and data check, snapshot and ground-data download, reference generation, validation (four independent models), SpaceX comparison, the Phase 2 runs, the Phase 3 reproductions, the Phase 4 failure files, runs and comparisons, plots |
 | `data/starlink/<date>/` | One dated snapshot: element sets, IERS file, trajectory checksums |
 | `data/ground/` | Cities and pairs; per date: SpaceX's PoP and location files, the community gateway list, assumed gateways; `hypatia/`: Hypatia's 100 cities |
 | `data/lens/<date>/` | Checksums of the LENS dish ping files (the files are not in git) |
@@ -184,6 +194,12 @@ constellation, ground, topology), never the reverse. `failure` may depend on
   its laser links are known down", because a working satellite whose neighbours all failed
   still carries traffic between two ground sites: that guess made every view wrong for good
   at a 30% failed share.
+- Prefer a number in the dashboard's exported files over anything worked out in the page,
+  because the data check can only vouch for what is in the files. The page interpolates
+  positions, looks up the state at a time and formats; nothing else.
+- Prefer interpolating positions along the arc after turning the later sample back by the
+  Earth's rotation over a straight line between Earth-fixed samples, because at a 60 s sample
+  step the arc is off by 12 m at most and the straight line by kilometres.
 - Prefer exact IEEE arithmetic over `-ffast-math`, because it breaks the
   bit-level agreement with the published SGP4 cases and differs between
   arm64 (local) and x86-64 (CI).
@@ -259,7 +275,11 @@ The rules from the owner's global file that this project relies on.
   re-signs HTTPS), build it from a copy of the Dockerfile outside the repo that also copies
   `/root/.ccr/ca-bundle.crt` in and sets `PIP_CERT` to it, tag it `satsim-ci`, and run
   `scripts/ci.sh <step>` in it with the `docker run` line of `scripts/check.sh`. Never
-  commit that copy.
+  commit that copy. The same copy needs two more changes for the dashboard: `CURL_CA_BUNDLE`
+  and `NODE_EXTRA_CA_CERTS` set to that bundle, and, because the cloud cannot reach
+  Playwright's download host, the session's own browsers copied in from `/opt/pw-browsers`
+  with `playwright install-deps chromium` in place of `install --with-deps`. If Docker Hub
+  answers 429, start the copy `FROM` an image already built in the session.
 - **Not in git, so not in the cloud:** a snapshot's SpaceX trajectory files
   (only `python/compare_spacex.py` needs them, and they cannot be downloaded
   again), the LENS ping files (`python/fetch_lens.py`; only
