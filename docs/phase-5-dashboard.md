@@ -1,6 +1,7 @@
 # Phase 5: The dashboard
 
-**Status:** specified 2026-11-22, implemented 2026-11-23. Results:
+**Status:** specified 2026-11-22, implemented and published 2026-11-23 at
+<https://teodortopan.github.io/satellite-network-sim/>. Results:
 [phase-5-results.md](phase-5-results.md). The work plan is in [phase-5-plan.md](phase-5-plan.md).
 
 Sources opened on 2026-11-22:

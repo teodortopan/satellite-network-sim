@@ -33,6 +33,18 @@ is the only study pair where the three modes differ in kind and not only in leng
 planner has a black hole of 8 s, local repair one of 0.1 s, and flooding a black hole of
 0.4 s and a loop of 7 ms, and flooding settles after 143.2 s.
 
+## Where it is
+
+<https://teodortopan.github.io/satellite-network-sim/>, on GitHub Pages. It was published on 2026-11-23 from `main` at `1d0d4d5` by the
+hand-started Pages workflow. The run took 7 minutes 16 seconds: 6 minutes 49 seconds to build
+the engine, make the full export, run the data check and build the page, and 16 seconds to
+publish.
+
+The live site was then opened in Chromium without a screen: the manifest says `full` (10
+files, 20,567,793 bytes), each of the four stories loads with no error on the console, the
+failure story's measures equal the table in this report's screenshot (time lost: planner
+8 s, local repair 100 ms, flooding 407 ms), and the page asks no other site for anything.
+
 ## The parts
 
 | Part | Size | Job |
@@ -132,7 +144,7 @@ are built.
   have no laser hop, so the four strategies give the same route.
 - **The visitor cannot invent a failure.** Only the exported scenarios exist (decision 2).
 - **Whether the page explains well is a judgment.** No test covers it (decision 9).
-- **The site is not published yet.** The Pages workflow exists and starts only by hand.
+- **A new deploy needs the owner's word each time.** The Pages workflow starts only by hand.
 
 ## Commands
 
