@@ -35,8 +35,8 @@ glossary of every orbital term used here.
 - `scripts/check.sh <step>` runs one step (`format`, `python-lint`,
   `asan-gcc`, `asan-clang`, `valgrind`, `tidy`, `validate`, `validate-topology`,
   `validate-routing`, `validate-failures`, `dashboard`).
-  Measured in a cloud session (x86-64, 4 cores, 2026-11-21): the full check takes
-  about 10 minutes once the build trees exist, and longer on a session's first run,
+  Measured in a cloud session (x86-64, 4 cores, 2026-11-23): the full check takes
+  about 16 minutes once the build trees exist, and longer on a session's first run,
   which compiles everything. clang-tidy is the longest step (about 8 minutes when
   the cores are shared with other work); the 805 sanitizer tests take under a minute
   with either compiler. Prefer `asan-clang` while iterating.
