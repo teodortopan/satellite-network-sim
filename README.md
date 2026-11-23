@@ -49,7 +49,8 @@ lasers are re-pointed. The program agrees with an independent model on every int
 and flood on an ideal shell. The numbers, the plots and the limits are in
 [docs/phase-4-results.md](docs/phase-4-results.md).
 
-Phase 5 (the dashboard) is implemented. `dashboard/` is a web page that replays saved engine
+Phase 5 (the dashboard) is implemented and published at
+<https://teodortopan.github.io/satellite-network-sim/>. `dashboard/` is a web page that replays saved engine
 runs on a globe: one failure under the three ways of reacting side by side, a route through
 two hours under four strategies, the constellation with its shells and laser patterns, and
 the network falling apart as satellites fail. The browser simulates nothing. It only moves
