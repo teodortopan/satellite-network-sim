@@ -1,56 +1,24 @@
-// Story: a route through time (spec 4.6). Replays a Phase 3 `routing` run on the best-case
-// model: for one direction of a study pair, the route each chosen strategy holds at the
-// clock's time, its drops, its delay over the run and the engine's summary.
+// Story: a connection over time (spec 4.6). Replays a Phase 3 `routing` run on the best-case
+// model: for one direction of a study pair, the route each rule (strategy) holds at the
+// clock's time, its breaks, its delay over the run and the engine's summary. Everything below
+// the text is a RouteView; this file adds the pair menu, the direction buttons and the words.
 
-import { BufferAttribute, DynamicDrawUsage } from 'three';
-import { Clock } from '../../clock/clock';
-import { ClockView } from '../../clock/clock-view';
-import { parseLinks, type CommonData } from '../../data/common';
+import type { CommonData } from '../../data/common';
+import { parseLinks } from '../../data/common';
 import { formatCount, formatMs, formatSeconds, formatSpan } from '../../format';
-import { dotGeometry, dots, shapeArray, type ThickPath } from '../../globe/layers';
-import { PathPlacer, routeNodes, siteScenePositions } from '../../globe/paths';
-import { SatelliteField } from '../../globe/satellite-field';
-import { rgbArray, Stage } from '../../globe/stage';
-import { droppedColor, DOTTED, line, MARKS, strategyStyle, THEME, type Mark } from '../../theme';
-import { setSwatch } from '../../ui/marks';
-import { dropdown, frameLoop, segmented, toggle } from '../../ui/controls';
+import { dropdown, segmented } from '../../ui/controls';
+import { fillFold, introMarkup, legendList } from '../../ui/intro';
+import { patternWords } from '../../ui/words';
 import type { Story, StoryContext } from '../story';
-import { DelayCharts } from './chart';
-import { parseRouteStory, type Direction, type DropElement, type RouteStory, type StrategyRun } from './data';
-import { stateAt, type RouteState } from './state';
-import { summaryTable } from './table';
+import { parseRouteStory, type Direction, type RouteStory } from './data';
+import { RouteView, STRATEGY_NOTES, strategySwatch, strategyTitle, type Endpoint } from './view';
 
-const START_SPEED = 30;
-const CAMERA_DISTANCE = 3.9;
-const SAT_SIZE = 2;
-
-export const STRATEGY_TITLES: Record<string, string> = {
-  'lowest-delay': 'Lowest delay',
-  'keep-until-broken': 'Keep until broken',
-  'longest-lived': 'Longest lived',
-  'threshold:2ms': 'Threshold 2 ms',
-};
-
-const STRATEGY_NOTES: Record<string, string> = {
-  'lowest-delay': 'takes the fastest path at every re-plan',
-  'keep-until-broken': 'keeps its route until a link of it breaks',
-  'longest-lived': 'keeps the satellites above the two cities that stay in view longest',
-  'threshold:2ms': 'switches only to a path faster by more than 2 ms',
-};
-
-const CAUSE_TITLES: Record<string, string> = {
-  ground_link_lost: 'ground link lost',
-  serving_left_view: 'serving satellite left view',
-  laser_link_down: 'laser link down',
-  no_path: 'no chain of lasers joins the cities',
-  no_coverage: 'no satellite in view',
-  no_gateway: 'no gateway reachable',
-  no_service: 'no service',
-};
+export { STRATEGY_TITLES } from './view';
 
 export const routeStory: Story = {
   id: 'route',
-  title: 'A route through time',
+  title: 'A connection over time',
+  summary: 'Follow one connection between two cities for a few minutes as the satellites move.',
   mount,
 };
 
@@ -71,93 +39,27 @@ async function mount({ data, root }: StoryContext): Promise<() => void> {
     parseRouteStory(v, c, manifest.satellites, data.sites, manifest.settings.window_s),
   );
   const links = await data.source.json(`links-${story.settings.pattern}.json`, (v, c) => parseLinks(v, c, manifest.satellites));
-  const strategies = story.settings.strategies;
   const name = (i: number): string => data.sites[i]?.name ?? '';
+  const endpoint = (i: number): Endpoint => {
+    const s = data.sites[i];
+    return { name: s?.name ?? '', lat_deg: s?.lat_deg ?? 0, lon_deg: s?.lon_deg ?? 0 };
+  };
 
   root.innerHTML = `
     <section class="story route">
-      <div class="intro">
-        <h1>A route through time</h1>
-        <div class="intro-text">
-          <p class="lede"></p>
-          <p class="how"></p>
-        </div>
-      </div>
-      <div class="control-bar"></div>
-      <div class="stage">
-        <div class="stage-globe"></div>
-        <aside class="stage-side">
-          <h2>At the clock’s time</h2>
-          <ul class="readouts"></ul>
-          <p class="stage-note">A dotted, dimmer line is a dropped route: the route held until the
-            drop, drawn dotted for as long as the drop lasts; a cross marks what the engine names
-            as its cause.</p>
-        </aside>
-      </div>
-      <div class="clock-dock"></div>
-      <div class="panels">
-        <section class="panel chart-panel">
-          <h2>Delay over the run</h2>
-          <p class="panel-note chart-note"></p>
-          <div class="chart-host"></div>
-        </section>
-        <section class="panel table-panel">
-          <h2>The engine’s summary</h2>
-          <p class="panel-note table-note"></p>
-          <div class="table-host"></div>
-        </section>
-      </div>
+      ${introMarkup('A connection over time')}
+      <div class="view-host"></div>
     </section>`;
   const el = (selector: string): HTMLElement => root.querySelector(selector) as HTMLElement;
   const section = el('.story');
+  writeText(root, story, data);
 
+  const view = new RouteView(el('.view-host'), data, links);
   const pairs = pairsOf(story);
-  writeText(el('.lede'), el('.how'), story, name);
-  el('.chart-note').textContent =
-    'One-way delay at every second, one row per strategy on the same delay scale. Grey hatched bands ' +
-    'are drops (no route); ticks along the bottom are route changes. The thin line marks the clock; ' +
-    'click a chart to move the clock there.';
-  el('.table-note').textContent =
-    `From the routing program’s summary (${story.sources.summary}) for the chosen direction. ` +
-    'A route change is any switch from one route to another without a drop between them.';
-
-  // The globe.
-  const stage = new Stage(el('.stage-globe'));
-  const field = new SatelliteField(data, links.pairs);
-  const sites = siteScenePositions(data);
-  const placer = new PathPlacer(field, sites);
-  stage.add(field.segments(THEME.links, 0.08));
-  stage.add(field.points(field.shellColors, new Float32Array(field.count).fill(SAT_SIZE), stage.dotMaterial()));
-  // Widest first, so routes the strategies share show as nested stripes of every style.
-  const lines = new Map<string, ThickPath>();
-  for (const s of [...strategies].sort((a, b) => strategyStyle(b).globeWidth - strategyStyle(a).globeWidth)) {
-    const style = strategyStyle(s);
-    lines.set(s, stage.path(style.color, style.globeWidth));
-  }
-  const causePosition = new BufferAttribute(new Float32Array(strategies.length * 2 * 3), 3);
-  causePosition.setUsage(DynamicDrawUsage);
-  const causeDots = dots(
-    dotGeometry(
-      causePosition,
-      rgbArray(Array<string>(strategies.length * 2).fill(MARKS.cause.color)),
-      new Float32Array(strategies.length * 2).fill(13),
-      undefined,
-      undefined,
-      shapeArray(Array(strategies.length * 2).fill(MARKS.cause.shape)),
-    ),
-    stage.dotMaterial(),
-  );
-  causeDots.renderOrder = 3;
-  stage.add(causeDots);
-  let endDots: ReturnType<Stage['fixedDots']> | null = null;
-
-  // Controls.
-  const shown = new Set(strategies);
   let pairIndex = 0;
   let dirIndex = 0;
-  const bar = el('.control-bar');
   const pairMenu = dropdown(
-    'Pair',
+    'Cities',
     pairs.map((p, i) => ({ value: String(i), text: `${name(p.a)} and ${name(p.b)}` })),
     (i) => {
       pairIndex = i;
@@ -166,48 +68,11 @@ async function mount({ data, root }: StoryContext): Promise<() => void> {
     },
   );
   const dirHost = document.createElement('div');
-  const toggles = document.createElement('div');
-  toggles.className = 'toggles';
-  toggles.setAttribute('role', 'group');
-  toggles.setAttribute('aria-label', 'Strategies');
-  for (const s of strategies) {
-    toggles.append(
-      toggle({ value: s, text: STRATEGY_TITLES[s] ?? s }, true, strategySwatch(s), (on) => {
-        if (on) shown.add(s);
-        else shown.delete(s);
-        charts?.setShown(shown);
-        drawn_t = Number.NaN;
-      }),
-    );
-  }
-  bar.append(pairMenu, dirHost, toggles);
-
-  // Readouts beside the globe, one per strategy.
-  const readouts = new Map<string, HTMLElement>();
-  for (const s of strategies) {
-    const li = document.createElement('li');
-    li.dataset.strategy = s;
-    li.innerHTML = '<span class="readout-name"></span><span class="readout-state"></span>';
-    const readoutName = li.querySelector('.readout-name') as HTMLElement;
-    readoutName.textContent = STRATEGY_TITLES[s] ?? s;
-    setSwatch(readoutName, strategySwatch(s));
-    readouts.set(s, li);
-    el('.readouts').append(li);
-  }
-
-  const clock = new Clock({ duration_s: story.settings.duration_s, speed: START_SPEED });
-  const clockView = new ClockView(clock, { marks: [], spans: [], holdLabel: '' });
-  el('.clock-dock').append(clockView.element);
-
-  let direction = story.directions[0] as Direction;
-  let charts: DelayCharts | null = null;
-  let drawn_t = Number.NaN;
-  // What each line shows now (a route's interval or a drop), to lay its dashes when it changes.
-  const shownOnLine = new Map<string, object>();
+  view.controls.append(pairMenu, dirHost);
 
   function showDirection(): void {
     const pair = pairs[pairIndex] as (typeof pairs)[number];
-    direction = pair.directions[dirIndex] as Direction;
+    const direction = pair.directions[dirIndex] as Direction;
     const menu = segmented(
       'Direction',
       pair.directions.map((d, i) => ({ value: String(i), text: `${name(d.from)} to ${name(d.to)}` })),
@@ -220,171 +85,55 @@ async function mount({ data, root }: StoryContext): Promise<() => void> {
     dirHost.replaceChildren(menu.element);
     section.dataset.from = name(direction.from);
     section.dataset.to = name(direction.to);
-
-    charts?.dispose();
-    charts = new DelayCharts(strategies, direction, STRATEGY_TITLES, (t) => {
-      clock.seek(t);
+    view.show({
+      settings: story.settings,
+      run_start_s: story.run_start_s,
+      direction,
+      from: endpoint(direction.from),
+      to: endpoint(direction.to),
     });
-    charts.setShown(shown);
-    el('.chart-host').replaceChildren(charts.element);
-    el('.table-host').replaceChildren(summaryTable(strategies, STRATEGY_TITLES, direction));
-
-    if (endDots !== null) {
-      stage.scene.remove(endDots);
-      endDots.geometry.dispose();
-    }
-    endDots = stage.fixedDots(
-      [...placer.site(direction.from), ...placer.site(direction.to)],
-      [MARKS.city.color, MARKS.city.color],
-      [11, 11],
-      [MARKS.city.shape, MARKS.city.shape],
-    );
-    stage.add(endDots);
-    stage.globe.lookFrom([0, 1, 2].map((k) => (sites[3 * direction.from + k] as number) + (sites[3 * direction.to + k] as number)), CAMERA_DISTANCE);
-    shownOnLine.clear();
-    drawn_t = Number.NaN;
   }
   showDirection();
 
-  const draw = (t: number): void => {
-    field.update(story.run_start_s + t);
-    let causes = 0;
-    for (const s of strategies) {
-      const run = direction.strategies[s] as StrategyRun;
-      const state = stateAt(run, t);
-      const line = lines.get(s) as ThickPath;
-      const on = shown.has(s);
-      line.object.visible = on;
-      showReadout(readouts.get(s) as HTMLElement, state, on, data);
-      if (!on || state.kind === 'none') {
-        line.set([]);
-        continue;
-      }
-      const style = strategyStyle(s);
-      if (state.kind === 'route') {
-        line.setStyle(style);
-        line.set(placer.points(routeNodes(direction.from, state.interval.route, direction.to)));
-        if (shownOnLine.get(s) !== state.interval) {
-          shownOnLine.set(s, state.interval);
-          line.layDashes();
-        }
-        continue;
-      }
-      // A drop: the route held until it, dotted and dimmer, and the element the engine names.
-      line.setStyle({ color: droppedColor(style.color), dash: DOTTED });
-      line.set(state.broken === null ? [] : placer.points(routeNodes(direction.from, state.broken.route, direction.to)));
-      if (shownOnLine.get(s) !== state.drop) {
-        shownOnLine.set(s, state.drop);
-        line.layDashes();
-      }
-      for (const p of elementPoints(state.drop.element, placer)) {
-        if (causes < strategies.length * 2) causePosition.set(p, 3 * causes++);
-      }
-    }
-    causePosition.needsUpdate = true;
-    causeDots.geometry.setDrawRange(0, causes);
-    charts?.setTime(t);
-  };
-
-  const stop = frameLoop((real_s) => {
-    clock.tick(real_s);
-    if (clock.t !== drawn_t) {
-      drawn_t = clock.t;
-      draw(clock.t);
-    }
-    clockView.update();
-    stage.render();
-    document.body.dataset.ready = 'true';
-  });
-
   return () => {
-    stop();
-    charts?.dispose();
-    clockView.dispose();
-    stage.dispose();
+    view.dispose();
     root.replaceChildren();
   };
 }
 
-/** A strategy's swatch: its line on the globe, narrowed to fit beside a name. */
-function strategySwatch(s: string): Mark {
-  const style = strategyStyle(s);
-  return line({ ...style, width: style.globeWidth * 0.6 });
-}
-
-/** Where to put the cross of a drop's element: a satellite, both ends of a link, a site. */
-function elementPoints(e: DropElement | null, placer: PathPlacer): number[][] {
-  if (e === null) return [];
-  const out: (number[] | null)[] =
-    e.kind === 'satellite'
-      ? [placer.node({ kind: 'sat', sat: e.sat })]
-      : e.kind === 'link'
-        ? [placer.node({ kind: 'sat', sat: e.a }), placer.node({ kind: 'sat', sat: e.b })]
-        : [placer.site(e.site)];
-  return out.filter((p): p is number[] => p !== null);
-}
-
-function elementName(e: DropElement | null, data: CommonData): string {
-  if (e === null) return '';
-  const sat = (i: number): string => data.satellites.name[i] ?? `satellite ${i}`;
-  switch (e.kind) {
-    case 'satellite':
-      return sat(e.sat);
-    case 'link':
-      return `the laser link ${sat(e.a)} to ${sat(e.b)}`;
-    case 'city':
-    case 'gateway':
-      return data.sites[e.site]?.name ?? '';
-  }
-}
-
-/** The readout of one strategy, and what the browser test reads: the state, the route as
- * catalogue numbers (as the routes CSV writes it) and the drop's cause. */
-function showReadout(li: HTMLElement, state: RouteState, on: boolean, data: CommonData): void {
-  const text = li.querySelector('.readout-state') as HTMLElement;
-  li.dataset.on = String(on);
-  li.dataset.state = state.kind;
-  li.dataset.step = state.step === null ? '' : String(state.step);
-  if (state.kind === 'route') {
-    const hops = state.interval.route.length;
-    li.dataset.route = state.interval.route.map((s) => data.satellites.norad[s]).join(' ');
-    li.dataset.delayMs = state.delay_ms === null ? '' : String(state.delay_ms);
-    delete li.dataset.cause;
-    text.textContent = `${formatMs(state.delay_ms)}, ${formatCount(hops)} ${hops === 1 ? 'satellite' : 'satellites'}`;
-  } else if (state.kind === 'drop') {
-    li.dataset.route = '';
-    li.dataset.delayMs = '';
-    li.dataset.cause = state.drop.cause;
-    const what = elementName(state.drop.element, data);
-    text.textContent =
-      `Dropped: ${CAUSE_TITLES[state.drop.cause] ?? state.drop.cause.replaceAll('_', ' ')}` +
-      `${what === '' ? '' : ` (${what})`}, for ${formatSeconds(state.drop.length_s)} from ${formatSeconds(state.drop.start_s)}`;
-  } else {
-    li.dataset.route = '';
-    li.dataset.delayMs = '';
-    delete li.dataset.cause;
-    text.textContent = 'No route';
-  }
-}
-
-/** The story's text: what is shown, and the main result for the first pair, from the file. */
-function writeText(lede: HTMLElement, how: HTMLElement, story: RouteStory, name: (i: number) => string): void {
+/** The story's words: what is shown, how to read it, and the main result for the first pair. */
+function writeText(root: HTMLElement, story: RouteStory, data: CommonData): void {
+  const q = (selector: string): HTMLElement => root.querySelector(selector) as HTMLElement;
+  const name = (i: number): string => data.sites[i]?.name ?? '';
   const first = story.directions[0] as Direction;
-  const parts = story.settings.strategies.map((s) => {
+  const strategies = story.settings.strategies;
+  q('.lede').textContent =
+    `A message from ${name(first.from)} to ${name(first.to)} goes up to a satellite, jumps from satellite to satellite ` +
+    `along laser links, and comes back down. The satellites move fast, so the path keeps changing: here are ` +
+    `${formatSpan(story.settings.duration_s)} of it under ${formatCount(strategies.length)} different rules for choosing the path.`;
+  q('.try-text').textContent =
+    'Press Play and watch the paths move. Switch rules on and off with the buttons above the globe. Pick another pair of cities.';
+
+  fillFold(q('.how-body'), [
+    'Each rule has its own line, the same on the globe, beside it, in the charts and in the table:',
+    legendList(
+      strategies.map((s) => [strategySwatch(s), `${strategyTitle(s)}: ${STRATEGY_NOTES[s] ?? ''}`.replace(/: $/, '')] as const),
+      'legend-list fold-legend',
+    ),
+    'Travel time is how long a message takes to get there, one way, in thousandths of a second (ms). ' +
+      'When a rule has no connection, its last path is drawn dotted and dimmer, and a cross marks what broke.',
+    'Drag the globe to turn it; scroll or pinch to zoom.',
+  ]);
+
+  const results = strategies.map((s) => {
     const sum = first.strategies[s]?.summary;
     if (sum === undefined) return '';
-    return `${STRATEGY_TITLES[s] ?? s} changed route ${formatCount(sum.changes)} ${sum.changes === 1 ? 'time' : 'times'}, at a median delay of ${formatMs(sum.delay_median_ms)}`;
+    return `${strategyTitle(s)} switched route ${formatCount(sum.changes)} ${sum.changes === 1 ? 'time' : 'times'}, with a typical travel time of ${formatMs(sum.delay_median_ms)}`;
   });
-  lede.textContent =
-    'A route is the chain of satellites that carries traffic from one city to another: up to a ' +
-    'satellite, across laser links between satellites, down to the other city. The satellites ' +
-    'move, so the route has to change. A strategy is the rule that picks the next route. ' +
-    `Over the ${formatSpan(story.settings.duration_s)} replayed here, from ${name(first.from)} to ${name(first.to)}: ` +
-    `${parts.filter((p) => p !== '').join('; ')}.`;
-  const notes = story.settings.strategies.map((s) => `${STRATEGY_TITLES[s] ?? s} ${STRATEGY_NOTES[s] ?? ''}`.trim());
-  how.textContent =
-    `The best case is shown: a city can use any satellite in view, and the laser pattern is “${story.settings.pattern}”. ` +
-    `${notes.join('; ')}. Routes are re-planned every ${formatSeconds(story.settings.replan_s)}. A drop is a stretch of time with no usable route; its cause is the one the engine gives. ` +
-    'Each strategy keeps its line (its grey, width and dashes) on the globe, in the chart and in the table; the cities are ringed dots. ' +
-    'Drag to turn the globe, scroll to zoom.';
+  fillFold(q('.sources-body'), [
+    `From ${name(first.from)} to ${name(first.to)}: ${results.filter((r) => r !== '').join('; ')}.`,
+    `This is the best case: a city can use any satellite it can see. Here ${patternWords(story.settings.pattern)}. Routes are checked every ${formatSeconds(story.settings.replan_s)}. ` +
+      `The run starts at ${story.settings.start_utc.replace('T', ' ')} UTC (world time).`,
+    `Computed by the simulator’s routing program (Phase 3). Its files: ${story.sources.routes}, ${story.sources.drops} and ${story.sources.summary}.`,
+  ]);
 }

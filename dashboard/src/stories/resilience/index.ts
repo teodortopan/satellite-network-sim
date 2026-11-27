@@ -13,6 +13,8 @@ import { BASELINE_STYLE, dot, failureKindStyle, line, MARKS, patternStyle, shell
 import { shapeArray } from '../../globe/layers';
 import { setSwatch } from '../../ui/marks';
 import { frameLoop, segmented } from '../../ui/controls';
+import { fillFold, introMarkup } from '../../ui/intro';
+import { patternShort, shellName } from '../../ui/words';
 import type { Story, StoryContext } from '../story';
 import { cellOf, parseResilienceStory, type Cell, type ResilienceStory, type Step, type Table } from './data';
 import { afterRecovery, alignTo, pickLinks, pointsOf, type Points } from './state';
@@ -35,7 +37,8 @@ const SHARE_TICKS = [0.001, 0.003, 0.01, 0.03, 0.1, 0.3];
 
 export const resilienceStory: Story = {
   id: 'resilience',
-  title: 'The network falling apart',
+  title: 'When many things break',
+  summary: 'Break more and more of the network at once and see how many cities can still reach each other.',
   mount,
 };
 
@@ -53,24 +56,24 @@ function styled(style: LineStyle, dashed = false): Pick<LineDef, 'color' | 'mark
 }
 
 const WHAT_FAILS: LineDef[] = [
-  { label: 'Random satellites', ...styled(failureKindStyle('random-satellites')), match: { group: 'random-satellites', scenario: 'random-satellites', pattern: 'three', repoint: 'off' } },
-  { label: 'Random lasers', ...styled(failureKindStyle('random-lasers')), match: { group: 'random-lasers', scenario: 'random-lasers', pattern: 'three', repoint: 'off' } },
-  { label: 'Busiest satellites first', ...styled(failureKindStyle('attack')), match: { group: 'attack', scenario: 'attack', pattern: 'three', repoint: 'off' } },
-  { label: 'Random satellites, re-pointed', ...styled(failureKindStyle('random-satellites'), true), match: { group: 'recovery-repointing', scenario: 'random-satellites', pattern: 'three', repoint: 'on' } },
-  { label: 'Busiest first, re-pointed', ...styled(failureKindStyle('attack'), true), match: { group: 'recovery-repointing', scenario: 'attack', pattern: 'three', repoint: 'on' } },
+  { label: 'Random satellites break', ...styled(failureKindStyle('random-satellites')), match: { group: 'random-satellites', scenario: 'random-satellites', pattern: 'three', repoint: 'off' } },
+  { label: 'Random laser links break', ...styled(failureKindStyle('random-lasers')), match: { group: 'random-lasers', scenario: 'random-lasers', pattern: 'three', repoint: 'off' } },
+  { label: 'The busiest satellites break', ...styled(failureKindStyle('attack')), match: { group: 'attack', scenario: 'attack', pattern: 'three', repoint: 'off' } },
+  { label: 'Random satellites, lasers re-aimed', ...styled(failureKindStyle('random-satellites'), true), match: { group: 'recovery-repointing', scenario: 'random-satellites', pattern: 'three', repoint: 'on' } },
+  { label: 'Busiest satellites, lasers re-aimed', ...styled(failureKindStyle('attack'), true), match: { group: 'recovery-repointing', scenario: 'attack', pattern: 'three', repoint: 'on' } },
 ];
 
 const BY_PATTERN: LineDef[] = [
-  { label: 'plus-grid', ...styled(patternStyle('plus-grid')), match: { group: 'pattern', scenario: 'random-satellites', pattern: 'plus-grid', repoint: 'off' } },
-  { label: 'three', ...styled(patternStyle('three')), match: { group: 'random-satellites', scenario: 'random-satellites', pattern: 'three', repoint: 'off' } },
-  { label: 'six', ...styled(patternStyle('six')), match: { group: 'pattern', scenario: 'random-satellites', pattern: 'six', repoint: 'off' } },
+  { label: patternShort('plus-grid'), ...styled(patternStyle('plus-grid')), match: { group: 'pattern', scenario: 'random-satellites', pattern: 'plus-grid', repoint: 'off' } },
+  { label: patternShort('three'), ...styled(patternStyle('three')), match: { group: 'random-satellites', scenario: 'random-satellites', pattern: 'three', repoint: 'off' } },
+  { label: patternShort('six'), ...styled(patternStyle('six')), match: { group: 'pattern', scenario: 'random-satellites', pattern: 'six', repoint: 'off' } },
 ];
 
 const PERCOLATION: LineDef[] = [
-  { label: 'plus-grid, satellites fail', ...styled(patternStyle('plus-grid')), match: { links: 'plus-grid', kind: 'satellites' } },
-  { label: 'plus-grid, lasers fail', ...styled(patternStyle('plus-grid'), true), match: { links: 'plus-grid', kind: 'laser-links' } },
-  { label: 'three, satellites fail', ...styled(patternStyle('three')), match: { links: 'three', kind: 'satellites' } },
-  { label: 'three, lasers fail', ...styled(patternStyle('three'), true), match: { links: 'three', kind: 'laser-links' } },
+  { label: `${patternShort('plus-grid')}, satellites break`, ...styled(patternStyle('plus-grid')), match: { links: 'plus-grid', kind: 'satellites' } },
+  { label: `${patternShort('plus-grid')}, lasers break`, ...styled(patternStyle('plus-grid'), true), match: { links: 'plus-grid', kind: 'laser-links' } },
+  { label: `${patternShort('three')}, satellites break`, ...styled(patternStyle('three')), match: { links: 'three', kind: 'satellites' } },
+  { label: `${patternShort('three')}, lasers break`, ...styled(patternStyle('three'), true), match: { links: 'three', kind: 'laser-links' } },
 ];
 
 async function mount({ data, root }: StoryContext): Promise<() => void> {
@@ -85,26 +88,36 @@ async function mount({ data, root }: StoryContext): Promise<() => void> {
 
   root.innerHTML = `
     <section class="story resilience">
-      <div class="intro">
-        <h1>The network falling apart</h1>
-        <div class="intro-text">
-          <p class="lede"></p>
-          <p class="how"></p>
+      ${introMarkup('When many things break')}
+      <div class="instant">
+        <div class="control-bar"><div class="control-group"><span class="control-label">How much breaks</span></div></div>
+        <div class="stage">
+          <div class="stage-globe"></div>
+          <aside class="stage-side">
+            <h2>City pairs after the break</h2>
+            <p class="instant-text"></p>
+            <ul class="legend-list globe-legend resilience-legend"></ul>
+            <ul class="pair-list"></ul>
+          </aside>
         </div>
+      </div>
+      <div class="charts-head">
+        <h2>As more and more breaks</h2>
+        <p>Each chart goes from a little broken (left) to a lot broken (right). The example on the globe above is one point on these lines.</p>
       </div>
       <div class="panels charts">
         <section class="panel" data-chart="what-fails">
-          <h2>What fails</h2>
+          <h2>What breaks</h2>
           <p class="panel-note"></p>
           <div class="line-plot"></div>
         </section>
         <section class="panel" data-chart="pattern">
-          <h2>The laser pattern</h2>
+          <h2>More lasers per satellite</h2>
           <p class="panel-note"></p>
           <div class="line-plot"></div>
         </section>
         <section class="panel" data-chart="percolation">
-          <h2>When one piece becomes many</h2>
+          <h2>When the network falls apart</h2>
           <p class="panel-note"></p>
           <div class="line-plot"></div>
         </section>
@@ -113,32 +126,17 @@ async function mount({ data, root }: StoryContext): Promise<() => void> {
           <div class="numbers-tables"></div>
         </details>
       </div>
-      <div class="instant">
-        <div class="instant-head">
-          <h2>One draw, on the real constellation</h2>
-          <p class="instant-text"></p>
-        </div>
-        <div class="control-bar"></div>
-        <div class="stage">
-          <div class="stage-globe"></div>
-          <aside class="stage-side">
-            <h2>The study pairs after recovery</h2>
-            <ul class="pair-list"></ul>
-            <ul class="legend-list resilience-legend"></ul>
-          </aside>
-        </div>
-        <div class="panels">
-          <section class="panel network-panel">
-            <h2>Pieces of the network</h2>
-            <p class="panel-note network-note"></p>
-            <div class="table-scroll"></div>
-          </section>
-        </div>
+      <div class="panels">
+        <section class="panel network-panel">
+          <h2>How the network split, in the example on the globe</h2>
+          <p class="panel-note network-note"></p>
+          <div class="table-scroll"></div>
+        </section>
       </div>
     </section>`;
   const el = (selector: string): HTMLElement => root.querySelector(selector) as HTMLElement;
   const section = el('.story');
-  writeText(el('.lede'), el('.how'), story);
+  writeText(root, story);
 
   const recovery = story.charts.recovery_summary;
   const percolation = story.charts.percolation;
@@ -148,12 +146,12 @@ async function mount({ data, root }: StoryContext): Promise<() => void> {
   };
   note(
     'what-fails',
-    `Share of the city pairs that still have a route once every failure is known, against the share of satellites or lasers failed (mean over the runs; ${recovery.source}). Pattern “three”. The dot on the points says what fails; dashed: the satellites point their lasers again at new partners.`,
+    'How many city pairs can still reach each other, as more of the network breaks. The shape on each line says what breaks; dashed: the satellites turn their lasers to new partners after the break.',
   );
-  note('pattern', `The same share for random satellite failures under each laser pattern; the dot on the points says the pattern (${recovery.source}).`);
+  note('pattern', 'The same, when random satellites break, for satellites with 3, 4 or 6 lasers each.');
   note(
     'percolation',
-    `The largest connected part as a share of the working satellites, on Phase 4’s test shell of one orbit height (${percolation.source}). The dot on the points says the pattern; dashed: lasers fail, solid: satellites fail. Dotted upright lines, topped by the pattern’s dot: where theory says an endless grid of that kind falls apart.`,
+    'The biggest group of working satellites still joined by lasers, as a share of all working ones, on a test group at one height. Solid: satellites break; dashed: lasers break. Each upright dotted line marks where theory says such a network falls apart.',
   );
   // The two share charts on one scale, from just below the lowest share either shows (display only).
   const lowest = Math.min(
@@ -167,8 +165,8 @@ async function mount({ data, root }: StoryContext): Promise<() => void> {
       lineChart(root.querySelector(`[data-chart="${chart}"] .line-plot`) as HTMLElement, {
         x,
         lines: lines.map(({ d, p }) => toLine(d, x, p)),
-        xLabel: 'Failed share',
-        yLabel: 'Pairs with a route',
+        xLabel: 'Share broken',
+        yLabel: 'City pairs still connected',
         height: 260,
         xLog: true,
         xTicks: (min, max) => SHARE_TICKS.filter((v) => v >= min * 0.999 && v <= max * 1.001),
@@ -186,8 +184,8 @@ async function mount({ data, root }: StoryContext): Promise<() => void> {
     lineChart(root.querySelector('[data-chart="percolation"] .line-plot') as HTMLElement, {
       x: px,
       lines: perc.map(({ d, p }) => toLine(d, px, p)),
-      xLabel: 'Failed share',
-      yLabel: 'Largest part',
+      xLabel: 'Share broken',
+      yLabel: 'Biggest joined group',
       height: 260,
       xValue: formatShare,
       yValue: formatShare,
@@ -250,16 +248,12 @@ async function mount({ data, root }: StoryContext): Promise<() => void> {
     globeEl.dataset.failedSatellites = String(step.failed_satellites.length);
     globeEl.dataset.linksDrawn = String(step.planned_links_not_failed.length);
     el('.instant-text').textContent =
-      `${stepTitle(step)} failed at ${step.utc.replace('T', ' ')} UTC (${step.seed === null ? 'the busiest satellites at that instant' : `random draw ${step.seed}`}), ` +
-      `${formatCount(step.failed_satellites.length)} satellites. Crosses are the failed satellites, small dots the working ones. The faint lines are the ` +
-      `${formatCount(step.planned_links_not_failed.length)} planned laser links of the pattern “${step.pattern}” that did not fail (the ` +
-      `${formatCount(step.failed_links.length)} links of the failed satellites are left out). They are planned links, not the links that work: ` +
-      'a planned link can also be out of sight at this instant, and no program writes that. The bright, thick line: each pair’s route after ' +
-      'recovery, chosen by a planner that knows every failure; the faint, thin line: its route with nothing failed.';
+      `${formatCount(step.failed_satellites.length)} satellites broken (${stepTitle(step)}). Each bright line is a pair’s new path around the breaks.`;
     writePairs(el('.pair-list'), step, data);
+    writeExample(el('.sources-body .example'), step);
     el('.network-note').textContent =
-      `From the run’s network file (${step.sources.network ?? ''}): the working satellites split into pieces that lasers do not join. ` +
-      'Lasers never join two shells, so all shells together are always several pieces.';
+      'The working satellites fall into pieces: groups that lasers join to each other but not to the rest. ' +
+      'Lasers never join two groups of different height and tilt, so all of them together are always several pieces.';
     el('.network-panel .table-scroll').replaceChildren(networkTable(step));
     fresh = true;
   };
@@ -269,7 +263,7 @@ async function mount({ data, root }: StoryContext): Promise<() => void> {
     show,
   );
   menu.select(0);
-  el('.control-bar').append(menu.element);
+  el('.control-bar .control-group').append(menu.element);
   show(0);
 
   const stop = frameLoop(() => {
@@ -300,10 +294,10 @@ function toLine(d: LineDef, x: readonly number[], p: Points): Line {
 }
 
 function stepTitle(s: Step): string {
-  return s.scenario === 'attack' ? `${formatShare(s.share)}, busiest first` : `${formatShare(s.share)} at random`;
+  return s.scenario === 'attack' ? `the busiest ${formatShare(s.share)}` : `${formatShare(s.share)} at random`;
 }
 
-const CAUSES: Record<string, string> = { no_path: 'no chain of lasers joins the cities', no_coverage: 'no satellite in view' };
+const CAUSES: Record<string, string> = { no_path: 'no chain of satellites joins the two cities', no_coverage: 'no satellite in view' };
 
 /** One line per study pair; data attributes for the browser test (route as catalogue numbers). */
 function writePairs(list: HTMLElement, step: Step, data: CommonData): void {
@@ -325,7 +319,7 @@ function writePairs(list: HTMLElement, step: Step, data: CommonData): void {
       state.className = 'pair-state';
       const cause = p.reference.drop_cause === null ? '' : ` (${CAUSES[p.reference.drop_cause] ?? p.reference.drop_cause.replaceAll('_', ' ')})`;
       state.textContent = after.routed
-        ? `${formatMs(p.reference.one_way_ms)} over ${formatCount(after.route.length)} satellites; with nothing failed ${formatMs(p.baseline.one_way_ms)}`
+        ? `${formatMs(p.reference.one_way_ms)} over ${formatCount(after.route.length)} ${after.route.length === 1 ? 'satellite' : 'satellites'} (${formatMs(p.baseline.one_way_ms)} with nothing broken)`
         : `no route${cause}`;
       li.append(name, state);
       return li;
@@ -335,12 +329,12 @@ function writePairs(list: HTMLElement, step: Step, data: CommonData): void {
 
 function writeLegend(list: HTMLElement): void {
   const items: [Mark, string][] = [
-    [line(ROUTE_STYLE), 'Route after recovery'],
-    [line({ ...BASELINE_STYLE, width: 1.6 }, BASELINE_OPACITY), 'Route with nothing failed'],
-    [dot(MARKS.city), 'City of a study pair'],
-    [dot(FAILED), 'Failed satellite'],
+    [line(ROUTE_STYLE), 'New path around the breaks'],
+    [line({ ...BASELINE_STYLE, width: 1.6 }, BASELINE_OPACITY), 'Path with nothing broken'],
+    [dot(MARKS.city), 'City'],
+    [dot(FAILED), 'Broken satellite'],
     [dot({ color: shellColor(0), shape: 'disc' }), 'Working satellite'],
-    [line({ color: THEME.links, width: 1, dash: [] }, LINK_OPACITY), 'Planned laser link that did not fail'],
+    [line({ color: THEME.links, width: 1, dash: [] }, LINK_OPACITY), 'Laser link still working'],
   ];
   list.replaceChildren(
     ...items.map(([mark, text]) => {
@@ -354,8 +348,8 @@ function writeLegend(list: HTMLElement): void {
 
 function networkTable(step: Step): HTMLTableElement {
   const t = document.createElement('table');
-  t.innerHTML = `<thead><tr><th scope="col">Scope</th><th scope="col">Working satellites</th><th scope="col">Pieces</th>
-    <th scope="col">Largest piece</th><th scope="col">Its share</th></tr></thead><tbody></tbody>`;
+  t.innerHTML = `<thead><tr><th scope="col">Which satellites</th><th scope="col">Working satellites</th><th scope="col">Pieces</th>
+    <th scope="col">Biggest piece</th><th scope="col">Its share</th></tr></thead><tbody></tbody>`;
   const body = t.querySelector('tbody') as HTMLElement;
   for (const r of step.network) {
     const tr = document.createElement('tr');
@@ -367,7 +361,7 @@ function networkTable(step: Step): HTMLTableElement {
     ];
     const th = document.createElement('th');
     th.scope = 'row';
-    th.textContent = r.scope === 'all' ? 'All shells' : `Shell ${r.scope}`;
+    th.textContent = r.scope === 'all' ? 'All groups' : shellName(r.scope);
     tr.append(th);
     for (const [field, text] of cells) {
       const td = document.createElement('td');
@@ -417,7 +411,20 @@ function numbersTable(table: Table, name: string, columns: readonly string[]): H
   return wrap;
 }
 
-function writeText(lede: HTMLElement, how: HTMLElement, story: ResilienceStory): void {
+/** The fold's part about the example on the globe, which changes with the chosen share. */
+function writeExample(p: HTMLElement, step: Step): void {
+  p.textContent =
+    `The example on the globe: ${stepTitle(step)} broken at ${step.utc.replace('T', ' ')} UTC (world time) ` +
+    `(${step.seed === null ? 'the busiest satellites at that moment' : `random draw ${step.seed}`}), ` +
+    `${formatCount(step.failed_satellites.length)} satellites. The faint lines are the ` +
+    `${formatCount(step.planned_links_not_failed.length)} planned laser links (${patternShort(step.pattern)}) that did not break; the ` +
+    `${formatCount(step.failed_links.length)} links of the broken satellites are left out. A planned link can also be out of ` +
+    'sight at that moment, which no program records. The new paths are chosen by a planner that knows about every break.' +
+    (step.sources.network === undefined ? '' : ` Pieces of the network: ${step.sources.network}.`);
+}
+
+function writeText(root: HTMLElement, story: ResilienceStory): void {
+  const q = (selector: string): HTMLElement => root.querySelector(selector) as HTMLElement;
   const t = story.charts.recovery_summary;
   const at = (match: Record<string, Cell>): { share: number; reach: number | null } | null => {
     const p = pointsOf(t, match, 'share', 'reach_reference_mean');
@@ -430,16 +437,29 @@ function writeText(lede: HTMLElement, how: HTMLElement, story: ResilienceStory):
   let result = '';
   if (random !== null && attack !== null) {
     result =
-      ` With ${formatShare(random.share)} of the satellites failed at random, ${formatShare(random.reach)} of the pairs still have a route; ` +
-      `when the busiest ${formatShare(attack.share)} fail, ${formatShare(attack.reach)} do.`;
+      `With ${formatShare(random.share)} of the satellites broken at random, ${formatShare(random.reach)} of the city pairs can still reach each other; ` +
+      `when the busiest ${formatShare(attack.share)} break, ${formatShare(attack.reach)} can.`;
   }
-  if (six !== null) result += ` With the pattern “six” and ${formatShare(six.share)} failed at random, ${formatShare(six.reach)} do.`;
-  lede.textContent =
-    'What happens when many satellites or laser links stop working at once? Here every failure is old news: everybody ' +
-    'knows about it, and the route of each pair of cities is planned again around it. A pair still has a route if some chain ' +
-    'of working satellites and lasers joins its two cities.' + result;
-  how.textContent =
-    'The charts are Phase 4’s summaries over many random draws. A connected part is a group of satellites that lasers join to each ' +
-    'other; when too much fails, the network breaks into many small parts. Below, one draw on the real constellation: pick a failed share ' +
-    'to see what is left. Drag to turn the globe.';
+  if (six !== null) result += ` With ${patternShort('six')} and ${formatShare(six.share)} broken at random, ${formatShare(six.reach)} can.`;
+  q('.lede').textContent =
+    'What if many satellites stop working at the same time? Here the network has had time to find new paths around ' +
+    'every break. The globe shows one example; the charts below it show how much still connects as more breaks.';
+  q('.try-text').textContent =
+    'Pick how much breaks, above the globe, and see which paths survive. Then follow the charts from left (a little broken) to right (a lot).';
+  fillFold(q('.how-body'), [
+    'On the globe, crosses are broken satellites and small dots working ones. For each pair of cities, the bright line is its new path ' +
+      'and the faint thin line the path it had with nothing broken. The list beside the globe gives each pair’s travel time: how long a ' +
+      'message takes, one way, in thousandths of a second (ms).',
+    'In the charts, the shape on each line tells the lines apart, as named under each chart. “Lasers re-aimed” means the satellites ' +
+      'next to a broken one turn their lasers to new partners.',
+    'Drag the globe to turn it; scroll or pinch to zoom. Point at a chart to read its values.',
+  ]);
+  const example = document.createElement('p');
+  example.className = 'example';
+  fillFold(q('.sources-body'), [
+    result,
+    'The charts are averages over many random draws, from runs of the simulator’s failures program (Phase 4): ' +
+      `${t.source} and ${story.charts.percolation.source}. The test group in the last chart flies at one height.`,
+    example,
+  ]);
 }

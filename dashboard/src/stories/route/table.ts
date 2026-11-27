@@ -7,10 +7,10 @@ import { setSwatch } from '../../ui/marks';
 import type { Direction, RouteSummary } from './data';
 
 const ROWS: { key: keyof RouteSummary; label: string; show: (s: RouteSummary) => string }[] = [
-  { key: 'delay_median_ms', label: 'Median delay', show: (s) => formatMs(s.delay_median_ms) },
-  { key: 'changes', label: 'Route changes', show: (s) => formatCount(s.changes) },
-  { key: 'drop_events', label: 'Drops', show: (s) => formatCount(s.drop_events) },
-  { key: 'no_route_total_s', label: 'Time without a route', show: (s) => formatSeconds(s.no_route_total_s) },
+  { key: 'delay_median_ms', label: 'Typical travel time (median)', show: (s) => formatMs(s.delay_median_ms) },
+  { key: 'changes', label: 'Times the route switched', show: (s) => formatCount(s.changes) },
+  { key: 'drop_events', label: 'Times the connection broke', show: (s) => formatCount(s.drop_events) },
+  { key: 'no_route_total_s', label: 'Time with no connection', show: (s) => formatSeconds(s.no_route_total_s) },
 ];
 
 export function summaryTable(strategies: readonly string[], names: Record<string, string>, direction: Direction): HTMLTableElement {

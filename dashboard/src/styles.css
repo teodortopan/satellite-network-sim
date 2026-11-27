@@ -9,6 +9,7 @@
   --step-0: 1rem;
   --step-1: 1.1875rem;
   --step-2: 1.5rem;
+  --step-3: clamp(1.75rem, 1.4rem + 1.2vw, 2.5rem);
   --step-4: clamp(2rem, 1.2rem + 3vw, 3.25rem);
   --gutter: clamp(16px, 3vw, 40px);
   color-scheme: dark;
@@ -63,9 +64,9 @@ a {
 .masthead {
   display: flex;
   flex-wrap: wrap;
-  align-items: baseline;
-  gap: 8px 28px;
-  padding: 18px var(--gutter) 0;
+  align-items: flex-start;
+  gap: 8px 32px;
+  padding: 16px var(--gutter) 0;
 }
 
 .mark {
@@ -77,20 +78,78 @@ a {
 .story-menu {
   display: flex;
   flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 8px 28px;
+}
+
+.menu-group {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
   gap: 4px 22px;
 }
 
+.menu-label {
+  font: 600 var(--step--1) / 1.2 var(--sans);
+  color: var(--dim);
+  opacity: 0.7;
+}
+
 .story-menu a {
+  display: grid;
+  gap: 2px;
+  max-width: 15rem;
   font-size: var(--step--1);
+  line-height: 1.2;
   text-decoration: none;
   color: var(--dim);
+}
+
+.menu-title {
   padding-bottom: 2px;
   border-bottom: 1px solid transparent;
+  justify-self: start;
+}
+
+.menu-summary {
+  display: none;
+  font-size: 0.75rem;
+  line-height: 1.3;
+  opacity: 0.8;
+}
+
+.story-menu a:hover .menu-title {
+  color: var(--chalk);
 }
 
 .story-menu a[aria-current='page'] {
   color: var(--chalk);
+}
+
+.story-menu a[aria-current='page'] .menu-title {
   border-bottom-color: var(--chalk);
+}
+
+/* A story computed from the visitor's own choice: the main entry, drawn as a button. */
+.menu-primary a .menu-title {
+  padding: 7px 14px;
+  border: 1px solid var(--chalk);
+  border-radius: 999px;
+  color: var(--chalk);
+  font-weight: 600;
+}
+
+.menu-primary a[aria-current='page'] .menu-title {
+  background: var(--chalk);
+  color: var(--night);
+}
+
+/* The one-line summaries under the titles, on screens wide enough to hold them on one row
+   (elsewhere each title's tooltip holds it). */
+@media (min-width: 1800px) {
+  .menu-saved .menu-summary {
+    display: block;
+  }
 }
 
 .status {
@@ -115,37 +174,82 @@ a {
 
 .intro {
   display: grid;
-  grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
-  gap: 20px clamp(24px, 4vw, 64px);
+  grid-template-columns: minmax(0, 4fr) minmax(0, 8fr);
+  gap: 10px clamp(24px, 4vw, 64px);
   align-items: start;
-  padding: clamp(28px, 5vw, 64px) var(--gutter) 28px;
+  padding: clamp(18px, 2.5vw, 30px) var(--gutter) 18px;
 }
 
 .intro h1 {
-  font: 400 var(--step-4) / 1.04 var(--serif);
-  letter-spacing: -0.015em;
-  max-width: 11ch;
+  font: 400 var(--step-3) / 1.08 var(--serif);
+  letter-spacing: -0.01em;
 }
 
 .intro-text {
   display: grid;
-  gap: 14px;
-  max-width: 64ch;
-  font: 400 var(--step-1) / 1.55 var(--serif);
+  gap: 8px;
+  max-width: 78ch;
+  font: 400 var(--step-0) / 1.5 var(--sans);
 }
 
-.intro-text .how {
-  font: 400 var(--step-0) / 1.6 var(--sans);
+.lede {
+  color: var(--chalk);
+}
+
+.try {
+  color: var(--chalk);
+}
+
+.try-label {
+  font-weight: 700;
+}
+
+.folds {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 24px;
+}
+
+.fold {
+  font-size: var(--step--1);
   color: var(--dim);
 }
 
-.how b {
-  font-weight: 600;
+.fold[open] {
+  flex-basis: 100%;
 }
 
-.k-mark {
+.fold summary {
+  cursor: pointer;
+  width: max-content;
+  max-width: 100%;
+  padding: 4px 0;
   color: var(--chalk);
-  white-space: nowrap;
+  text-decoration: underline;
+  text-decoration-color: var(--rule);
+  text-underline-offset: 3px;
+}
+
+.fold summary:hover {
+  text-decoration-color: var(--chalk);
+}
+
+.fold-body {
+  display: grid;
+  gap: 8px;
+  padding: 6px 0 10px 14px;
+  border-left: 1px solid var(--rule);
+  max-width: 78ch;
+}
+
+.fold-legend li {
+  display: grid;
+  grid-template-columns: 37px 1fr;
+  align-items: start;
+}
+
+.fold-legend .swatch {
+  margin-top: 3px;
 }
 
 /* The swatch of a series beside its name: a piece of its line or its dot. */
@@ -170,8 +274,57 @@ a {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 12px 24px;
-  padding: 0 var(--gutter) 16px;
+  gap: 8px 16px;
+  padding: 0 var(--gutter) 10px;
+}
+
+.control-label {
+  font: 600 var(--step--1) / 1.2 var(--sans);
+  color: var(--dim);
+}
+
+.control-group,
+.page-controls {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 14px;
+}
+
+.page-controls:empty {
+  display: none;
+}
+
+/* The legend beside (or above) a globe: one row per mark, or a strip of them. */
+.globe-legend {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 5px;
+  font-size: var(--step--1);
+  color: var(--dim);
+}
+
+.globe-legend li {
+  display: flex;
+  align-items: center;
+}
+
+.globe-legend .swatch-dot {
+  width: 30px;
+  display: inline-flex;
+  justify-content: center;
+}
+
+.legend-strip {
+  padding: 0 var(--gutter) 10px;
+}
+
+.legend-strip .globe-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 20px;
 }
 
 .segmented {
@@ -255,7 +408,7 @@ a {
 }
 
 .lane-head h3 {
-  font: 400 var(--step-2) / 1.1 var(--serif);
+  font: 600 var(--step-0) / 1.2 var(--sans);
 }
 
 .lane-state {
@@ -270,7 +423,7 @@ a {
 }
 
 .lane-globe {
-  height: clamp(240px, 42vh, 520px);
+  height: clamp(220px, 36vh, 520px);
 }
 
 .lane-note {
@@ -337,7 +490,7 @@ a {
 
 .clock {
   display: grid;
-  grid-template-columns: auto 6.5rem minmax(0, 1fr) 11rem;
+  grid-template-columns: auto 6.5rem minmax(0, 1fr) 14rem;
   grid-template-areas: 'play time bar speed' '. status status status';
   align-items: center;
   gap: 2px 18px;
@@ -346,8 +499,12 @@ a {
 
 .clock-play {
   grid-area: play;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
   font: 600 var(--step--1) / 1 var(--sans);
-  min-width: 5.5rem;
+  min-width: 6.5rem;
   padding: 11px 16px;
   border-radius: 6px;
   border: 0;
@@ -356,9 +513,26 @@ a {
   cursor: pointer;
 }
 
+/* A triangle to play, two bars to pause. */
+.clock-play::before {
+  content: '';
+  width: 0;
+  height: 0;
+  border-style: solid;
+  border-width: 6px 0 6px 10px;
+  border-color: transparent transparent transparent currentColor;
+}
+
+.clock-play[aria-pressed='true']::before {
+  width: 3px;
+  height: 12px;
+  border-width: 0 3px;
+  border-color: currentColor;
+}
+
 .clock-time {
   grid-area: time;
-  font: 400 var(--step-1) / 1 var(--sans);
+  font: 400 var(--step-0) / 1 var(--sans);
   text-align: right;
 }
 
@@ -452,7 +626,7 @@ a {
 .clock-speed {
   grid-area: speed;
   display: grid;
-  grid-template-columns: 3.5rem 1fr;
+  grid-template-columns: auto 3rem 1fr;
   align-items: center;
   gap: 8px;
   font-size: var(--step--1);
@@ -662,7 +836,7 @@ a {
 
 .stage-globe {
   position: relative;
-  height: clamp(340px, 64vh, 720px);
+  height: clamp(320px, 52vh, 720px);
   touch-action: none;
   cursor: grab;
 }
@@ -681,7 +855,18 @@ a {
 }
 
 .stage-side h2 {
-  font: 400 var(--step-2) / 1.15 var(--serif);
+  font: 600 var(--step-0) / 1.2 var(--sans);
+}
+
+.stage-side .globe-legend {
+  padding-top: 12px;
+  border-top: 1px solid var(--rule);
+}
+
+.stage-side .resilience-legend {
+  padding: 0 0 12px;
+  border-top: 0;
+  border-bottom: 1px solid var(--rule);
 }
 
 .stage-note {
@@ -844,15 +1029,20 @@ a {
   min-width: 720px;
 }
 
-.instant-head {
+.charts-head {
   display: grid;
-  gap: 8px;
+  gap: 6px;
   max-width: 80ch;
-  padding: clamp(28px, 5vw, 56px) var(--gutter) 18px;
+  padding: clamp(28px, 4vw, 48px) var(--gutter) 8px;
 }
 
-.instant-head h2 {
+.charts-head h2 {
   font: 400 var(--step-2) / 1.15 var(--serif);
+}
+
+.charts-head p {
+  color: var(--dim);
+  font-size: var(--step--1);
 }
 
 .instant-text {
@@ -906,7 +1096,7 @@ a {
   }
 
   .clock-speed {
-    grid-template-columns: 3.5rem 1fr;
+    grid-template-columns: auto 3rem 1fr;
   }
 
   .panels {
@@ -924,6 +1114,10 @@ a {
 
   .stage-globe {
     height: min(92vw, 460px);
+  }
+
+  .story-menu a {
+    max-width: none;
   }
 
   .stage-side {
@@ -946,4 +1140,10 @@ a {
 
 .line-plot .u-legend .u-value:empty {
   display: none;
+}
+
+/* A clock above the globes (the failure story's lanes are tall): Play sits right over them. */
+.clock-dock.clock-above {
+  border-top: 1px solid var(--rule);
+  border-bottom: 0;
 }

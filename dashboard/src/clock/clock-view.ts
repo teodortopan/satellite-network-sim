@@ -42,11 +42,12 @@ export class ClockView {
       <div class="clock-time" aria-live="off"></div>
       <div class="clock-bar">
         <div class="clock-track" aria-hidden="true"></div>
-        <input type="range" class="clock-range" min="0" step="any" aria-label="Time in the run">
+        <input type="range" class="clock-range" min="0" step="any" aria-label="Time in the run" title="Drag to move through time">
       </div>
       <label class="clock-speed">
+        <span class="clock-speed-name">Speed</span>
         <span class="clock-speed-label"></span>
-        <input type="range" min="0" max="${SLIDER_STEPS}" step="1" aria-label="Playback speed">
+        <input type="range" min="0" max="${SLIDER_STEPS}" step="1" aria-label="Playback speed" title="How many seconds of the run pass in one second">
       </label>
       <div class="clock-status" role="status"></div>`;
     this.element = el;

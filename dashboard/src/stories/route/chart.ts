@@ -51,7 +51,7 @@ export class DelayCharts {
       setSwatch(delayName, line(strategyStyle(strategy)));
       const plotEl = element.querySelector('.delay-plot') as HTMLElement;
       plotEl.setAttribute('role', 'img');
-      plotEl.setAttribute('aria-label', `One-way delay over time, ${strategy}`);
+      plotEl.setAttribute('aria-label', `Travel time over the run, ${names[strategy] ?? strategy}`);
       const run = direction.strategies[strategy] as StrategyRun;
       const row: Row = {
         strategy,
@@ -110,7 +110,7 @@ export class DelayCharts {
       series: [{}, { stroke: color, width: style.width, dash: [...style.dash], points: { show: false } }],
       axes: [
         { ...AXIS, size: 30, values: (_u, ticks) => ticks.map((v) => `${v} s`) },
-        { ...AXIS, size: 64, label: 'ms', labelSize: 14, values: (_u, ticks) => ticks.map((v) => formatMs(v)) },
+        { ...AXIS, size: 64, label: 'one way', labelSize: 14, values: (_u, ticks) => ticks.map((v) => formatMs(v)) },
       ],
       hooks: {
         drawClear: [(u) => drawDrops(u, row.run)],
@@ -119,7 +119,7 @@ export class DelayCharts {
           (u) => {
             const idx = u.cursor.idx;
             row.readout.textContent =
-              idx === null || idx === undefined ? '' : `at ${idx} s: ${row.run.delay_ms[idx] === null ? 'no route' : formatMs(row.run.delay_ms[idx] ?? null)}`;
+              idx === null || idx === undefined ? '' : `at ${idx} s: ${row.run.delay_ms[idx] === null ? 'no connection' : formatMs(row.run.delay_ms[idx] ?? null)}`;
           },
         ],
       },
