@@ -52,6 +52,15 @@ function manifestFor(files: Map<string, Uint8Array<ArrayBuffer>>, sizeOverride: 
     satellites: 2,
     positions: [{ path: 'positions-0.bin', first_sample: 0, samples: 2 }],
     files: [...files].map(([path, bytes]) => ({ path, bytes: sizeOverride[path] ?? bytes.length, sha256: '0' })),
+    engine: {
+      program: { js: 'positions-0.bin', wasm: 'positions-0.bin' },
+      snapshot: ['satellites.json'],
+      ground: ['sites.json'],
+      settings: { model: 'best-case', pattern: 'three', replan_s: 15, planner: 'start', backup: 'on', step_s: 1, plan_time_utc: '2026-11-18T21:15:00', roles: 'study' },
+      strategies: ['lowest-delay'],
+      window: { start_utc: '2026-11-18T21:30:30', duration_s: 60 },
+      arguments: ['{snapshot}', '{ground}', '{cities}', '{start_utc}', '{duration_s}', '{strategies}', '{drops}'],
+    },
   };
 }
 
@@ -132,6 +141,21 @@ describe('loaders', () => {
     (manifest.positions[0] as { samples: number }).samples = 1;
     const error = await refusal(openData('data/', fetcherFor(files, manifest)));
     expect(error.file).toBe('manifest.json');
+  });
+
+  it('read the engine block, and refuse one that names a file not in the export', async () => {
+    const files = exportFiles();
+    const source = await openData('data/', fetcherFor(files, manifestFor(files)));
+    expect(source.manifest.engine.window).toEqual({ start_utc: '2026-11-18T21:30:30', duration_s: 60 });
+    expect(source.manifest.engine.strategies).toEqual(['lowest-delay']);
+    const manifest = manifestFor(files) as { engine: { ground: string[] } };
+    manifest.engine.ground = ['engine/ground/gateways.json'];
+    const error = await refusal(openData('data/', fetcherFor(files, manifest)));
+    expect(error.file).toBe('manifest.json');
+    expect(error.problem).toBe('engine names "engine/ground/gateways.json", which is not in files');
+    const none = manifestFor(files) as Record<string, unknown>;
+    delete none.engine;
+    expect((await refusal(openData('data/', fetcherFor(files, none)))).problem).toBe('engine is missing');
   });
 
   it('report a file that cannot be downloaded', async () => {

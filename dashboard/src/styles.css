@@ -1147,3 +1147,303 @@ a {
   border-top: 1px solid var(--rule);
   border-bottom: 0;
 }
+
+/* "Try it": two place boxes, the button, examples, the status line and the headline. */
+
+.trip {
+  display: grid;
+  gap: 8px;
+  margin: 4px 0 2px;
+}
+
+.trip-fields {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: end;
+  gap: 8px 10px;
+}
+
+.trip-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 18px;
+}
+
+.trip-actions > .trip-examples,
+.trip-actions > .trip-status {
+  flex: 1 1 18rem;
+  min-width: 0;
+}
+
+.place-box {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.place-label {
+  font: 600 var(--step--1) / 1.2 var(--sans);
+  color: var(--dim);
+}
+
+.place-box[data-active='true'] .place-label {
+  color: var(--chalk);
+}
+
+.place-field {
+  position: relative;
+}
+
+.place-input {
+  width: 100%;
+  font: 500 var(--step-0) / 1.2 var(--sans);
+  color: var(--chalk);
+  background: var(--panel);
+  border: 1px solid var(--rule);
+  border-radius: 6px;
+  padding: 11px 12px;
+}
+
+.place-input::placeholder {
+  color: var(--dim);
+  opacity: 0.8;
+}
+
+.place-box[data-active='true'] .place-input {
+  border-color: var(--chalk);
+  box-shadow: inset 0 0 0 1px var(--chalk);
+}
+
+.place-suggestions {
+  position: absolute;
+  z-index: 20;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  min-width: min(22rem, 86vw);
+  max-height: 18rem;
+  overflow-y: auto;
+  margin: 0;
+  padding: 4px 0;
+  list-style: none;
+  background: var(--panel);
+  border: 1px solid var(--dim);
+  border-radius: 6px;
+  box-shadow: 0 8px 24px var(--night);
+}
+
+.place-suggestions li {
+  padding: 9px 12px;
+  font-size: var(--step--1);
+  cursor: pointer;
+}
+
+.place-suggestions li[aria-selected='true'],
+.place-suggestions li[role='option']:hover {
+  background: var(--chalk);
+  color: var(--night);
+}
+
+.place-suggestions li.place-none {
+  color: var(--dim);
+  cursor: default;
+}
+
+.trip-swap {
+  font: 400 var(--step-1) / 1 var(--sans);
+  color: var(--chalk);
+  background: transparent;
+  border: 1px solid var(--rule);
+  border-radius: 999px;
+  width: 42px;
+  height: 42px;
+  cursor: pointer;
+}
+
+.trip-go {
+  font: 700 var(--step-0) / 1 var(--sans);
+  color: var(--night);
+  background: var(--chalk);
+  border: 0;
+  border-radius: 6px;
+  padding: 13px 20px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.trip-go[data-running='true'] {
+  color: var(--chalk);
+  background: transparent;
+  box-shadow: inset 0 0 0 1px var(--chalk);
+}
+
+.trip-go:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.trip-examples {
+  min-height: 30px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 8px;
+  font-size: var(--step--1);
+  color: var(--dim);
+}
+
+.trip-example {
+  font: 500 var(--step--1) / 1 var(--sans);
+  color: var(--chalk);
+  background: transparent;
+  border: 1px solid var(--rule);
+  border-radius: 999px;
+  padding: 7px 12px;
+  cursor: pointer;
+}
+
+.trip-example:hover,
+.trip-swap:hover {
+  border-color: var(--chalk);
+}
+
+.explore .intro {
+  grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
+}
+
+.intro-lead {
+  display: grid;
+  gap: 10px;
+  max-width: 62ch;
+}
+
+.trip-status {
+  display: grid;
+  gap: 6px;
+  font-size: var(--step--1);
+}
+
+.trip-status[hidden],
+.trip-examples[hidden] {
+  display: none;
+}
+
+.trip-status[data-kind='error'],
+.trip-status[data-kind='notice'] {
+  padding: 8px 12px;
+  border-left: 3px solid var(--chalk);
+  background: var(--panel);
+}
+
+.trip-progress {
+  height: 6px;
+  background: var(--rule);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.trip-bar {
+  height: 100%;
+  width: 0;
+  background: var(--chalk);
+  transition: width 0.2s linear;
+}
+
+.trip-retry {
+  justify-self: start;
+  font: 600 var(--step--1) / 1 var(--sans);
+  color: var(--night);
+  background: var(--chalk);
+  border: 0;
+  border-radius: 6px;
+  padding: 9px 14px;
+  cursor: pointer;
+}
+
+.trip-result {
+  display: grid;
+  gap: 2px;
+  padding: 0 var(--gutter) 12px;
+}
+
+.headline {
+  font: 400 var(--step-2) / 1.2 var(--serif);
+  color: var(--chalk);
+}
+
+.run-note {
+  font-size: var(--step--1);
+  color: var(--dim);
+}
+
+.explore .stage-globe {
+  height: clamp(300px, 42vh, 680px);
+}
+
+/* The side panel scrolls beside the globe rather than make the row taller than the globe, so
+   Play stays right under it. */
+.explore .stage {
+  grid-template-rows: auto;
+  align-items: start;
+}
+
+.explore .stage-side {
+  max-height: clamp(300px, 42vh, 680px);
+  overflow-y: auto;
+}
+
+.pick-hint {
+  position: absolute;
+  top: 10px;
+  left: 12px;
+  padding: 5px 10px;
+  border-radius: 999px;
+  background: var(--panel);
+  color: var(--dim);
+  font-size: var(--step--1);
+  pointer-events: none;
+}
+
+@media (max-width: 860px) {
+  .explore .intro {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .trip-fields {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .trip-fields > .place-box:first-child {
+    grid-column: 1;
+    grid-row: 1;
+  }
+
+  .trip-swap {
+    grid-column: 2;
+    grid-row: 1 / span 2;
+    align-self: center;
+    margin-top: 20px;
+  }
+
+  .trip-fields > .place-box:nth-child(3) {
+    grid-column: 1;
+    grid-row: 2;
+  }
+
+  .trip-go {
+    flex: 1 1 100%;
+  }
+
+  .explore .stage-side {
+    max-height: none;
+  }
+
+  .headline {
+    font-size: var(--step-1);
+  }
+
+  .explore .stage-globe {
+    height: min(92vw, 420px);
+  }
+}

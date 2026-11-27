@@ -15,7 +15,7 @@ import { dotGeometry, dots, shapeArray, type ThickPath } from '../../globe/layer
 import { PathPlacer, pointScenePosition, routeNodes, siteScenePositions } from '../../globe/paths';
 import { SatelliteField } from '../../globe/satellite-field';
 import { rgbArray, Stage } from '../../globe/stage';
-import { dot, droppedColor, DOTTED, line, MARKS, STRATEGY_STYLES, strategyStyle, THEME, type Mark } from '../../theme';
+import { dot, droppedColor, DOTTED, line, MARKS, STRATEGY_STYLES, strategyStyle, THEME, type DotMark, type Mark } from '../../theme';
 import { frameLoop, toggle } from '../../ui/controls';
 import { legendList } from '../../ui/intro';
 import { setSwatch } from '../../ui/marks';
@@ -30,6 +30,11 @@ const SAT_SIZE = 2;
 /** At most this many crosses for what broke (two per rule: a laser link has two ends). */
 const CAUSE_CAPACITY = 16;
 const LINK_OPACITY = 0.08;
+/** A click on the globe moves less than this between press and release, and is this short. */
+const PICK_MOVE_PX = 6;
+const PICK_MS = 700;
+/** A place chosen for the next run, before it is shown. */
+export const PICKED: DotMark = { color: THEME.chalk, shape: 'ring' };
 
 /** Each rule's name, in plain words. */
 export const STRATEGY_TITLES: Record<string, string> = {
@@ -132,6 +137,8 @@ export class RouteView {
   private readonly causePosition: BufferAttribute;
   private readonly causeDots: Points;
   private endDots: Points | null = null;
+  private pickedDots: Points | null = null;
+  private readonly legend: HTMLUListElement;
   private readouts = new Map<string, HTMLElement>();
   private shownSet = new Set<string>();
   private current: Shown | null = null;
@@ -184,15 +191,14 @@ export class RouteView {
     this.controls = el('.page-controls');
     this.toggles = el('.toggles');
     this.readoutList = el('.readouts');
-    el('.legend-host').append(
-      legendList([
+    this.legend = legendList([
         [dot(MARKS.city), 'The two places'],
         [dot({ color: MARKS.satellite.color, shape: 'disc' }), 'A satellite'],
         [line({ color: THEME.links, width: 1, dash: [] }, 0.6), 'Laser links between satellites'],
         [line({ color: droppedColor(THEME.chalk), width: 3, dash: DOTTED }), 'No connection: the last route, dotted'],
         [dot(MARKS.cause), 'What broke'],
-      ]),
-    );
+      ]);
+    el('.legend-host').append(this.legend);
 
     this.stage = new Stage(el('.stage-globe'));
     this.field = new SatelliteField(data, links.pairs, linkCapacity);
@@ -274,14 +280,74 @@ export class RouteView {
       [MARKS.city.shape, MARKS.city.shape],
     );
     this.stage.add(this.endDots);
-    const a = this.placer.site(from);
-    const b = this.placer.site(to);
-    const mid = [0, 1, 2].map((k) => (a[k] as number) + (b[k] as number));
-    this.stage.globe.lookFrom(Math.hypot(...mid) < 1e-6 ? a : mid, CAMERA_DISTANCE);
+    this.look(run.from, run.to);
 
     this.onLine.clear();
     this.drawn_t = Number.NaN;
     if (options.play === true) clock.play();
+  }
+
+  /** Turn the globe to look at two places (from above the middle of them). */
+  look(a: Endpoint, b: Endpoint): void {
+    const pa = pointScenePosition(a);
+    const pb = pointScenePosition(b);
+    const mid = [0, 1, 2].map((k) => (pa[k] as number) + (pb[k] as number));
+    this.stage.globe.lookFrom(Math.hypot(...mid) < 1e-6 ? pa : mid, CAMERA_DISTANCE);
+  }
+
+  /** Mark places chosen for the next run (rings, beside the shown run's two places). */
+  markPicked(places: readonly Endpoint[]): void {
+    if (this.pickedDots !== null) {
+      this.stage.scene.remove(this.pickedDots);
+      this.pickedDots.geometry.dispose();
+      this.pickedDots = null;
+    }
+    if (places.length === 0) return;
+    this.pickedDots = this.stage.fixedDots(
+      places.flatMap((p) => pointScenePosition(p)),
+      places.map(() => PICKED.color),
+      places.map(() => 20),
+      places.map(() => PICKED.shape),
+    );
+    this.stage.add(this.pickedDots);
+  }
+
+  /** Another line of the legend beside the globe. */
+  addLegendItem(mark: Mark, text: string): void {
+    const [li] = legendList([[mark, text]]).children;
+    if (li !== undefined) this.legend.append(li);
+  }
+
+  /**
+   * Calls `onPick` with the latitude and longitude of a click or tap on the Earth: a press and
+   * release less than PICK_MOVE_PX apart and PICK_MS long, so a drag that turns the globe is
+   * not a click. Returns the function that stops listening.
+   */
+  onPick(onPick: (at: { lat_deg: number; lon_deg: number }) => void): () => void {
+    const globe = this.stage.element;
+    let down: { id: number; x: number; y: number; at: number } | null = null;
+    const press = (e: PointerEvent): void => {
+      down = e.isPrimary ? { id: e.pointerId, x: e.clientX, y: e.clientY, at: performance.now() } : null;
+    };
+    const release = (e: PointerEvent): void => {
+      const d = down;
+      down = null;
+      if (d === null || d.id !== e.pointerId) return;
+      if (Math.hypot(e.clientX - d.x, e.clientY - d.y) > PICK_MOVE_PX || performance.now() - d.at > PICK_MS) return;
+      const at = this.stage.pick(e.clientX, e.clientY);
+      if (at !== null) onPick(at);
+    };
+    const cancel = (): void => {
+      down = null;
+    };
+    globe.addEventListener('pointerdown', press);
+    globe.addEventListener('pointerup', release);
+    globe.addEventListener('pointercancel', cancel);
+    return () => {
+      globe.removeEventListener('pointerdown', press);
+      globe.removeEventListener('pointerup', release);
+      globe.removeEventListener('pointercancel', cancel);
+    };
   }
 
   /** Move the clock back to the run's start; play it unless `play` is false. */

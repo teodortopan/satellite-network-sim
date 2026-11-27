@@ -34,7 +34,8 @@ runners, so a mistake in their parsing or conversion cannot hide itself. Compare
     ground data's own file, the manifest's `engine` block (its file lists, the settings against
     the route story's, the on-demand strategies, its window against the position window, and
     every flag of its argument list against those settings). That the program reproduces the
-    route story is dashboard/scripts/check-engine.ts's job, not this one's.
+    route story is dashboard/scripts/check-engine.ts's job, not this one's;
+  - places.json byte for byte with data/ground/places/places.json.
 
 Whole numbers and names must be equal; decimals must equal the number the program wrote
 (Python's float() of its text, which a JSON number round-trips exactly). Each difference is
@@ -84,6 +85,7 @@ ENGINE_GROUND = (
     "starlink_pops.csv",
     "starlink_geofeed.csv",
 )
+PLACES = REPO / "data/ground/places/places.json"
 ENGINE_STRATEGIES = ["lowest-delay", "keep-until-broken", "threshold:2ms"]
 
 
@@ -1125,6 +1127,9 @@ def main(argv: list[str]) -> int:
         )
     check_route(check, load("story-route.json"), res, names, window_start, window_s)
     check_engine(check, args.data, manifest, load("story-route.json"), args.engine)
+    if "places.json" not in {f["path"] for f in manifest["files"]}:
+        check.differ("manifest.json", "files", "places.json", "missing", "listed")
+    same_bytes(check, args.data, "places.json", PLACES)
     check_failure(check, load("story-failure.json"), res, names, window_start, window_s, len(sites))
     check_resilience(check, load("story-resilience.json"), res, names, window_start, window_s)
 

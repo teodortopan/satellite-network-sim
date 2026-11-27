@@ -37,7 +37,8 @@ function report(error: unknown): void {
 }
 
 function storyFromHash(): Story {
-  const id = location.hash.replace(/^#/, '');
+  // The story's id, before any query part a story keeps its own state in (#explore?from=...).
+  const id = location.hash.replace(/^#/, '').split('?')[0] ?? '';
   return STORIES.find((s) => s.id === id) ?? (STORIES[0] as Story);
 }
 

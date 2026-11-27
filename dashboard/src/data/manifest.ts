@@ -1,5 +1,6 @@
 // manifest.json (dashboard/data-format.md).
 
+import { parseEngine, type EngineManifest } from '../engine/settings';
 import type { Check } from './check';
 
 export interface FileEntry {
@@ -28,6 +29,8 @@ export interface Manifest {
   satellites: number;
   positions: PositionFile[];
   files: FileEntry[];
+  /** The routing program in WebAssembly and its inputs (data-format.md "The engine"). */
+  engine: EngineManifest;
 }
 
 export const FORMAT_VERSION = 1;
@@ -94,6 +97,11 @@ export function parseManifest(value: unknown, c: Check): Manifest {
     c.fail('positions', `cover ${next} samples, but settings.samples is ${settings.samples}`);
   }
 
+  const engine = parseEngine(value, c);
+  for (const path of [engine.program.js, engine.program.wasm, ...engine.snapshot, ...engine.ground]) {
+    if (!files.some((f) => f.path === path)) c.fail('engine', `names "${path}", which is not in files`);
+  }
+
   return {
     snapshot: c.string(c.field(root, 'snapshot', ''), 'snapshot'),
     ground: c.string(c.field(root, 'ground', ''), 'ground'),
@@ -101,5 +109,6 @@ export function parseManifest(value: unknown, c: Check): Manifest {
     satellites,
     positions,
     files,
+    engine,
   };
 }

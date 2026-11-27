@@ -109,6 +109,18 @@ length `N`; index `i` of every array is satellite `i`.
 | `source` | `"real"` or `"assumed"` | gateway | `assumed`: placed at a PoP (`make_assumed_gateways.py`) |
 | `city` | string | pop | The PoP's city |
 
+## `places.json`
+
+The places a visitor of "Try it" can find by name: Natural Earth's populated places (1:10m,
+simple; public domain), made by `python/fetch_places.py` into `data/ground/places/places.json`
+and copied unchanged (the data check compares the two byte for byte).
+
+`{"fields": ["name", "region", "country", "lat_deg", "lon_deg", "population"], "rows": [ ... ]}`,
+one row per place, largest population first (7,342 rows). The page refuses the file unless
+`fields` is exactly that list and every row has six items: `name` (a non-empty string),
+`region` (string, may be empty), `country` (string), `lat_deg` (number, -90 to 90), `lon_deg`
+(number, -180 to 180) and `population` (whole number, 0 or more).
+
 ## `links-<pattern>.json`
 
 One file each for `plus-grid`, `three` and `six`: the planned laser links of that pattern at
@@ -302,3 +314,10 @@ The program reads its arguments from `callMain` and writes `/run/routes.csv` (co
 lines into `Module.onRoutesLine`, for progress), `/run/summary.txt` and `/run/messages.txt`;
 the exit status is the routing program's (0, 1 if a check failed, 2 for bad arguments or
 inputs).
+
+"Try it" (`src/stories/explore/`) runs it in a Web Worker (`src/engine/worker.ts`): the page
+downloads every file of this block through the manifest (refusing a size that is not the
+manifest's), compiles the `.wasm` once and hands the worker the program's text, the compiled
+module and the inputs; the worker imports the program from a `blob:` URL, so the page works
+from any directory (a GitHub Pages sub-path included). A run covers the window's start to at
+most 600 s later, with `strategies`.

@@ -2,8 +2,9 @@
 // scene, and the per-frame settings every dots object and thick line needs (dot size with the
 // zoom, line width in pixels).
 
-import { BufferAttribute, Color, LineSegments, Mesh, Points, Scene, type BufferGeometry, type Material, type Object3D, type ShaderMaterial } from 'three';
+import { BufferAttribute, Color, LineSegments, Mesh, Points, Scene, Vector3, type BufferGeometry, type Material, type Object3D, type ShaderMaterial } from 'three';
 import { THEME, type DotShape } from '../theme';
+import { raySphere, sceneToLatLon } from './coords';
 import { GlobeView } from './globe-view';
 import { dotGeometry, dotMaterial, dots, earth, shapeArray, ThickPath } from './layers';
 
@@ -59,6 +60,24 @@ export class Stage {
 
   render(): void {
     this.globe.render();
+  }
+
+  /**
+   * The latitude and longitude under a point of the window (clientX, clientY), or null off the
+   * Earth: a ray from the camera through that point to the sphere of the Earth (radius 1).
+   * The camera orbits a fixed Earth, so the scene's Earth-fixed axes hold whatever the turn.
+   */
+  pick(clientX: number, clientY: number): { lat_deg: number; lon_deg: number } | null {
+    const r = this.element.getBoundingClientRect();
+    if (r.width < 1 || r.height < 1) return null;
+    const camera = this.globe.camera;
+    camera.aspect = r.width / r.height;
+    camera.updateProjectionMatrix();
+    camera.updateMatrixWorld();
+    const ndc = new Vector3(((clientX - r.left) / r.width) * 2 - 1, -(((clientY - r.top) / r.height) * 2 - 1), 0.5);
+    const direction = ndc.unproject(camera).sub(camera.position);
+    const hit = raySphere(camera.position.toArray(), direction.toArray());
+    return hit === null ? null : sceneToLatLon(...hit);
   }
 
   dispose(): void {
