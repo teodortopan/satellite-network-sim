@@ -15,7 +15,7 @@ export class SatelliteField {
   readonly pointIndex: BufferAttribute;
   /** The planned links whose two satellites are drawable, as an index list for segments. */
   readonly linkIndex: BufferAttribute;
-  /** RGB per satellite: its shell's colour. */
+  /** RGB per satellite: its shell's muted grey. */
   readonly shellColors: Float32Array;
   /** How many entries of pointIndex and linkIndex are in use (for draw ranges). */
   pointCount = 0;
@@ -77,9 +77,16 @@ export class SatelliteField {
     this.updateLinks();
   }
 
-  /** The satellites as one dots object with these colours and sizes, drawn when drawable. */
-  points(colors: Float32Array, sizes: Float32Array, material: ShaderMaterial, mark?: Float32Array, down?: Float32Array): Points {
-    const geometry = dotGeometry(this.position, colors, sizes, mark, down);
+  /** The satellites as one dots object with these colours, sizes and shapes, drawn when drawable. */
+  points(
+    colors: Float32Array,
+    sizes: Float32Array,
+    material: ShaderMaterial,
+    mark?: Float32Array,
+    down?: Float32Array,
+    shapes?: Float32Array,
+  ): Points {
+    const geometry = dotGeometry(this.position, colors, sizes, mark, down, shapes);
     geometry.setIndex(this.pointIndex);
     const object = dots(geometry, material);
     object.onBeforeRender = () => geometry.setDrawRange(0, this.pointCount);

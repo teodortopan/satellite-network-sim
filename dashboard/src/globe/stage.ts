@@ -3,9 +3,9 @@
 // zoom, line width in pixels).
 
 import { BufferAttribute, Color, LineSegments, Mesh, Points, Scene, type BufferGeometry, type Material, type Object3D, type ShaderMaterial } from 'three';
-import { THEME } from '../theme';
+import { THEME, type DotShape } from '../theme';
 import { GlobeView } from './globe-view';
-import { dotGeometry, dotMaterial, dots, earth, ThickPath } from './layers';
+import { dotGeometry, dotMaterial, dots, earth, shapeArray, ThickPath } from './layers';
 
 export class Stage {
   readonly globe: GlobeView;
@@ -32,9 +32,9 @@ export class Stage {
     this.scene.add(...objects);
   }
 
-  /** A dots material whose size follows the zoom. */
-  dotMaterial(markColor: string = THEME.news, downColor: string = THEME.failed): ShaderMaterial {
-    const m = dotMaterial({ markColor, markGrow: 1, downColor });
+  /** A dots material whose size follows the zoom (marks and failures are not used here). */
+  dotMaterial(): ShaderMaterial {
+    const m = dotMaterial({ markColor: THEME.news, markGrow: 1, downColor: THEME.failed });
     this.materials.push(m);
     return m;
   }
@@ -48,9 +48,10 @@ export class Stage {
     return p;
   }
 
-  /** Fixed dots at scene positions (x y z each), one colour and size per dot. */
-  fixedDots(positions: readonly number[], colors: readonly string[], sizes: readonly number[]): Points {
-    const geometry = dotGeometry(new BufferAttribute(new Float32Array(positions), 3), rgbArray(colors), new Float32Array(sizes));
+  /** Fixed dots at scene positions (x y z each), one colour, size and shape per dot. */
+  fixedDots(positions: readonly number[], colors: readonly string[], sizes: readonly number[], shapes: readonly DotShape[]): Points {
+    const position = new BufferAttribute(new Float32Array(positions), 3);
+    const geometry = dotGeometry(position, rgbArray(colors), new Float32Array(sizes), undefined, undefined, shapeArray(shapes));
     const points = dots(geometry, this.dotMaterial());
     points.renderOrder = 1;
     return points;

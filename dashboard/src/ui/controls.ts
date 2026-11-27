@@ -2,6 +2,9 @@
 // direction, a pattern), a switch that is on or off (a strategy, a kind of ground site), and
 // the animation loop that draws a story's frames.
 
+import type { Mark } from '../theme';
+import { setSwatch } from './marks';
+
 export interface Choice {
   /** Written to data-value, for the browser test and the CSS. */
   value: string;
@@ -38,15 +41,15 @@ export function segmented(label: string, choices: readonly Choice[], onPick: (in
   return { element, select };
 }
 
-/** A switch with a colour swatch; `onChange` runs with the new state on a click. */
-export function toggle(choice: Choice, on: boolean, swatch: string | null, onChange: (on: boolean) => void): HTMLButtonElement {
+/** A switch with the swatch of what it shows; `onChange` runs with the new state on a click. */
+export function toggle(choice: Choice, on: boolean, swatch: Mark | null, onChange: (on: boolean) => void): HTMLButtonElement {
   const button = document.createElement('button');
   button.type = 'button';
   button.className = 'toggle';
   button.dataset.value = choice.value;
   button.setAttribute('aria-pressed', String(on));
-  if (swatch !== null) button.style.setProperty('--swatch', swatch);
   button.textContent = choice.text;
+  setSwatch(button, swatch);
   button.addEventListener('click', () => {
     const next = button.getAttribute('aria-pressed') !== 'true';
     button.setAttribute('aria-pressed', String(next));
