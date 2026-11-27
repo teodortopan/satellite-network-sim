@@ -413,6 +413,8 @@ Which satellite does a dish use?
 
 - **Tradeoff:** The visitor can't invent a failure. Only the exported scenarios exist.
 
+- **Changed** on 2026-11-27 by Phase 6, decision 1.
+
 ### 3. How Do Satellite Positions Get to the Browser?
 
 - **Options:** Every position at 1 s steps, sampled positions with interpolation in the browser, or SGP4 in the browser through WebAssembly.
@@ -482,3 +484,35 @@ Which satellite does a dish use?
 - **Why:** A dashboard can look right and be wrong. The data check makes sure every number shown came from the engine, and the browser test makes sure the page actually loads and draws.
 
 - **Tradeoff:** Whether the picture explains things well can't be tested. That stays a judgment.
+
+## Phase 6: Playground
+
+### 1. How Does a Visitor Get a Route Between Any Two Places?
+
+- **Options:** The engine compiled to WebAssembly and run in the browser, a fixed list of city pairs computed ahead of time, or a server that runs the engine.
+
+- **Chosen:** The engine in the browser, next to the saved runs. No server.
+
+- **Why:** A visitor should be able to try their own two places. The check proves the engine in the browser gives the same routes as the tested one, and the site stays a free static page.
+
+- **Tradeoff:** A second build of the engine to keep proven, and a larger CI image. A run made in the browser is the best case only, with three of the four strategies.
+
+### 2. How Does a Visitor Choose the Places?
+
+- **Options:** A search box plus clicking the globe, a search box only, or a short built-in list of cities.
+
+- **Chosen:** A search box over Natural Earth's list of places, plus clicking any point on the globe.
+
+- **Why:** A name is the easiest way in, and a click covers every place the list doesn't have.
+
+- **Tradeoff:** The list is a map maker's selection, not every town. A clicked point has no name.
+
+### 3. Which Colours?
+
+- **Options:** Strict black, white and greys, or greys plus one red for failures.
+
+- **Chosen:** Strict black, white and greys on a black background.
+
+- **Why:** That's the look asked for.
+
+- **Tradeoff:** Lines and dots are told apart by dashes, width and shape, which is harder to read at a glance than colour.
