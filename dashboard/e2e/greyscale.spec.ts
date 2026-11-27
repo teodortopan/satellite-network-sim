@@ -7,6 +7,7 @@ import { test } from '@playwright/test';
 import { expectNoHue, open } from './helpers';
 
 const GLOBES: Record<string, string> = {
+  explore: '.stage-globe',
   failure: '.lanes',
   route: '.stage-globe',
   constellation: '.stage-globe',

@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta name="description" content="See how a network of thousands of real Starlink satellites passes messages around the world, and what happens when parts of it break." />
+    <meta name="description" content="Pick any two places on Earth and see how a message would travel between them through thousands of real Starlink satellites, and what happens when parts of the network break." />
     <meta name="color-scheme" content="dark" />
     <title>Satellite network simulator</title>
     <link rel="icon" href="data:," />
@@ -18,8 +18,10 @@
     <footer class="colophon">
       <p id="about-data"></p>
       <p>Everything else you see (the laser links, the routes, the travel times, the breaks) was
-        computed by this project's simulator and saved; this page only replays it, moving the
-        satellites smoothly between saved positions. Land outlines: Natural Earth, public domain.</p>
+        computed by this project's simulator: the saved runs were worked out in advance and are
+        replayed here, moving the satellites smoothly between saved positions; on "Try it", the
+        same simulator, compiled to WebAssembly, works out your route in your browser. Land
+        outlines and place names: Natural Earth, public domain.</p>
     </footer>
     <script type="module" src="/src/main.ts"></script>
   </body>

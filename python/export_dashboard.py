@@ -63,6 +63,9 @@ the shells, planes and laser plans of the plan time of Phases 3 and 4 (2026-11-1
                  keep-until-broken and threshold:2ms; longest-lived needs the most memory and
                  time), the window it may run in (the position window) and the route story's
                  argument list with placeholders for what a run chooses.
+  Places         data/ground/places/places.json (Natural Earth's populated places, made by
+                 python/fetch_places.py), copied unchanged to places.json: the names the page's
+                 place search offers.
 
 Values the export works out itself (each is named in dashboard/data-format.md and recomputed
 by the data check): times from UTC text as seconds from the window or run start; per route
@@ -138,6 +141,9 @@ ENGINE_GROUND_FILES = (
     "starlink_pops.csv",
     "starlink_geofeed.csv",
 )
+# The places the page's search offers (python/fetch_places.py), copied unchanged.
+PLACES = REPO / "data/ground/places/places.json"
+PLACES_FILE = "places.json"
 ENGINE_STRATEGIES = ("lowest-delay", "keep-until-broken", "threshold:2ms")
 # What a run chooses, in the argument list: the route story's own command with these values
 # replaced by placeholders, the routes CSV to standard output (the WebAssembly entry counts
@@ -1229,6 +1235,9 @@ def export(args, mode: str) -> dict:
         old.unlink()
     shutil.rmtree(out / ENGINE_DIR, ignore_errors=True)
     engine_files = copy_engine(args.engine, out)
+    if not PLACES.is_file():
+        raise ExportError(f"{PLACES} not found (python/fetch_places.py downloads it)")
+    shutil.copyfile(PLACES, out / PLACES_FILE)
     positions = write_positions(out, positions_array(res / "positions.csv", index, samples))
     write_json(
         out / "satellites.json",

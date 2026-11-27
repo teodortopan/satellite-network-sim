@@ -7,6 +7,7 @@ import { expect, test } from '@playwright/test';
 import { open } from './helpers';
 
 const GLOBES: Record<string, string> = {
+  explore: '.stage-globe',
   failure: '.lanes',
   route: '.stage-globe',
   constellation: '.stage-globe',
@@ -72,10 +73,13 @@ for (const [story, globe] of Object.entries(GLOBES)) {
   });
 }
 
-test('the menu lists the saved runs, each with a plain one-line summary', async ({ page }) => {
+test('the menu lists "Try it" first, then the saved runs, each with a plain one-line summary', async ({ page }) => {
   await open(page, 'route');
   const menu = page.locator('#story-menu');
   await expect(menu.locator('.menu-label')).toHaveText('Saved runs');
+  await expect(menu.locator('.menu-primary a[data-story]')).toHaveCount(1);
+  await expect(menu.locator('a[data-story]').first()).toHaveAttribute('data-story', 'explore');
+  await expect(menu.locator('a[data-story]').first().locator('.menu-title')).toHaveText('Try it');
   const links = menu.locator('a[data-story]');
   expect(await links.count()).toBe(Object.keys(GLOBES).length);
   for (const link of await links.all()) {

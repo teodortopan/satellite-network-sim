@@ -1,9 +1,20 @@
 # The dashboard
 
-A web page that replays the engine's saved runs (Phase 5, spec
-[docs/phase-5-dashboard.md](../docs/phase-5-dashboard.md)). Nothing is simulated in the browser:
-the page loads files the engine wrote, moves satellites between saved positions (spec 4.3) and
-formats numbers.
+A web page that shows the simulator's Starlink-like network on real orbital data (Phase 5, spec
+[docs/phase-5-dashboard.md](../docs/phase-5-dashboard.md)).
+
+- **The landing page, "Try it"** (`#explore`): a visitor picks any two places (by name, or by
+  clicking the globe) and the routing program, compiled to WebAssembly, works out the route
+  between them in the visitor's browser, in a Web Worker. This is the one thing computed in the
+  browser. It is vouched for by the engine check (`scripts/check-engine.ts`, part of
+  `scripts/ci.sh dashboard`), which runs the same exported WebAssembly program the same way
+  (`src/engine/run.ts`, `src/engine/from-csv.ts`) and holds it to the native routing program
+  and to the saved route story; the browser test (`e2e/explore.spec.ts`) checks that the page
+  shows exactly the routes CSV the worker returned. Until the visitor's own run is ready, the
+  saved route story's first pair plays. The address keeps the choice
+  (`#explore?from=Lagos,6.4452,3.3896&to=...`), so a run can be shared.
+- **The saved runs**: the page loads files the engine wrote, moves satellites between saved
+  positions (spec 4.3) and formats numbers; nothing of them is simulated in the browser.
 
 Vite, strict TypeScript, three.js for the globe, uPlot for the charts, no UI framework.
 
@@ -61,10 +72,14 @@ listed in `package.json`.
 | `main.ts` | Loads the manifest and the shared files, builds the story menu, mounts a story |
 | `data/` | The checks (`check.ts`), the loader with the size check (`loader.ts`), `manifest.ts`, the shared files (`common.ts`) |
 | `clock/` | The clock's logic (`clock.ts`, no DOM) and its controls (`clock-view.ts`) |
-| `globe/` | Interpolation (`interpolation.ts`), ECEF and latitude/longitude to the scene (`coords.ts`), the renderer and views (`globe-view.ts`), what is drawn (`layers.ts`), the shared satellite positions and links (`satellite-field.ts`), sites and routes in the scene (`paths.ts`), one globe in one element (`stage.ts`) |
+| `globe/` | Interpolation (`interpolation.ts`), ECEF and latitude/longitude to the scene and back, for a click (`coords.ts`), the renderer and views (`globe-view.ts`), what is drawn (`layers.ts`), the shared satellite positions and links (`satellite-field.ts`), sites and routes in the scene (`paths.ts`), one globe in one element (`stage.ts`) |
 | `charts/` | What every uPlot chart shares: the axis look, a chart that follows its element's width, line charts with a legend that reads the values under the cursor |
 | `ui/` | Shared controls: one-of-several buttons, switches, drop-down lists, the frame loop |
 | `stories/` | `story.ts` (the interface), `index.ts` (the registered stories), one folder per story |
+| `stories/explore/` | "Try it", the landing page: two place boxes, the run in the browser, the headline (`state.ts`: the address, picked points, the headline from the engine's output) |
+| `engine/` | The routing program in WebAssembly: one run (`run.ts`), its output to the route story's types (`from-csv.ts`), the manifest's `engine` block (`settings.ts`), the Web Worker that runs it (`worker.ts`, `protocol.ts`) and the page's side, which downloads and compiles once and runs one request at a time (`client.ts`) |
+| `data/places.ts` | `places.json`, the places a visitor can search |
+| `ui/place-search.ts` | The place box: a combobox with suggestions (name prefix, then word start, then anywhere; accents and case ignored; larger places first) |
 | `stories/failure/` | One failure, three reactions (spec 4.5) |
 | `stories/route/` | A route through time (spec 4.6) |
 | `stories/constellation/` | The constellation (spec 4.7) |
@@ -97,6 +112,9 @@ with the data check's own interpolation; the unit test holds the page's interpol
 - Land outlines: [Natural Earth](https://www.naturalearthdata.com/about/terms-of-use/) 1:110m
   land, public domain, through the npm package `world-atlas` 2.0.2 (ISC licence,
   Mike Bostock), bundled into the page.
+- Place names: [Natural Earth](https://www.naturalearthdata.com/about/terms-of-use/) 1:10m
+  populated places (v5.1.2), public domain, exported as `places.json`.
 - three.js (MIT), uPlot (MIT) and topojson-client (ISC) are bundled into the page.
 
-The page loads nothing from other sites: no fonts, scripts, trackers or cookies.
+The page loads nothing from other sites: no fonts, scripts, trackers or cookies. The engine's
+program is loaded from the page's own data directory and imported from a `blob:` URL.
