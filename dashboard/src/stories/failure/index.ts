@@ -8,12 +8,14 @@ import { GlobeView } from '../../globe/globe-view';
 import { earth } from '../../globe/layers';
 import { siteScenePositions } from '../../globe/paths';
 import { SatelliteField } from '../../globe/satellite-field';
-import { dot, LANE_STATE_STYLES, line, MARKS, THEME, type LineStyle, type Mark } from '../../theme';
-import { setSwatch } from '../../ui/marks';
+import { formatInstant } from '../../format';
+import { BASELINE_STYLE, dot, LANE_STATE_STYLES, line, MARKS, THEME, type LineStyle } from '../../theme';
 import { frameLoop, segmented } from '../../ui/controls';
+import { fillFold, introMarkup, legendList } from '../../ui/intro';
+import { patternWords } from '../../ui/words';
 import type { Story, StoryContext } from '../story';
 import { MODES, parseFailureStory, type FailureStory, type Scenario } from './data';
-import { Lane } from './lane';
+import { Lane, MODE_NOTES, MODE_TITLES } from './lane';
 import { ContextChart, FactsPanel, measuresPanel } from './panels';
 import { intervalAt } from './state';
 
@@ -26,22 +28,23 @@ const CAMERA_DISTANCE = 3.3;
 
 const SCENARIO_TITLES: Record<string, { title: string; text: string }> = {
   'route-satellite': {
-    title: 'A satellite on the route',
-    text: 'The satellite carrying the route at that moment stops working.',
+    title: 'A satellite on the path',
+    text: 'The satellite carrying the messages at that moment stops working.',
   },
   region: {
     title: 'A whole region',
-    text: 'Every satellite over a region around the route stops working at once.',
+    text: 'Every satellite over a region around the path stops working at once.',
   },
   gateway: {
-    title: 'The route’s gateway',
-    text: 'The gateway the route comes down to stops working.',
+    title: 'The ground station',
+    text: 'The ground station the messages come down to stops working.',
   },
 };
 
 export const failureStory: Story = {
   id: 'failure',
-  title: 'One failure, three reactions',
+  title: 'When a satellite breaks',
+  summary: 'One piece of the network breaks; watch three ways it can notice and work around it.',
   mount,
 };
 
@@ -55,49 +58,65 @@ async function mount({ data, root }: StoryContext): Promise<() => void> {
 
   root.innerHTML = `
     <section class="story failure">
-      <div class="intro">
-        <h1>One failure, three reactions</h1>
-        <div class="intro-text">
-          <p class="lede"></p>
-          <p class="how">The bright line is the route at the clock’s time:
-            <b class="k-mark" data-mark="delivered">solid</b> when traffic arrives,
-            <b class="k-mark" data-mark="black_hole">dashed</b> up to where it is lost in a black
-            hole (a large hollow square marks the spot), <b class="k-mark" data-mark="loop">dotted</b> while it
-            goes round in a loop; the state is also named above each globe. The faint, thin line is
-            the route with no failure. Satellites turn into <b class="k-mark" data-mark="news">rings</b>
-            when they have the news: the detectors in the first two lanes, every satellite the flood
-            reaches in the third. Failed elements turn into <b class="k-mark" data-mark="failed">crosses</b>.
-            Drag to turn the globes, pinch or scroll to zoom.</p>
-        </div>
-      </div>
+      ${introMarkup('When a satellite breaks')}
       <div class="scenario-bar">
+        <span class="control-label">What breaks</span>
         <p class="scenario-text"></p>
       </div>
+      <div class="legend-strip"></div>
+      <div class="clock-dock clock-above"></div>
       <div class="lanes"></div>
-      <div class="clock-dock"></div>
       <div class="panels"></div>
     </section>`;
   const el = (selector: string): HTMLElement => root.querySelector(selector) as HTMLElement;
-  const keyMarks: Record<string, Mark> = {
+  const marks = {
     delivered: line(LANE_STATE_STYLES.delivered as LineStyle),
     black_hole: line(LANE_STATE_STYLES.black_hole as LineStyle),
     loop: line(LANE_STATE_STYLES.loop as LineStyle),
+    baseline: line(BASELINE_STYLE, 0.35),
     news: dot(MARKS.news),
     failed: dot(MARKS.failed),
+    lost: dot(MARKS.blackHole),
+    city: dot(MARKS.city),
+    gateway: dot(MARKS.gateway),
   };
-  for (const b of root.querySelectorAll<HTMLElement>('.how [data-mark]')) {
-    const mark = keyMarks[b.dataset.mark ?? ''];
-    if (mark !== undefined) setSwatch(b, mark);
-  }
+  el('.legend-strip').append(
+    legendList([
+      [marks.delivered, 'Path of the messages'],
+      [marks.black_hole, 'Lost (dashed)'],
+      [marks.loop, 'Going in circles (dotted)'],
+      [marks.baseline, 'Path if nothing broke'],
+      [marks.failed, 'Broken'],
+      [marks.news, 'Knows about it'],
+      [marks.city, 'City'],
+      [marks.gateway, 'Ground station'],
+    ]),
+  );
   const from = data.sites[story.from]?.name ?? '';
   const to = data.sites[story.to]?.name ?? '';
   el('.lede').textContent =
-    `Traffic from ${from} to ${to} goes up to a satellite, across laser links between ` +
-    `satellites, down to a gateway and on by fibre. At ${story.instant_utc.replace('T', ' ')} UTC ` +
-    'something on that path fails. Each lane replays the same run under one way of reacting: how ' +
-    'long it takes to notice, to find a way round, and to settle on the route a planner that ' +
-    'knows everything would choose. The clock slows down around the failure, because the first ' +
-    'reactions are milliseconds apart.';
+    `Messages from ${from} to ${to} go up to a satellite, jump between satellites along laser links, and come ` +
+    'down at a ground station. Then one piece on the way breaks. The three globes replay the same moment, each ' +
+    'with a different way for the network to notice and work around it.';
+  el('.try-text').textContent =
+    'Press Play and watch the break: the clock slows to a crawl around it, because the first reactions are ' +
+    'thousandths of a second apart. Compare the three globes. Drag one to turn it.';
+  fillFold(el('.how-body'), [
+    legendList(
+      [
+        [marks.delivered, 'Solid: messages arrive. Above each globe: “Arriving” and how long a message takes, one way, in thousandths of a second (ms).'],
+        [marks.black_hole, 'Dashed: messages are sent into the broken piece and vanish there, a “black hole”. A hollow square marks the spot.'],
+        [marks.loop, 'Dotted: messages go round in circles between satellites (a “loop”) and never arrive.'],
+        [marks.baseline, 'Faint and thin: the path messages would take if nothing had broken.'],
+        [marks.failed, 'A cross: what broke.'],
+        [marks.news, 'A ring: a satellite that knows about the break.'],
+      ],
+      'legend-list fold-legend',
+    ),
+    'The three ways to react, one per globe:',
+    ...MODES.map((m) => `${MODE_TITLES[m]}. ${MODE_NOTES[m]}`),
+    'Under each globe, a list lights up as each step happens. Times are seconds from the start of the run.',
+  ]);
 
   const lanesEl = el('.lanes');
   const globe = new GlobeView(lanesEl, THEME.night);
@@ -111,6 +130,7 @@ async function mount({ data, root }: StoryContext): Promise<() => void> {
     const scenario = story.scenarios[index] as Scenario;
     menu.select(index);
     el('.scenario-text').textContent = SCENARIO_TITLES[scenario.scenario]?.text ?? '';
+    writeSources(el('.sources-body'), story, scenario, pattern);
     root.querySelector('.story')?.setAttribute('data-scenario', scenario.scenario);
     current = new ScenarioView(scenario, story, data, field, sites, earthGroup, globe, {
       lanes: lanesEl,
@@ -123,7 +143,7 @@ async function mount({ data, root }: StoryContext): Promise<() => void> {
     story.scenarios.map((s) => ({ value: s.scenario, text: SCENARIO_TITLES[s.scenario]?.title ?? s.scenario })),
     show,
   );
-  el('.scenario-bar').prepend(menu.element);
+  el('.scenario-text').before(menu.element);
   show(0);
 
   const stop = frameLoop((real_s) => current?.frame(real_s));
@@ -176,9 +196,9 @@ class ScenarioView {
     });
     this.clock.seek(Math.max(scenario.failure_s - START_BEFORE_S, 0));
     this.clockView = new ClockView(this.clock, {
-      marks: [{ t_s: scenario.failure_s, label: 'failure' }],
+      marks: [{ t_s: scenario.failure_s, label: 'the break' }],
       spans: scenario.slow_motion,
-      holdLabel: 'paused just before the failure',
+      holdLabel: 'paused just before the break',
     });
     places.clock.append(this.clockView.element);
 
@@ -208,4 +228,17 @@ class ScenarioView {
     for (const lane of this.lanes) lane.dispose();
     this.facts.element.parentElement?.replaceChildren();
   }
+}
+
+/** The fold with the run's settings and files: what the main text leaves out. */
+function writeSources(body: HTMLElement, story: FailureStory, scenario: Scenario, pattern: string): void {
+  fillFold(body, [
+    `The break happens at ${story.instant_utc.replace('T', ' ')} UTC (world time), ${formatInstant(scenario.failure_s)} into the run. ` +
+      `In this run ${patternWords(pattern)}.`,
+    'In the simulator these three ways are called planner, local repair and flooding. A planner on the ground ' +
+      'plans every route; satellites tell it what they see, and their reports take time to arrive.',
+    `Computed by the simulator’s failures program (Phase 4). Its files: ${scenario.sources.events} (what happened ` +
+      `when) and ${scenario.sources.measures} (the numbers below); the comparison with other runs comes from ` +
+      `${scenario.context.source}.`,
+  ]);
 }

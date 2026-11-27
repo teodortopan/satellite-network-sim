@@ -8,6 +8,7 @@ import { openData } from './data/loader';
 import { STORIES } from './stories';
 import type { Story } from './stories/story';
 import { applyTheme } from './theme';
+import { formatCount, formatSpan } from './format';
 
 const DATA_URL = 'data/';
 
@@ -53,17 +54,11 @@ async function start(): Promise<void> {
   status.hidden = true;
   const s = data.source.manifest.settings;
   about.textContent =
-    `Satellites of the ${data.source.manifest.snapshot} snapshot, ${data.satellites.norad.length.toLocaleString('en-US')} ` +
-    `in planes; positions every ${s.sample_step_s} s from ${s.window_start_utc.replace('T', ' ')} UTC ` +
-    `for ${s.window_s} s (${s.mode} export).`;
+    `The satellites are real: ${formatCount(data.satellites.norad.length)} Starlink satellites at the positions ` +
+    `published for them on ${data.source.manifest.snapshot}, followed for ${formatSpan(s.window_s)} from ` +
+    `${s.window_start_utc.replace('T', ' ')} UTC (world time), one position every ${s.sample_step_s} s.`;
 
-  for (const story of STORIES) {
-    const link = document.createElement('a');
-    link.href = `#${story.id}`;
-    link.textContent = story.title;
-    link.dataset.story = story.id;
-    menu.append(link);
-  }
+  buildMenu(menu, STORIES);
 
   let unmount: (() => void) | null = null;
   let mounting = Promise.resolve();
@@ -72,7 +67,7 @@ async function start(): Promise<void> {
     mounting = mounting.then(async () => {
       unmount?.();
       unmount = null;
-      menu.querySelectorAll('a').forEach((a) => {
+      menu.querySelectorAll<HTMLAnchorElement>('a[data-story]').forEach((a) => {
         if (a.dataset.story === story.id) a.setAttribute('aria-current', 'page');
         else a.removeAttribute('aria-current');
       });
@@ -87,6 +82,43 @@ async function start(): Promise<void> {
   };
   window.addEventListener('hashchange', show);
   show();
+}
+
+/**
+ * The menu: stories of the 'try' group first, as the main entries, then the saved runs under
+ * their label. Each entry is the title with the story's one-line summary under it (shown on
+ * wide screens; always its tooltip).
+ */
+function buildMenu(nav: HTMLElement, stories: readonly Story[]): void {
+  const entry = (story: Story): HTMLAnchorElement => {
+    const link = document.createElement('a');
+    link.href = `#${story.id}`;
+    link.dataset.story = story.id;
+    link.title = story.summary;
+    const title = document.createElement('span');
+    title.className = 'menu-title';
+    title.textContent = story.title;
+    const summary = document.createElement('span');
+    summary.className = 'menu-summary';
+    summary.textContent = story.summary;
+    link.append(title, summary);
+    return link;
+  };
+  const tryIt = stories.filter((s) => s.group === 'try');
+  const saved = stories.filter((s) => s.group !== 'try');
+  if (tryIt.length > 0) {
+    const group = document.createElement('div');
+    group.className = 'menu-group menu-primary';
+    group.append(...tryIt.map(entry));
+    nav.append(group);
+  }
+  const group = document.createElement('div');
+  group.className = 'menu-group menu-saved';
+  const label = document.createElement('span');
+  label.className = 'menu-label';
+  label.textContent = 'Saved runs';
+  group.append(label, ...saved.map(entry));
+  nav.append(group);
 }
 
 void start();

@@ -10,7 +10,9 @@ import { formatCount } from '../../format';
 import { siteScenePositions } from '../../globe/paths';
 import { SatelliteField } from '../../globe/satellite-field';
 import { rgbArray, Stage } from '../../globe/stage';
-import { dot, FADED, MARKS, SHAPE_CODE, shellMark, THEME, type DotMark } from '../../theme';
+import { dot, FADED, line, MARKS, SHAPE_CODE, shellMark, THEME, type DotMark } from '../../theme';
+import { fillFold, introMarkup, legendList } from '../../ui/intro';
+import { patternShort, patternWords, shellName } from '../../ui/words';
 import { shapeArray } from '../../globe/layers';
 import { setSwatch } from '../../ui/marks';
 import { dropdown, frameLoop, segmented, toggle } from '../../ui/controls';
@@ -25,17 +27,19 @@ const FADED_SIZE = 1.6;
 /** The planned laser links: one pattern at a time, so one grey (the menu names the pattern). */
 const LINK_OPACITY = 0.2;
 
-const SITE_KINDS: { kind: SiteKind; text: string; mark: DotMark; size: number }[] = [
-  { kind: 'city', text: 'Cities', mark: MARKS.city, size: 11 },
-  { kind: 'gateway', text: 'Gateways', mark: MARKS.gateway, size: 7 },
-  { kind: 'pop', text: 'PoPs', mark: MARKS.pop, size: 7 },
+const SITE_KINDS: { kind: SiteKind; text: string; one: string; mark: DotMark; size: number }[] = [
+  { kind: 'city', text: 'Cities', one: 'City', mark: MARKS.city, size: 11 },
+  { kind: 'gateway', text: 'Ground stations', one: 'Ground station', mark: MARKS.gateway, size: 7 },
+  { kind: 'pop', text: 'Internet exchanges', one: 'Internet exchange', mark: MARKS.pop, size: 7 },
 ];
 
 export const constellationStory: Story = {
   id: 'constellation',
-  title: 'The constellation',
+  title: 'The satellites',
+  summary: 'Every satellite in the network, how they are grouped, and how lasers connect them.',
   mount,
 };
+
 
 async function mount({ data, root }: StoryContext): Promise<() => void> {
   const { manifest } = data.source;
@@ -46,31 +50,25 @@ async function mount({ data, root }: StoryContext): Promise<() => void> {
 
   root.innerHTML = `
     <section class="story constellation">
-      <div class="intro">
-        <h1>The constellation</h1>
-        <div class="intro-text">
-          <p class="lede"></p>
-          <p class="how"></p>
-        </div>
-      </div>
+      ${introMarkup('The satellites')}
       <div class="control-bar"></div>
       <div class="stage">
         <div class="stage-globe"></div>
         <aside class="stage-side">
           <h2>On the globe</h2>
-          <ul class="legend-list"></ul>
+          <ul class="legend-list globe-legend"></ul>
           <p class="stage-note links-note"></p>
         </aside>
       </div>
       <div class="clock-dock"></div>
       <div class="panels">
         <section class="panel shells-panel">
-          <h2>Shells</h2>
+          <h2>The groups of satellites (shells)</h2>
           <p class="panel-note shells-note"></p>
           <div class="table-scroll"></div>
         </section>
         <section class="panel patterns-panel">
-          <h2>Laser patterns</h2>
+          <h2>Laser layouts</h2>
           <p class="panel-note patterns-note"></p>
           <div class="table-scroll"></div>
         </section>
@@ -78,13 +76,13 @@ async function mount({ data, root }: StoryContext): Promise<() => void> {
     </section>`;
   const el = (selector: string): HTMLElement => root.querySelector(selector) as HTMLElement;
   const section = el('.story');
-  writeText(el('.lede'), el('.how'), story, manifest.satellites);
+  writeText(root, story, manifest.satellites, manifest.snapshot);
   el('.shells-note').textContent =
-    `From the constellation program’s summary (${story.sources.shells}) at the plan time ${story.plan_time_utc.replace('T', ' ')} UTC. ` +
-    'A shell is a height band and an inclination; a plane is a group of satellites on one orbit plane.';
+    'Each group flies at about the same height and the same tilt to the equator; within a group, an orbit is ' +
+    'one ring of satellites following each other.';
   el('.patterns-note').textContent =
-    `From the topology program’s summaries (${story.sources.patterns.join(', ')}). In-plane links join neighbours ` +
-    'on one orbit; cross-plane links join satellites of neighbouring planes.';
+    'How many laser links each layout plans, and where they point: along the orbit (to the satellites ahead and ' +
+    'behind), to the next orbit over, or to the orbit two over.';
   el('.shells-panel .table-scroll').append(shellTable(story));
   el('.patterns-panel .table-scroll').append(patternTable(story));
 
@@ -138,11 +136,11 @@ async function mount({ data, root }: StoryContext): Promise<() => void> {
     section.dataset.plane = plane === null ? 'all' : String(plane);
     section.dataset.pattern = story.patterns[patternIndex]?.pattern ?? '';
     globeEl.dataset.satellitesChosen = String(picked.reduce((n, p) => n + p, 0));
-    writeLegend(el('.legend-list'), shell, data.satellites.shells);
+    writeLegend(el('.stage-side .legend-list'), shell, data.satellites.shells);
     el('.links-note').textContent =
-      `Lines: the planned laser links of the pattern “${drawnLinks.pattern}” at the plan time` +
-      `${plane === null ? '' : ', those of the chosen plane and those that leave it'}. ` +
-      'Planned links, not the links that work: a planned link can be out of sight at a moment.';
+      `The lines are the planned laser links, ${patternShort(drawnLinks.pattern)}` +
+      `${plane === null ? '' : ', of the chosen orbit and those that leave it'}. ` +
+      'A planned link can be out of sight for a moment.';
     fresh = true;
   };
 
@@ -154,8 +152,8 @@ async function mount({ data, root }: StoryContext): Promise<() => void> {
     const count = story.shells[shell]?.planes ?? 0;
     planeHost.append(
       dropdown(
-        'Plane',
-        [{ value: 'all', text: 'All planes' }, ...Array.from({ length: count }, (_, i) => ({ value: String(i), text: `Plane ${i}` }))],
+        'Orbit (plane)',
+        [{ value: 'all', text: 'All orbits' }, ...Array.from({ length: count }, (_, i) => ({ value: String(i), text: `Orbit ${i}` }))],
         (i) => {
           plane = i === 0 ? null : i - 1;
           apply();
@@ -164,7 +162,7 @@ async function mount({ data, root }: StoryContext): Promise<() => void> {
     );
   };
   bar.append(
-    dropdown('Shell', [{ value: 'all', text: 'All shells' }, ...data.satellites.shells.map((s) => ({ value: s, text: `Shell ${s}` }))], (i) => {
+    dropdown('Group (shell)', [{ value: 'all', text: 'All groups' }, ...data.satellites.shells.map((s) => ({ value: s, text: shellName(s) }))], (i) => {
       shell = i === 0 ? null : i - 1;
       plane = null;
       showPlanes();
@@ -174,7 +172,7 @@ async function mount({ data, root }: StoryContext): Promise<() => void> {
   );
   const patternMenu = segmented(
     'Laser pattern',
-    story.patterns.map((p) => ({ value: p.pattern, text: p.pattern })),
+    story.patterns.map((p) => ({ value: p.pattern, text: patternShort(p.pattern) })),
     (i) => {
       patternIndex = i;
       apply();
@@ -195,7 +193,11 @@ async function mount({ data, root }: StoryContext): Promise<() => void> {
     );
   }
   globeEl.dataset.sites = siteLayers.map((l) => l.kind).join(' ');
-  bar.append(patternMenu.element, siteToggles);
+  const patternGroup = document.createElement('div');
+  patternGroup.className = 'control-group';
+  patternGroup.innerHTML = '<span class="control-label">Laser layout</span>';
+  patternGroup.append(patternMenu.element);
+  bar.append(patternGroup, siteToggles);
   apply();
 
   const clock = new Clock({ duration_s: manifest.settings.window_s, speed: START_SPEED });
@@ -230,10 +232,14 @@ function writeLegend(list: HTMLElement, shell: number | null, shells: readonly s
   list.replaceChildren(
     ...shells.map((name, i) => {
       const li = document.createElement('li');
-      li.textContent = `Shell ${name}`;
+      li.textContent = shellName(name);
       setSwatch(li, dot(shell === null || shell === i ? shellMark(i) : FADED));
       return li;
     }),
+    ...legendList([
+      [line({ color: THEME.links, width: 1, dash: [] }, 0.6), 'Laser link'],
+      ...SITE_KINDS.map(({ one, mark }) => [dot(mark), one] as const),
+    ]).children,
   );
 }
 
@@ -262,10 +268,10 @@ function table(head: readonly string[]): { table: HTMLTableElement; body: HTMLEl
 }
 
 function shellTable(story: ConstellationStory): HTMLTableElement {
-  const { table: t, body } = table(['Shell', 'Satellites', 'Planes', 'Height', 'Inclination', 'Plane size']);
+  const { table: t, body } = table(['Group', 'Satellites', 'Orbits', 'Height', 'Tilt to the equator', 'Satellites per orbit']);
   story.shells.forEach((s, i) => {
     const tr = document.createElement('tr');
-    cell(tr, s.shell, { shell: s.shell }, true);
+    cell(tr, shellName(s.shell), { shell: s.shell }, true);
     setSwatch(tr.firstElementChild as HTMLElement, dot(shellMark(i)));
     cell(tr, formatCount(s.satellites_in_planes), { shell: s.shell, field: 'satellites_in_planes' });
     cell(tr, formatCount(s.planes), { shell: s.shell, field: 'planes' });
@@ -278,10 +284,10 @@ function shellTable(story: ConstellationStory): HTMLTableElement {
 }
 
 function patternTable(story: ConstellationStory): HTMLTableElement {
-  const { table: t, body } = table(['Pattern', 'Links', 'In plane', 'Cross plane', 'Second cross plane']);
+  const { table: t, body } = table(['Layout', 'Laser links', 'Along the orbit', 'To the next orbit', 'To the orbit two over']);
   for (const p of story.patterns) {
     const tr = document.createElement('tr');
-    cell(tr, p.pattern, { pattern: p.pattern }, true);
+    cell(tr, `${patternShort(p.pattern)} (“${p.pattern}”)`, { pattern: p.pattern }, true);
     cell(tr, formatCount(p.links), { pattern: p.pattern, field: 'links' });
     cell(tr, formatCount(p.by_kind.in_plane), { pattern: p.pattern, field: 'in_plane' });
     cell(tr, formatCount(p.by_kind.cross_plane), { pattern: p.pattern, field: 'cross_plane' });
@@ -291,19 +297,35 @@ function patternTable(story: ConstellationStory): HTMLTableElement {
   return t;
 }
 
-function writeText(lede: HTMLElement, how: HTMLElement, story: ConstellationStory, satellites: number): void {
+function writeText(root: HTMLElement, story: ConstellationStory, satellites: number, snapshot: string): void {
+  const q = (selector: string): HTMLElement => root.querySelector(selector) as HTMLElement;
+  q('.lede').textContent =
+    `Each dot is one of ${formatCount(satellites)} real Starlink satellites, where it was on ${snapshot}. They fly in ` +
+    'groups at about the same height and the same tilt to the equator (shells), each group in rings that share one ' +
+    'orbit (planes). The faint lines are the laser links that connect the satellites to each other.';
+  q('.try-text').textContent =
+    'Press Play to watch them circle the Earth. Pick one group to see it alone, then one orbit. Switch the laser ' +
+    'layout to see how many partners each satellite gets.';
+  fillFold(q('.how-body'), [
+    'Each group of satellites has its own dot shape and brightness, listed beside the globe. A group not chosen fades to small dark dots.',
+    legendList(
+      [
+        [dot(MARKS.city), 'A city used in the other stories.'],
+        [dot(MARKS.gateway), 'A ground station (gateway): where the satellites hand messages to the Internet on the ground.'],
+        [dot(MARKS.pop), 'An Internet exchange (point of presence, PoP): where the satellite operator’s network meets the rest of the Internet.'],
+      ],
+      'legend-list fold-legend',
+    ),
+    'Lasers never join two groups. Drag the globe to turn it; scroll or pinch to zoom.',
+  ]);
   const largest = story.shells.reduce((a, b) => (b.satellites_in_planes > a.satellites_in_planes ? b : a));
-  const patterns = story.patterns.map((p) => `“${p.pattern}” ${formatCount(p.links)}`).join(', ');
-  lede.textContent =
-    `These are the ${formatCount(satellites)} satellites of the snapshot that the engine places in a shell and a plane. ` +
-    'A shell is a group flying at about the same height and the same tilt to the equator (the inclination); ' +
-    `there are ${formatCount(story.shells.length)}, the largest, ${largest.shell}, with ${formatCount(largest.satellites_in_planes)} satellites in ` +
-    `${formatCount(largest.planes)} planes. A laser pattern is the rule that decides which satellites point their lasers at each other. ` +
-    `The number of planned laser links per pattern: ${patterns}.`;
-  how.textContent =
-    'Each dot is a satellite; its shape and brightness say its shell (the list beside the globe shows each shell’s mark). ' +
-    'Pick one shell or one plane to see it alone. The faint lines are one pattern’s planned laser links; lasers never join ' +
-    'two shells. Ringed dots with a centre are the cities of the study pairs, hollow squares the gateways (ground stations ' +
-    'that join the satellites to the Internet), diamonds the PoPs (points of presence, where the operator’s network meets ' +
-    'the rest of the Internet). Play the clock to see the satellites move; drag to turn the globe.';
+  const patterns = story.patterns.map((p) => `${formatCount(p.links)} with ${patternShort(p.pattern)}`).join(', ');
+  fillFold(q('.sources-body'), [
+    `There are ${formatCount(story.shells.length)} groups; the largest, ${shellName(largest.shell)}, has ` +
+      `${formatCount(largest.satellites_in_planes)} satellites in ${formatCount(largest.planes)} orbits. Planned laser links: ${patterns}.`,
+    `Laser layouts: ${story.patterns.map((p) => patternWords(p.pattern)).join('; ')}.`,
+    `Groups and orbits are found from the satellites’ positions at ${story.plan_time_utc.replace('T', ' ')} UTC (world time). ` +
+      `Computed by the simulator’s constellation program (${story.sources.shells}) and topology program ` +
+      `(${story.sources.patterns.join(', ')}).`,
+  ]);
 }

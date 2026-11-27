@@ -14,8 +14,15 @@ export interface StoryContext {
 export interface Story {
   /** The story's place in the address (#failure). */
   id: string;
-  /** The menu label. */
+  /** The menu label and the story's heading. */
   title: string;
+  /** One plain sentence saying what the visitor will see, under the title in the menu. */
+  summary: string;
+  /**
+   * Where the menu lists it: 'try' stories (computed in the page, from the visitor's own
+   * choice) come first as the main entries; 'saved' ones (the default) under "Saved runs".
+   */
+  group?: 'try' | 'saved';
   /** Load the story's own files and draw it; resolves to the function that removes it. */
   mount(context: StoryContext): Promise<() => void>;
 }

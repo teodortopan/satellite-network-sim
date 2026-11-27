@@ -35,24 +35,38 @@ import {
 
 const SAT_SIZE = 2.2;
 
+/** The three ways of reacting (the simulator calls them planner, local repair, flooding). */
 export const MODE_TITLES: Record<Mode, string> = {
-  planner: 'Planner',
-  'local-repair': 'Local repair',
-  flooding: 'Flooding',
+  planner: 'Wait for the control centre',
+  'local-repair': 'Detour on the spot',
+  flooding: 'Spread the word',
 };
 
-const MODE_NOTES: Record<Mode, string> = {
-  planner: 'Only the planner on the ground changes routes, once reports reach it.',
-  'local-repair': 'The node before the failure switches to a prepared backup; the planner follows.',
-  flooding: 'News spreads from node to node; every node works out its own routes.',
+/** The same, short enough for a chart's axis. */
+export const MODE_SHORT: Record<Mode, string> = {
+  planner: 'Control centre',
+  'local-repair': 'On the spot',
+  flooding: 'Spread the word',
+};
+
+export const MODE_NOTES: Record<Mode, string> = {
+  planner: 'Only a control centre on the ground changes the paths. It waits until news of the break reaches it.',
+  'local-repair': 'The satellite just before the break switches to a backup path it had ready. The control centre catches up later.',
+  flooding: 'Each satellite passes the news to its neighbours, and every one works out new paths by itself.',
 };
 
 export const STATE_TITLES: Record<LaneState, string> = {
-  delivered: 'Delivered',
-  black_hole: 'Black hole',
-  loop: 'Loop',
+  delivered: 'Arriving',
+  black_hole: 'Lost (black hole)',
+  loop: 'Going in circles',
   no_route: 'No route',
 };
+
+/** How the first report reached the control centre: `hops` is how often it was passed on. */
+export function relayed(hops: number): string {
+  if (hops === 0) return 'the first sent straight there';
+  return `the first passed on ${hops} ${hops === 1 ? 'time' : 'times'}`;
+}
 
 /** How much a failed satellite's cross grows over a working satellite's dot. */
 const FAILED_GROW = 2.8;
@@ -179,7 +193,7 @@ export class Lane {
     }
     let text = STATE_TITLES[iv.state];
     if (iv.state === 'delivered') text += `, ${formatMs(iv.one_way_ms)} one way`;
-    if (iv.state === 'black_hole' && iv.failed_element !== null) text += `: lost at ${this.elementName(iv)}`;
+    if (iv.state === 'black_hole' && iv.failed_element !== null) text += ` at ${this.elementName(iv)}`;
     this.stateText.textContent = text;
     setSwatch(this.stateText, style === null ? null : line(style));
     this.stateText.dataset.state = iv.state;
@@ -193,7 +207,7 @@ export class Lane {
       case 'satellite':
         return sat(e.sat);
       case 'link':
-        return `the laser link ${sat(e.a)} to ${sat(e.b)}`;
+        return `the laser link between ${sat(e.a)} and ${sat(e.b)}`;
       case 'gateway':
       case 'city':
         return this.data.sites[e.site]?.name ?? '';
@@ -317,30 +331,31 @@ export class Lane {
       list.append(li);
       this.news.push({ element: li, t_s });
     };
-    add(s.failure_s, `Failure at ${formatInstant(s.failure_s)}`, 'failure');
+    add(s.failure_s, `Breaks at ${formatInstant(s.failure_s)}`, 'failure');
     if (fact === null) {
-      add(null, 'Nobody detects the failure in this run', 'none');
+      add(null, 'Nobody notices the break in this run', 'none');
       return;
     }
     const detected = firstDetection(fact);
     if (this.mode === 'flooding') {
-      add(detected, `Detected at ${formatInstant(detected)}; the flood starts`, 'detected');
+      add(detected, `Noticed at ${formatInstant(detected)}; the news starts to spread`, 'detected');
       add(
         fact.flood_last_s,
-        `Flood reached ${formatCount(fact.flood_nodes)} nodes by ${formatInstant(fact.flood_last_s)}`,
+        `News reached ${formatCount(fact.flood_nodes)} satellites and stations by ${formatInstant(fact.flood_last_s)}`,
         'flood',
       );
       return;
     }
-    add(detected, `Detected at ${formatInstant(detected)}`, 'detected');
+    add(detected, `Noticed at ${formatInstant(detected)}`, 'detected');
     const reports = fact.reports ?? 0;
-    const hops = fact.report_hops === null ? '' : `, the first after ${fact.report_hops} ${fact.report_hops === 1 ? 'hop' : 'hops'}`;
+    const hops =
+      fact.report_hops === null ? '' : `, ${relayed(fact.report_hops)}`;
     add(
       fact.planner_known_s,
-      `Planner knew at ${formatInstant(fact.planner_known_s)} (${reports} ${reports === 1 ? 'report' : 'reports'}${hops})`,
+      `Control centre knows at ${formatInstant(fact.planner_known_s)} (${reports} ${reports === 1 ? 'report' : 'reports'}${hops})`,
       'planner-known',
     );
     const plan = newPlanAt(s.plans[this.mode], fact.planner_known_s);
-    add(plan, plan === null ? 'No new plan within the run' : `New plan in effect at ${formatInstant(plan)}`, 'new-plan');
+    add(plan, plan === null ? 'No new paths within the run' : `New paths in use at ${formatInstant(plan)}`, 'new-plan');
   }
 }

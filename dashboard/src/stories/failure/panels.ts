@@ -8,7 +8,7 @@ import { formatCount, formatInstant, formatMs, formatSeconds } from '../../forma
 import { dot, MODE_MARKS, THEME, type DotShape } from '../../theme';
 import { drawShape, setSwatch } from '../../ui/marks';
 import { MODES, type Element, type Fact, type Measure, type Mode, type Scenario } from './data';
-import { MODE_TITLES } from './lane';
+import { MODE_SHORT, MODE_TITLES, relayed } from './lane';
 import { factAt, firstDetection } from './state';
 
 export function elementName(e: Element, data: CommonData): string {
@@ -19,7 +19,7 @@ export function elementName(e: Element, data: CommonData): string {
     case 'link':
       return `Laser link ${sat(e.a)} to ${sat(e.b)}`;
     case 'gateway':
-      return `Gateway ${data.sites[e.site]?.name ?? ''}`;
+      return `Ground station ${data.sites[e.site]?.name ?? ''}`;
     case 'city':
       return `Dish at ${data.sites[e.site]?.name ?? ''}`;
   }
@@ -34,14 +34,14 @@ export class FactsPanel {
     this.element = document.createElement('section');
     this.element.className = 'panel facts';
     this.element.innerHTML = `
-      <h2>What was known, and when</h2>
-      <p class="panel-note">Each fact is something that changed. Times are seconds from the run's
-        start; a cell lights up once the clock passes it.</p>
+      <h2>Who knew what, and when</h2>
+      <p class="panel-note">Each row is something that changed. Times are seconds from the start of
+        the run; a cell lights up once the clock passes it.</p>
       <div class="facts-scroll">
         <table>
           <thead><tr>
-            <th scope="col">Fact</th><th scope="col">Happened</th><th scope="col">First detected</th>
-            <th scope="col">Planner knew</th><th scope="col">Reports</th><th scope="col">Flood reached</th>
+            <th scope="col">What changed</th><th scope="col">When</th><th scope="col">First noticed</th>
+            <th scope="col">Control centre knew</th><th scope="col">Reports sent</th><th scope="col">News spread to</th>
           </tr></thead>
           <tbody></tbody>
         </table>
@@ -53,14 +53,14 @@ export class FactsPanel {
       const reports =
         fact.reports === null
           ? 'none'
-          : `${formatCount(fact.reports)}${fact.report_hops === null ? '' : ` (first: ${fact.report_hops} ${fact.report_hops === 1 ? 'hop' : 'hops'})`}`;
+          : `${formatCount(fact.reports)}${fact.report_hops === null ? '' : ` (${relayed(fact.report_hops)})`}`;
       const cells: [string, string][] = [
-        ['subject', `${elementName(fact.subject, data)} ${fact.state}${fact.old ? ' (old news)' : ''}`],
+        ['subject', `${elementName(fact.subject, data)} ${fact.state === 'down' ? 'stops working' : 'works again'}${fact.old ? ' (already known)' : ''}`],
         ['happened', fact.old ? 'before the run' : formatInstant(fact.t_s)],
         ['detected', formatInstant(firstDetection(fact))],
         ['planner', formatInstant(fact.planner_known_s)],
         ['reports', reports],
-        ['flood', fact.flood_nodes === null || fact.flood_nodes === 0 ? 'none' : `${formatCount(fact.flood_nodes)} nodes, last at ${formatInstant(fact.flood_last_s)}`],
+        ['flood', fact.flood_nodes === null || fact.flood_nodes === 0 ? 'none' : `${formatCount(fact.flood_nodes)} places, the last at ${formatInstant(fact.flood_last_s)}`],
       ];
       for (const [key, text] of cells) {
         const td = document.createElement(key === 'subject' ? 'th' : 'td');
@@ -86,31 +86,30 @@ export class FactsPanel {
 }
 
 const MEASURE_ROWS: { key: Measure; label: string; unit: 's' | 'ms' | 'count' }[] = [
-  { key: 'lost_s', label: 'Time lost', unit: 's' },
-  { key: 'black_hole_s', label: 'of it in a black hole', unit: 's' },
-  { key: 'loop_s', label: 'of it in a loop', unit: 's' },
-  { key: 'restore_s', label: 'Time to restore', unit: 's' },
-  { key: 'settle_s', label: 'Time to settle', unit: 's' },
-  { key: 'extra_median_ms', label: 'Extra delay, median', unit: 'ms' },
-  { key: 'extra_max_ms', label: 'Extra delay, largest', unit: 'ms' },
-  { key: 'extra_settled_ms', label: 'Extra delay once settled', unit: 'ms' },
-  { key: 'reports', label: 'Reports', unit: 'count' },
-  { key: 'messages', label: 'Messages', unit: 'count' },
+  { key: 'lost_s', label: 'Time with messages lost', unit: 's' },
+  { key: 'black_hole_s', label: 'of it vanishing (black hole)', unit: 's' },
+  { key: 'loop_s', label: 'of it going in circles (loop)', unit: 's' },
+  { key: 'restore_s', label: 'Time until messages arrive again', unit: 's' },
+  { key: 'settle_s', label: 'Time until the best path is in use', unit: 's' },
+  { key: 'extra_median_ms', label: 'Extra travel time, typical', unit: 'ms' },
+  { key: 'extra_max_ms', label: 'Extra travel time, worst', unit: 'ms' },
+  { key: 'extra_settled_ms', label: 'Extra travel time once settled', unit: 'ms' },
+  { key: 'reports', label: 'Reports sent to the control centre', unit: 'count' },
+  { key: 'messages', label: 'News messages sent', unit: 'count' },
 ];
 
 export function measuresPanel(scenario: Scenario): HTMLElement {
   const el = document.createElement('section');
   el.className = 'panel measures';
   el.innerHTML = `
-    <h2>Measures of this run</h2>
+    <h2>How each way did</h2>
     <p class="panel-note"></p>
     <table>
       <thead><tr><th scope="col"><span class="visually-hidden">Measure</span></th></tr></thead>
       <tbody></tbody>
     </table>`;
   (el.querySelector('.panel-note') as HTMLElement).textContent =
-    `From t_f, the failure at ${formatInstant(scenario.failure_s)}, against the run with no failure. ` +
-    `Engine file: ${scenario.sources.measures}.`;
+    `Counted from the break at ${formatInstant(scenario.failure_s)}, against the same run with nothing broken.`;
   const head = el.querySelector('thead tr') as HTMLElement;
   for (const mode of MODES) {
     const th = document.createElement('th');
@@ -160,15 +159,15 @@ export class ContextChart {
     this.element = document.createElement('section');
     this.element.className = 'panel context';
     this.element.innerHTML = `
-      <h2>Against every main run of Phase 4</h2>
+      <h2>Compared with many other runs</h2>
       <p class="panel-note"></p>
       <div class="context-plot" role="img"></div>
       <ul class="context-legend"></ul>`;
     (this.element.querySelector('.panel-note') as HTMLElement).textContent =
-      `Time lost in every main run of this scenario, one dot per run (${scenario.context.source}). ` +
-      'The ringed dot is the run replayed here.';
+      'Time with messages lost in many runs of this kind of break, one dot per run, for each way of reacting. ' +
+      'The ringed dot is the run shown above. Each step along the bottom is ten times the one before.';
     const plotEl = this.element.querySelector('.context-plot') as HTMLElement;
-    plotEl.setAttribute('aria-label', 'Time lost per reaction mode over the main runs, log scale');
+    plotEl.setAttribute('aria-label', 'Time with messages lost for each way of reacting, over many runs');
     const legend = this.element.querySelector('.context-legend') as HTMLElement;
 
     const groups: DotGroup[] = MODES.map((mode, row) => {
@@ -176,7 +175,7 @@ export class ContextChart {
       const own = scenario.context.rows.find((r) => r.reaction === mode && r.run === scenario.context.this_run);
       const mark = MODE_MARKS[mode] ?? { color: THEME.chalk, shape: 'disc' };
       const li = document.createElement('li');
-      li.textContent = `${MODE_TITLES[mode]}: this run ${formatSeconds(own?.lost_s ?? null)}`;
+      li.textContent = `${MODE_TITLES[mode]}: ${formatSeconds(own?.lost_s ?? null)} in the run shown`;
       setSwatch(li, dot(mark));
       legend.append(li);
       return {
@@ -196,7 +195,7 @@ export class ContextChart {
       shape: 'ring',
     });
     const ringed = document.createElement('li');
-    ringed.textContent = 'This run';
+    ringed.textContent = 'The run shown above';
     setSwatch(ringed, dot({ color: THEME.chalk, shape: 'ring' }));
     legend.append(ringed);
 
@@ -240,16 +239,16 @@ function options(width: number, height: number, groups: DotGroup[]): uPlot.Optio
     axes: [
       {
         ...AXIS,
-        label: 'Time lost (log scale)',
+        label: 'Time with messages lost',
         labelSize: 22,
         splits: (_u, _i, min, max) => DECADES.filter((v) => v >= min && v <= max),
         values: (_u, ticks) => ticks.map((v) => formatSeconds(v)),
       },
       {
         ...AXIS,
-        size: 96,
+        size: 120,
         splits: () => [0, 1, 2],
-        values: (_u, ticks) => ticks.map((v) => MODE_TITLES[MODES[2 - v] as Mode]),
+        values: (_u, ticks) => ticks.map((v) => MODE_SHORT[MODES[2 - v] as Mode]),
       },
     ],
   };

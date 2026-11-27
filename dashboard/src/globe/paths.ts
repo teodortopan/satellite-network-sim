@@ -9,6 +9,11 @@ import type { SatelliteField } from './satellite-field';
 
 export const SITE_RADIUS = 1.002;
 
+/** A point given by latitude and longitude (degrees), in scene coordinates just above the ground. */
+export function pointScenePosition(p: { lat_deg: number; lon_deg: number }): [number, number, number] {
+  return latLonToScene(p.lat_deg, p.lon_deg, SITE_RADIUS);
+}
+
 /** Scene positions of every site, just above the ground. */
 export function siteScenePositions(data: CommonData): Float32Array {
   const out = new Float32Array(data.sites.length * 3);
@@ -26,14 +31,37 @@ export function routeNodes(from: number, route: readonly number[], to: number | 
   return nodes;
 }
 
+/**
+ * Where the nodes of a path are at the clock's time. Sites are numbered as in `sites` (the
+ * saved ground sites); extra places (points chosen by coordinate, such as the two ends of a
+ * route between any two points) are numbered after them: `siteCount`, `siteCount + 1`, ...
+ */
 export class PathPlacer {
+  private extra = new Float32Array(0);
+
   constructor(
     private readonly field: SatelliteField,
     private readonly sites: Float32Array,
   ) {}
 
+  /** The number of saved sites; the first extra place has this number. */
+  get siteCount(): number {
+    return this.sites.length / 3;
+  }
+
+  /** Replace the extra places (x y z each, scene coordinates); returns the first one's number. */
+  setExtraSites(positions: readonly number[] | Float32Array): number {
+    if (positions.length % 3 !== 0) throw new RangeError('extra places come as x y z triples');
+    this.extra = Float32Array.from(positions);
+    return this.siteCount;
+  }
+
   site(i: number): number[] {
-    return Array.from(this.sites.subarray(3 * i, 3 * i + 3));
+    const n = this.siteCount;
+    if (!Number.isInteger(i) || i < 0 || i >= n + this.extra.length / 3) throw new RangeError(`there is no place ${i}`);
+    if (i < n) return Array.from(this.sites.subarray(3 * i, 3 * i + 3));
+    const k = i - n;
+    return Array.from(this.extra.subarray(3 * k, 3 * k + 3));
   }
 
   /** Where a node is now; null for a satellite with no position at this step. */
