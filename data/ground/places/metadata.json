@@ -1,0 +1,12 @@
+{
+  "places.json": {
+    "source_url": "https://raw.githubusercontent.com/nvkelso/natural-earth-vector/v5.1.2/geojson/ne_10m_populated_places_simple.geojson",
+    "fetched_at_utc": "2026-11-27T20:02:45Z",
+    "sha256": "fd3fa867a320cbd5c5b6bb5bc550afeec2939fb2cef688e508007282a55ac42f",
+    "bytes": 4932147,
+    "dataset": "Natural Earth populated places, 1:10m, simple",
+    "release": "v5.1.2",
+    "licence": "public domain (Natural Earth terms of use)",
+    "rows": 7342
+  }
+}
