@@ -72,6 +72,11 @@ proof, and it is part of the check.
   full gazetteer.
 - By clicking the globe, for any point.
 
+No place on Earth is without coverage for a whole run on this snapshot: the 97 degree shell
+passes over both poles, and runs at 85 to 90 degrees north and south only show gaps of 30 to
+63 s. The page's message for a place with no coverage at all is therefore tested on
+hand-made engine output only.
+
 ### 3.4 How the browser's engine is proved right
 
 The `dashboard` step of the check builds the WebAssembly program and runs it in Node
@@ -112,6 +117,10 @@ formats. The page says, beside an on-demand run, that it was computed in the bro
 | One simulated minute, three strategies | 0.85 s |
 | Memory of the program | 33 MiB |
 | The native program, same run of 420 s | 6.2 s against about 7 s |
+
+In Chromium without a screen (software drawing, the same machine), for a run of 420 s: 8.3 to
+10.7 s from the press to the result the first time, downloads included, and 7.2 to 8.5 s the
+second time. Not measured: other browsers, a phone.
 
 ## 4. A page a newcomer understands
 
