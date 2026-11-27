@@ -7,22 +7,21 @@ import { Clock } from '../../clock/clock';
 import { ClockView } from '../../clock/clock-view';
 import { parseLinks, type CommonData } from '../../data/common';
 import { formatCount, formatMs, formatSeconds, formatSpan } from '../../format';
-import { dotGeometry, dots, type ThickPath } from '../../globe/layers';
+import { dotGeometry, dots, shapeArray, type ThickPath } from '../../globe/layers';
 import { PathPlacer, routeNodes, siteScenePositions } from '../../globe/paths';
 import { SatelliteField } from '../../globe/satellite-field';
 import { rgbArray, Stage } from '../../globe/stage';
-import { strategyColor, THEME } from '../../theme';
+import { droppedColor, DOTTED, line, MARKS, strategyStyle, THEME, type Mark } from '../../theme';
+import { setSwatch } from '../../ui/marks';
 import { dropdown, frameLoop, segmented, toggle } from '../../ui/controls';
 import type { Story, StoryContext } from '../story';
 import { DelayCharts } from './chart';
-import { parseRouteStory, type Direction, type Drop, type DropElement, type RouteStory, type StrategyRun } from './data';
+import { parseRouteStory, type Direction, type DropElement, type RouteStory, type StrategyRun } from './data';
 import { stateAt, type RouteState } from './state';
 import { summaryTable } from './table';
 
 const START_SPEED = 30;
 const CAMERA_DISTANCE = 3.9;
-/** Widest first, so routes the strategies share show as stripes of every colour. */
-const ROUTE_WIDTHS = [9, 6.5, 4.2, 2.2];
 const SAT_SIZE = 2;
 
 export const STRATEGY_TITLES: Record<string, string> = {
@@ -90,9 +89,9 @@ async function mount({ data, root }: StoryContext): Promise<() => void> {
         <aside class="stage-side">
           <h2>At the clock’s time</h2>
           <ul class="readouts"></ul>
-          <p class="stage-note">A dashed line is a dropped route: the route held until the drop,
-            drawn broken for as long as the drop lasts; the red dot marks what the engine names as
-            its cause.</p>
+          <p class="stage-note">A dotted, dimmer line is a dropped route: the route held until the
+            drop, drawn dotted for as long as the drop lasts; a cross marks what the engine names
+            as its cause.</p>
         </aside>
       </div>
       <div class="clock-dock"></div>
@@ -115,8 +114,8 @@ async function mount({ data, root }: StoryContext): Promise<() => void> {
   const pairs = pairsOf(story);
   writeText(el('.lede'), el('.how'), story, name);
   el('.chart-note').textContent =
-    'One-way delay at every second, one row per strategy on the same delay scale. Red bands are ' +
-    'drops (no route); ticks along the bottom are route changes. The thin line marks the clock; ' +
+    'One-way delay at every second, one row per strategy on the same delay scale. Grey hatched bands ' +
+    'are drops (no route); ticks along the bottom are route changes. The thin line marks the clock; ' +
     'click a chart to move the clock there.';
   el('.table-note').textContent =
     `From the routing program’s summary (${story.sources.summary}) for the chosen direction. ` +
@@ -129,12 +128,23 @@ async function mount({ data, root }: StoryContext): Promise<() => void> {
   const placer = new PathPlacer(field, sites);
   stage.add(field.segments(THEME.links, 0.08));
   stage.add(field.points(field.shellColors, new Float32Array(field.count).fill(SAT_SIZE), stage.dotMaterial()));
+  // Widest first, so routes the strategies share show as nested stripes of every style.
   const lines = new Map<string, ThickPath>();
-  strategies.forEach((s, i) => lines.set(s, stage.path(strategyColor(s), ROUTE_WIDTHS[i] ?? 2)));
+  for (const s of [...strategies].sort((a, b) => strategyStyle(b).globeWidth - strategyStyle(a).globeWidth)) {
+    const style = strategyStyle(s);
+    lines.set(s, stage.path(style.color, style.globeWidth));
+  }
   const causePosition = new BufferAttribute(new Float32Array(strategies.length * 2 * 3), 3);
   causePosition.setUsage(DynamicDrawUsage);
   const causeDots = dots(
-    dotGeometry(causePosition, rgbArray(Array<string>(strategies.length * 2).fill(THEME.failed)), new Float32Array(strategies.length * 2).fill(13)),
+    dotGeometry(
+      causePosition,
+      rgbArray(Array<string>(strategies.length * 2).fill(MARKS.cause.color)),
+      new Float32Array(strategies.length * 2).fill(13),
+      undefined,
+      undefined,
+      shapeArray(Array(strategies.length * 2).fill(MARKS.cause.shape)),
+    ),
     stage.dotMaterial(),
   );
   causeDots.renderOrder = 3;
@@ -162,7 +172,7 @@ async function mount({ data, root }: StoryContext): Promise<() => void> {
   toggles.setAttribute('aria-label', 'Strategies');
   for (const s of strategies) {
     toggles.append(
-      toggle({ value: s, text: STRATEGY_TITLES[s] ?? s }, true, strategyColor(s), (on) => {
+      toggle({ value: s, text: STRATEGY_TITLES[s] ?? s }, true, strategySwatch(s), (on) => {
         if (on) shown.add(s);
         else shown.delete(s);
         charts?.setShown(shown);
@@ -177,9 +187,10 @@ async function mount({ data, root }: StoryContext): Promise<() => void> {
   for (const s of strategies) {
     const li = document.createElement('li');
     li.dataset.strategy = s;
-    li.style.setProperty('--swatch', strategyColor(s));
     li.innerHTML = '<span class="readout-name"></span><span class="readout-state"></span>';
-    (li.querySelector('.readout-name') as HTMLElement).textContent = STRATEGY_TITLES[s] ?? s;
+    const readoutName = li.querySelector('.readout-name') as HTMLElement;
+    readoutName.textContent = STRATEGY_TITLES[s] ?? s;
+    setSwatch(readoutName, strategySwatch(s));
     readouts.set(s, li);
     el('.readouts').append(li);
   }
@@ -191,7 +202,8 @@ async function mount({ data, root }: StoryContext): Promise<() => void> {
   let direction = story.directions[0] as Direction;
   let charts: DelayCharts | null = null;
   let drawn_t = Number.NaN;
-  const shownBroken = new Map<string, Drop>();
+  // What each line shows now (a route's interval or a drop), to lay its dashes when it changes.
+  const shownOnLine = new Map<string, object>();
 
   function showDirection(): void {
     const pair = pairs[pairIndex] as (typeof pairs)[number];
@@ -223,12 +235,13 @@ async function mount({ data, root }: StoryContext): Promise<() => void> {
     }
     endDots = stage.fixedDots(
       [...placer.site(direction.from), ...placer.site(direction.to)],
-      [THEME.city, THEME.city],
-      [9, 9],
+      [MARKS.city.color, MARKS.city.color],
+      [11, 11],
+      [MARKS.city.shape, MARKS.city.shape],
     );
     stage.add(endDots);
     stage.globe.lookFrom([0, 1, 2].map((k) => (sites[3 * direction.from + k] as number) + (sites[3 * direction.to + k] as number)), CAMERA_DISTANCE);
-    shownBroken.clear();
+    shownOnLine.clear();
     drawn_t = Number.NaN;
   }
   showDirection();
@@ -247,17 +260,21 @@ async function mount({ data, root }: StoryContext): Promise<() => void> {
         line.set([]);
         continue;
       }
+      const style = strategyStyle(s);
       if (state.kind === 'route') {
-        line.setDashed(false);
+        line.setStyle(style);
         line.set(placer.points(routeNodes(direction.from, state.interval.route, direction.to)));
-        shownBroken.delete(s);
+        if (shownOnLine.get(s) !== state.interval) {
+          shownOnLine.set(s, state.interval);
+          line.layDashes();
+        }
         continue;
       }
-      // A drop: the route held until it, broken, and the element the engine names.
-      line.setDashed(true);
+      // A drop: the route held until it, dotted and dimmer, and the element the engine names.
+      line.setStyle({ color: droppedColor(style.color), dash: DOTTED });
       line.set(state.broken === null ? [] : placer.points(routeNodes(direction.from, state.broken.route, direction.to)));
-      if (shownBroken.get(s) !== state.drop) {
-        shownBroken.set(s, state.drop);
+      if (shownOnLine.get(s) !== state.drop) {
+        shownOnLine.set(s, state.drop);
         line.layDashes();
       }
       for (const p of elementPoints(state.drop.element, placer)) {
@@ -289,7 +306,13 @@ async function mount({ data, root }: StoryContext): Promise<() => void> {
   };
 }
 
-/** Where to put the red dot of a drop's element: a satellite, both ends of a link, a site. */
+/** A strategy's swatch: its line on the globe, narrowed to fit beside a name. */
+function strategySwatch(s: string): Mark {
+  const style = strategyStyle(s);
+  return line({ ...style, width: style.globeWidth * 0.6 });
+}
+
+/** Where to put the cross of a drop's element: a satellite, both ends of a link, a site. */
 function elementPoints(e: DropElement | null, placer: PathPlacer): number[][] {
   if (e === null) return [];
   const out: (number[] | null)[] =
@@ -362,5 +385,6 @@ function writeText(lede: HTMLElement, how: HTMLElement, story: RouteStory, name:
   how.textContent =
     `The best case is shown: a city can use any satellite in view, and the laser pattern is “${story.settings.pattern}”. ` +
     `${notes.join('; ')}. Routes are re-planned every ${formatSeconds(story.settings.replan_s)}. A drop is a stretch of time with no usable route; its cause is the one the engine gives. ` +
-    'Each strategy keeps its colour on the globe, in the chart and in the table. Drag to turn the globe, scroll to zoom.';
+    'Each strategy keeps its line (its grey, width and dashes) on the globe, in the chart and in the table; the cities are ringed dots. ' +
+    'Drag to turn the globe, scroll to zoom.';
 }

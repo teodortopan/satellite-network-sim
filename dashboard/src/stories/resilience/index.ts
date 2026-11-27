@@ -9,7 +9,9 @@ import type { ThickPath } from '../../globe/layers';
 import { PathPlacer, routeNodes, siteScenePositions } from '../../globe/paths';
 import { SatelliteField } from '../../globe/satellite-field';
 import { rgbArray, Stage } from '../../globe/stage';
-import { FAILURE_KIND_COLORS, patternColor, shellColor, THEME } from '../../theme';
+import { BASELINE_STYLE, dot, failureKindStyle, line, MARKS, patternStyle, shellColor, THEME, type DotShape, type LineStyle, type Mark } from '../../theme';
+import { shapeArray } from '../../globe/layers';
+import { setSwatch } from '../../ui/marks';
 import { frameLoop, segmented } from '../../ui/controls';
 import type { Story, StoryContext } from '../story';
 import { cellOf, parseResilienceStory, type Cell, type ResilienceStory, type Step, type Table } from './data';
@@ -17,8 +19,18 @@ import { afterRecovery, alignTo, pickLinks, pointsOf, type Points } from './stat
 
 const PATTERNS = ['plus-grid', 'three', 'six'] as const;
 const CAMERA_DISTANCE = 4.2;
-const FAILED_COLOR = '#56606b';
+/** Failed satellites: crosses, dimmer than the failure mark of the other stories because a
+ * share of up to 30% of the constellation is drawn. */
+const FAILED = { color: '#9c9c9c', shape: 'cross' } as const;
+const FAILED_SIZE = 3.4;
+const WORKING_SIZE = 1.8;
+/** The route after recovery, and the route with nothing failed (faint, thin) beneath it. */
+const ROUTE_STYLE: LineStyle = { color: THEME.delivered, width: 3.6, dash: [] };
+const BASELINE_OPACITY = 0.35;
+/** Dashed: re-pointed (what fails), or lasers fail (percolation); the grey and the dot on the
+ * points say the kind of failure or the pattern. */
 const DASH = [7, 5];
+const LINK_OPACITY = 0.3;
 const SHARE_TICKS = [0.001, 0.003, 0.01, 0.03, 0.1, 0.3];
 
 export const resilienceStory: Story = {
@@ -30,29 +42,35 @@ export const resilienceStory: Story = {
 interface LineDef {
   label: string;
   color: string;
+  marker: DotShape;
   dash?: number[];
   match: Record<string, Cell>;
 }
 
+/** A chart line in a series' style (its grey and its dot), dashed or not. */
+function styled(style: LineStyle, dashed = false): Pick<LineDef, 'color' | 'marker' | 'dash'> {
+  return { color: style.color, marker: style.marker ?? 'disc', ...(dashed ? { dash: DASH } : {}) };
+}
+
 const WHAT_FAILS: LineDef[] = [
-  { label: 'Random satellites', color: FAILURE_KIND_COLORS['random-satellites'] as string, match: { group: 'random-satellites', scenario: 'random-satellites', pattern: 'three', repoint: 'off' } },
-  { label: 'Random lasers', color: FAILURE_KIND_COLORS['random-lasers'] as string, match: { group: 'random-lasers', scenario: 'random-lasers', pattern: 'three', repoint: 'off' } },
-  { label: 'Busiest satellites first', color: FAILURE_KIND_COLORS.attack as string, match: { group: 'attack', scenario: 'attack', pattern: 'three', repoint: 'off' } },
-  { label: 'Random satellites, re-pointed', color: FAILURE_KIND_COLORS['random-satellites'] as string, dash: DASH, match: { group: 'recovery-repointing', scenario: 'random-satellites', pattern: 'three', repoint: 'on' } },
-  { label: 'Busiest first, re-pointed', color: FAILURE_KIND_COLORS.attack as string, dash: DASH, match: { group: 'recovery-repointing', scenario: 'attack', pattern: 'three', repoint: 'on' } },
+  { label: 'Random satellites', ...styled(failureKindStyle('random-satellites')), match: { group: 'random-satellites', scenario: 'random-satellites', pattern: 'three', repoint: 'off' } },
+  { label: 'Random lasers', ...styled(failureKindStyle('random-lasers')), match: { group: 'random-lasers', scenario: 'random-lasers', pattern: 'three', repoint: 'off' } },
+  { label: 'Busiest satellites first', ...styled(failureKindStyle('attack')), match: { group: 'attack', scenario: 'attack', pattern: 'three', repoint: 'off' } },
+  { label: 'Random satellites, re-pointed', ...styled(failureKindStyle('random-satellites'), true), match: { group: 'recovery-repointing', scenario: 'random-satellites', pattern: 'three', repoint: 'on' } },
+  { label: 'Busiest first, re-pointed', ...styled(failureKindStyle('attack'), true), match: { group: 'recovery-repointing', scenario: 'attack', pattern: 'three', repoint: 'on' } },
 ];
 
 const BY_PATTERN: LineDef[] = [
-  { label: 'plus-grid', color: patternColor('plus-grid'), match: { group: 'pattern', scenario: 'random-satellites', pattern: 'plus-grid', repoint: 'off' } },
-  { label: 'three', color: patternColor('three'), match: { group: 'random-satellites', scenario: 'random-satellites', pattern: 'three', repoint: 'off' } },
-  { label: 'six', color: patternColor('six'), match: { group: 'pattern', scenario: 'random-satellites', pattern: 'six', repoint: 'off' } },
+  { label: 'plus-grid', ...styled(patternStyle('plus-grid')), match: { group: 'pattern', scenario: 'random-satellites', pattern: 'plus-grid', repoint: 'off' } },
+  { label: 'three', ...styled(patternStyle('three')), match: { group: 'random-satellites', scenario: 'random-satellites', pattern: 'three', repoint: 'off' } },
+  { label: 'six', ...styled(patternStyle('six')), match: { group: 'pattern', scenario: 'random-satellites', pattern: 'six', repoint: 'off' } },
 ];
 
 const PERCOLATION: LineDef[] = [
-  { label: 'plus-grid, satellites fail', color: patternColor('plus-grid'), match: { links: 'plus-grid', kind: 'satellites' } },
-  { label: 'plus-grid, lasers fail', color: patternColor('plus-grid'), dash: DASH, match: { links: 'plus-grid', kind: 'laser-links' } },
-  { label: 'three, satellites fail', color: patternColor('three'), match: { links: 'three', kind: 'satellites' } },
-  { label: 'three, lasers fail', color: patternColor('three'), dash: DASH, match: { links: 'three', kind: 'laser-links' } },
+  { label: 'plus-grid, satellites fail', ...styled(patternStyle('plus-grid')), match: { links: 'plus-grid', kind: 'satellites' } },
+  { label: 'plus-grid, lasers fail', ...styled(patternStyle('plus-grid'), true), match: { links: 'plus-grid', kind: 'laser-links' } },
+  { label: 'three, satellites fail', ...styled(patternStyle('three')), match: { links: 'three', kind: 'satellites' } },
+  { label: 'three, lasers fail', ...styled(patternStyle('three'), true), match: { links: 'three', kind: 'laser-links' } },
 ];
 
 async function mount({ data, root }: StoryContext): Promise<() => void> {
@@ -130,12 +148,12 @@ async function mount({ data, root }: StoryContext): Promise<() => void> {
   };
   note(
     'what-fails',
-    `Share of the city pairs that still have a route once every failure is known, against the share of satellites or lasers failed (mean over the runs; ${recovery.source}). Pattern “three”; dashed: the satellites point their lasers again at new partners.`,
+    `Share of the city pairs that still have a route once every failure is known, against the share of satellites or lasers failed (mean over the runs; ${recovery.source}). Pattern “three”. The dot on the points says what fails; dashed: the satellites point their lasers again at new partners.`,
   );
-  note('pattern', `The same share for random satellite failures under each laser pattern (${recovery.source}).`);
+  note('pattern', `The same share for random satellite failures under each laser pattern; the dot on the points says the pattern (${recovery.source}).`);
   note(
     'percolation',
-    `The largest connected part as a share of the working satellites, on Phase 4’s test shell of one orbit height (${percolation.source}). Dotted lines: where theory says an endless grid of that kind falls apart.`,
+    `The largest connected part as a share of the working satellites, on Phase 4’s test shell of one orbit height (${percolation.source}). The dot on the points says the pattern; dashed: lasers fail, solid: satellites fail. Dotted upright lines, topped by the pattern’s dot: where theory says an endless grid of that kind falls apart.`,
   );
   // The two share charts on one scale, from just below the lowest share either shows (display only).
   const lowest = Math.min(
@@ -176,7 +194,7 @@ async function mount({ data, root }: StoryContext): Promise<() => void> {
       yRange: [0, 1.02],
       marks: PERCOLATION.flatMap((d) => {
         const t = pointsOf(percolation, d.match, 'failed_share', 'threshold_failed_share').y[0];
-        return typeof t === 'number' ? [{ x: t, color: d.color }] : [];
+        return typeof t === 'number' ? [{ x: t, color: d.color, shape: d.marker }] : [];
       }),
     }),
   );
@@ -190,19 +208,27 @@ async function mount({ data, root }: StoryContext): Promise<() => void> {
   const stage = new Stage(globeEl);
   const three = links.get('three') as Links;
   const field = new SatelliteField(data, new Uint32Array(0), Math.max(...[...links.values()].map((l) => l.pairs.length)));
-  const segments = field.segments(THEME.links, 0.3);
+  const segments = field.segments(THEME.links, LINK_OPACITY);
   stage.add(segments);
   const colors = new Float32Array(field.count * 3);
   const sizes = new Float32Array(field.count);
-  const satPoints = field.points(colors, sizes, stage.dotMaterial());
+  const shapes = new Float32Array(field.count);
+  const satPoints = field.points(colors, sizes, stage.dotMaterial(), undefined, undefined, shapes);
   stage.add(satPoints);
   const sites = siteScenePositions(data);
   const placer = new PathPlacer(field, sites);
   const pairs = story.steps[0]?.routes ?? [];
   const cities = [...new Set(pairs.flatMap((p) => [p.from, p.to]))];
-  stage.add(stage.fixedDots(cities.flatMap((i) => placer.site(i)), cities.map(() => THEME.city), cities.map(() => 8)));
-  const baselines = pairs.map(() => stage.path(THEME.baseline, 1.6, 0.35));
-  const routes = pairs.map(() => stage.path(THEME.delivered, 3.6));
+  stage.add(
+    stage.fixedDots(
+      cities.flatMap((i) => placer.site(i)),
+      cities.map(() => MARKS.city.color),
+      cities.map(() => 10),
+      cities.map(() => MARKS.city.shape),
+    ),
+  );
+  const baselines = pairs.map(() => stage.path(BASELINE_STYLE.color, 1.6, BASELINE_OPACITY));
+  const routes = pairs.map(() => stage.path(ROUTE_STYLE.color, ROUTE_STYLE.width));
   stage.globe.lookFrom([0, 1, 2].map((k) => cities.reduce((sum, i) => sum + (sites[3 * i + k] as number), 0)), CAMERA_DISTANCE);
   writeLegend(el('.resilience-legend'));
 
@@ -214,20 +240,22 @@ async function mount({ data, root }: StoryContext): Promise<() => void> {
     field.setLinks(pickLinks(planned.pairs, step.planned_links_not_failed));
     const failed = new Uint8Array(field.count);
     for (const s of step.failed_satellites) failed[s] = 1;
-    colors.set(rgbArray(data.satellites.shell.map((s, i) => (failed[i] === 1 ? FAILED_COLOR : shellColor(s)))));
-    failed.forEach((f, i) => (sizes[i] = f === 1 ? 2.6 : 1.8));
+    colors.set(rgbArray(data.satellites.shell.map((s, i) => (failed[i] === 1 ? FAILED.color : shellColor(s)))));
+    failed.forEach((f, i) => (sizes[i] = f === 1 ? FAILED_SIZE : WORKING_SIZE));
+    shapes.set(shapeArray(Array.from(failed, (f) => (f === 1 ? FAILED.shape : 'disc'))));
     satPoints.geometry.getAttribute('aColor').needsUpdate = true;
     satPoints.geometry.getAttribute('aSize').needsUpdate = true;
+    satPoints.geometry.getAttribute('aShape').needsUpdate = true;
     section.dataset.step = step.name;
     globeEl.dataset.failedSatellites = String(step.failed_satellites.length);
     globeEl.dataset.linksDrawn = String(step.planned_links_not_failed.length);
     el('.instant-text').textContent =
       `${stepTitle(step)} failed at ${step.utc.replace('T', ' ')} UTC (${step.seed === null ? 'the busiest satellites at that instant' : `random draw ${step.seed}`}), ` +
-      `${formatCount(step.failed_satellites.length)} satellites. Grey dots are the failed satellites. The faint lines are the ` +
+      `${formatCount(step.failed_satellites.length)} satellites. Crosses are the failed satellites, small dots the working ones. The faint lines are the ` +
       `${formatCount(step.planned_links_not_failed.length)} planned laser links of the pattern “${step.pattern}” that did not fail (the ` +
       `${formatCount(step.failed_links.length)} links of the failed satellites are left out). They are planned links, not the links that work: ` +
-      'a planned link can also be out of sight at this instant, and no program writes that. Teal: each pair’s route after recovery, ' +
-      'chosen by a planner that knows every failure; faint white: its route with nothing failed.';
+      'a planned link can also be out of sight at this instant, and no program writes that. The bright, thick line: each pair’s route after ' +
+      'recovery, chosen by a planner that knows every failure; the faint, thin line: its route with nothing failed.';
     writePairs(el('.pair-list'), step, data);
     el('.network-note').textContent =
       `From the run’s network file (${step.sources.network ?? ''}): the working satellites split into pieces that lasers do not join. ` +
@@ -268,7 +296,7 @@ async function mount({ data, root }: StoryContext): Promise<() => void> {
 }
 
 function toLine(d: LineDef, x: readonly number[], p: Points): Line {
-  return { label: d.label, color: d.color, values: alignTo(x, p), ...(d.dash === undefined ? {} : { dash: d.dash }) };
+  return { label: d.label, color: d.color, marker: d.marker, values: alignTo(x, p), ...(d.dash === undefined ? {} : { dash: d.dash }) };
 }
 
 function stepTitle(s: Step): string {
@@ -306,17 +334,19 @@ function writePairs(list: HTMLElement, step: Step, data: CommonData): void {
 }
 
 function writeLegend(list: HTMLElement): void {
-  const items: [string, string][] = [
-    [THEME.delivered, 'Route after recovery'],
-    [THEME.baseline, 'Route with nothing failed'],
-    [FAILED_COLOR, 'Failed satellite'],
-    [THEME.links, 'Planned laser link that did not fail'],
+  const items: [Mark, string][] = [
+    [line(ROUTE_STYLE), 'Route after recovery'],
+    [line({ ...BASELINE_STYLE, width: 1.6 }, BASELINE_OPACITY), 'Route with nothing failed'],
+    [dot(MARKS.city), 'City of a study pair'],
+    [dot(FAILED), 'Failed satellite'],
+    [dot({ color: shellColor(0), shape: 'disc' }), 'Working satellite'],
+    [line({ color: THEME.links, width: 1, dash: [] }, LINK_OPACITY), 'Planned laser link that did not fail'],
   ];
   list.replaceChildren(
-    ...items.map(([color, text]) => {
+    ...items.map(([mark, text]) => {
       const li = document.createElement('li');
-      li.style.setProperty('--swatch', color);
       li.textContent = text;
+      setSwatch(li, mark);
       return li;
     }),
   );

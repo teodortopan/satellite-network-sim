@@ -1,8 +1,8 @@
-// Story: the constellation (spec 4.7). Every satellite over the window coloured by shell, one
+// Story: the constellation (spec 4.7). Every satellite over the window marked by shell, one
 // shell or one plane picked out, the planned laser links of one pattern, the ground sites by
 // kind, and the constellation program's numbers per shell and per pattern.
 
-import { BufferAttribute, type LineBasicMaterial } from 'three';
+import type { BufferAttribute } from 'three';
 import { Clock } from '../../clock/clock';
 import { ClockView } from '../../clock/clock-view';
 import { parseLinks, type Links, type SiteKind } from '../../data/common';
@@ -10,7 +10,9 @@ import { formatCount } from '../../format';
 import { siteScenePositions } from '../../globe/paths';
 import { SatelliteField } from '../../globe/satellite-field';
 import { rgbArray, Stage } from '../../globe/stage';
-import { patternColor, THEME, vividShellColor } from '../../theme';
+import { dot, FADED, MARKS, SHAPE_CODE, shellMark, THEME, type DotMark } from '../../theme';
+import { shapeArray } from '../../globe/layers';
+import { setSwatch } from '../../ui/marks';
 import { dropdown, frameLoop, segmented, toggle } from '../../ui/controls';
 import type { Story, StoryContext } from '../story';
 import { parseConstellationStory, type ConstellationStory } from './data';
@@ -18,14 +20,15 @@ import { chosen, linksOf } from './state';
 
 const START_SPEED = 60;
 const CAMERA_DISTANCE = 4.3;
-const SAT_SIZE = 3;
-const FADED_SIZE = 1.4;
-const FADED_COLOR = '#2c4260';
+const SAT_SIZE = 3.6;
+const FADED_SIZE = 1.6;
+/** The planned laser links: one pattern at a time, so one grey (the menu names the pattern). */
+const LINK_OPACITY = 0.2;
 
-const SITE_KINDS: { kind: SiteKind; text: string; color: string; size: number }[] = [
-  { kind: 'city', text: 'Cities', color: THEME.city, size: 8 },
-  { kind: 'gateway', text: 'Gateways', color: THEME.gateway, size: 4 },
-  { kind: 'pop', text: 'PoPs', color: THEME.pop, size: 5.5 },
+const SITE_KINDS: { kind: SiteKind; text: string; mark: DotMark; size: number }[] = [
+  { kind: 'city', text: 'Cities', mark: MARKS.city, size: 11 },
+  { kind: 'gateway', text: 'Gateways', mark: MARKS.gateway, size: 7 },
+  { kind: 'pop', text: 'PoPs', mark: MARKS.pop, size: 7 },
 ];
 
 export const constellationStory: Story = {
@@ -90,19 +93,22 @@ async function mount({ data, root }: StoryContext): Promise<() => void> {
   const stage = new Stage(globeEl);
   const capacity = Math.max(...links.map((l) => l.pairs.length));
   const field = new SatelliteField(data, (links[0] as Links).pairs, capacity);
-  const segments = field.segments(patternColor((links[0] as Links).pattern), 0.16);
+  const segments = field.segments(THEME.links, LINK_OPACITY);
   stage.add(segments);
   const colors = new Float32Array(field.count * 3);
   const sizes = new Float32Array(field.count);
-  const satPoints = field.points(colors, sizes, stage.dotMaterial());
+  const ownShapes = shapeArray(data.satellites.shell.map((s) => shellMark(s).shape));
+  const shapes = ownShapes.slice();
+  const satPoints = field.points(colors, sizes, stage.dotMaterial(), undefined, undefined, shapes);
   stage.add(satPoints);
   const sitePositions = siteScenePositions(data);
-  const siteLayers = SITE_KINDS.map(({ kind, color, size }) => {
+  const siteLayers = SITE_KINDS.map(({ kind, mark, size }) => {
     const idx = data.sites.flatMap((s, i) => (s.kind === kind ? [i] : []));
     const layer = stage.fixedDots(
       idx.flatMap((i) => Array.from(sitePositions.subarray(3 * i, 3 * i + 3))),
-      idx.map(() => color),
+      idx.map(() => mark.color),
       idx.map(() => size),
+      idx.map(() => mark.shape),
     );
     stage.add(layer);
     return { kind, layer, count: idx.length };
@@ -117,14 +123,17 @@ async function mount({ data, root }: StoryContext): Promise<() => void> {
   let fresh = true;
   const apply = (): void => {
     const picked = chosen(data.satellites, shell, plane);
-    const c = rgbArray(data.satellites.shell.map((s, i) => (picked[i] === 1 ? vividShellColor(s) : FADED_COLOR)));
+    const c = rgbArray(data.satellites.shell.map((s, i) => (picked[i] === 1 ? shellMark(s).color : FADED.color)));
     colors.set(c);
-    picked.forEach((p, i) => (sizes[i] = p === 1 ? SAT_SIZE : FADED_SIZE));
+    picked.forEach((p, i) => {
+      sizes[i] = p === 1 ? SAT_SIZE * (shellMark(data.satellites.shell[i] ?? 0).grow ?? 1) : FADED_SIZE;
+      shapes[i] = p === 1 ? (ownShapes[i] as number) : SHAPE_CODE[FADED.shape];
+    });
     (satPoints.geometry.getAttribute('aColor') as BufferAttribute).needsUpdate = true;
     (satPoints.geometry.getAttribute('aSize') as BufferAttribute).needsUpdate = true;
+    (satPoints.geometry.getAttribute('aShape') as BufferAttribute).needsUpdate = true;
     drawnLinks = links[patternIndex] as Links;
     field.setLinks(linksOf(drawnLinks.pairs, picked, plane !== null));
-    (segments.material as LineBasicMaterial).color.set(patternColor(drawnLinks.pattern));
     section.dataset.shell = shell === null ? 'all' : (data.satellites.shells[shell] ?? '');
     section.dataset.plane = plane === null ? 'all' : String(plane);
     section.dataset.pattern = story.patterns[patternIndex]?.pattern ?? '';
@@ -176,10 +185,10 @@ async function mount({ data, root }: StoryContext): Promise<() => void> {
   siteToggles.className = 'toggles';
   siteToggles.setAttribute('role', 'group');
   siteToggles.setAttribute('aria-label', 'Ground sites');
-  for (const { kind, text, color } of SITE_KINDS) {
+  for (const { kind, text, mark } of SITE_KINDS) {
     const layer = siteLayers.find((l) => l.kind === kind);
     siteToggles.append(
-      toggle({ value: kind, text: `${text} (${formatCount(layer?.count ?? 0)})` }, true, color, (on) => {
+      toggle({ value: kind, text: `${text} (${formatCount(layer?.count ?? 0)})` }, true, dot(mark), (on) => {
         if (layer !== undefined) layer.layer.visible = on;
         globeEl.dataset.sites = siteLayers.filter((l) => l.layer.visible).map((l) => l.kind).join(' ');
       }),
@@ -221,8 +230,8 @@ function writeLegend(list: HTMLElement, shell: number | null, shells: readonly s
   list.replaceChildren(
     ...shells.map((name, i) => {
       const li = document.createElement('li');
-      li.style.setProperty('--swatch', shell === null || shell === i ? vividShellColor(i) : FADED_COLOR);
       li.textContent = `Shell ${name}`;
+      setSwatch(li, dot(shell === null || shell === i ? shellMark(i) : FADED));
       return li;
     }),
   );
@@ -256,8 +265,8 @@ function shellTable(story: ConstellationStory): HTMLTableElement {
   const { table: t, body } = table(['Shell', 'Satellites', 'Planes', 'Height', 'Inclination', 'Plane size']);
   story.shells.forEach((s, i) => {
     const tr = document.createElement('tr');
-    tr.style.setProperty('--swatch', vividShellColor(i));
     cell(tr, s.shell, { shell: s.shell }, true);
+    setSwatch(tr.firstElementChild as HTMLElement, dot(shellMark(i)));
     cell(tr, formatCount(s.satellites_in_planes), { shell: s.shell, field: 'satellites_in_planes' });
     cell(tr, formatCount(s.planes), { shell: s.shell, field: 'planes' });
     cell(tr, `${s.height_min_km} to ${s.height_max_km} km`, { shell: s.shell, field: 'height' });
@@ -272,7 +281,6 @@ function patternTable(story: ConstellationStory): HTMLTableElement {
   const { table: t, body } = table(['Pattern', 'Links', 'In plane', 'Cross plane', 'Second cross plane']);
   for (const p of story.patterns) {
     const tr = document.createElement('tr');
-    tr.style.setProperty('--swatch', patternColor(p.pattern));
     cell(tr, p.pattern, { pattern: p.pattern }, true);
     cell(tr, formatCount(p.links), { pattern: p.pattern, field: 'links' });
     cell(tr, formatCount(p.by_kind.in_plane), { pattern: p.pattern, field: 'in_plane' });
@@ -293,9 +301,9 @@ function writeText(lede: HTMLElement, how: HTMLElement, story: ConstellationStor
     `${formatCount(largest.planes)} planes. A laser pattern is the rule that decides which satellites point their lasers at each other. ` +
     `The number of planned laser links per pattern: ${patterns}.`;
   how.textContent =
-    'Each dot is a satellite, coloured by its shell; pick one shell or one plane to see it alone. ' +
-    'The lines are one pattern’s planned laser links; lasers never join two shells. White dots are the cities of the ' +
-    'study pairs, blue the gateways (ground stations that join the satellites to the Internet), lilac the PoPs ' +
-    '(points of presence, where the operator’s network meets the rest of the Internet). Play the clock to see the ' +
-    'satellites move; drag to turn the globe.';
+    'Each dot is a satellite; its shape and brightness say its shell (the list beside the globe shows each shell’s mark). ' +
+    'Pick one shell or one plane to see it alone. The faint lines are one pattern’s planned laser links; lasers never join ' +
+    'two shells. Ringed dots with a centre are the cities of the study pairs, hollow squares the gateways (ground stations ' +
+    'that join the satellites to the Internet), diamonds the PoPs (points of presence, where the operator’s network meets ' +
+    'the rest of the Internet). Play the clock to see the satellites move; drag to turn the globe.';
 }

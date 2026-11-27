@@ -8,7 +8,8 @@ import { GlobeView } from '../../globe/globe-view';
 import { earth } from '../../globe/layers';
 import { siteScenePositions } from '../../globe/paths';
 import { SatelliteField } from '../../globe/satellite-field';
-import { THEME } from '../../theme';
+import { dot, LANE_STATE_STYLES, line, MARKS, THEME, type LineStyle, type Mark } from '../../theme';
+import { setSwatch } from '../../ui/marks';
 import { frameLoop, segmented } from '../../ui/controls';
 import type { Story, StoryContext } from '../story';
 import { MODES, parseFailureStory, type FailureStory, type Scenario } from './data';
@@ -58,13 +59,15 @@ async function mount({ data, root }: StoryContext): Promise<() => void> {
         <h1>One failure, three reactions</h1>
         <div class="intro-text">
           <p class="lede"></p>
-          <p class="how">The bright line is the route at the clock’s time: <b class="k-delivered">teal</b>
-            when traffic arrives, <b class="k-black-hole">amber</b> up to where it is lost in a black
-            hole, <b class="k-loop">violet</b> while it goes round in a loop. The faint line is the
-            route with no failure. Satellites turn <b class="k-news">yellow</b> when they have the news:
-            the detectors in the first two lanes, every satellite the flood reaches in the third.
-            Failed elements turn <b class="k-failed">red</b>. Drag to turn the globes, pinch or scroll
-            to zoom.</p>
+          <p class="how">The bright line is the route at the clock’s time:
+            <b class="k-mark" data-mark="delivered">solid</b> when traffic arrives,
+            <b class="k-mark" data-mark="black_hole">dashed</b> up to where it is lost in a black
+            hole (a large hollow square marks the spot), <b class="k-mark" data-mark="loop">dotted</b> while it
+            goes round in a loop; the state is also named above each globe. The faint, thin line is
+            the route with no failure. Satellites turn into <b class="k-mark" data-mark="news">rings</b>
+            when they have the news: the detectors in the first two lanes, every satellite the flood
+            reaches in the third. Failed elements turn into <b class="k-mark" data-mark="failed">crosses</b>.
+            Drag to turn the globes, pinch or scroll to zoom.</p>
         </div>
       </div>
       <div class="scenario-bar">
@@ -75,6 +78,17 @@ async function mount({ data, root }: StoryContext): Promise<() => void> {
       <div class="panels"></div>
     </section>`;
   const el = (selector: string): HTMLElement => root.querySelector(selector) as HTMLElement;
+  const keyMarks: Record<string, Mark> = {
+    delivered: line(LANE_STATE_STYLES.delivered as LineStyle),
+    black_hole: line(LANE_STATE_STYLES.black_hole as LineStyle),
+    loop: line(LANE_STATE_STYLES.loop as LineStyle),
+    news: dot(MARKS.news),
+    failed: dot(MARKS.failed),
+  };
+  for (const b of root.querySelectorAll<HTMLElement>('.how [data-mark]')) {
+    const mark = keyMarks[b.dataset.mark ?? ''];
+    if (mark !== undefined) setSwatch(b, mark);
+  }
   const from = data.sites[story.from]?.name ?? '';
   const to = data.sites[story.to]?.name ?? '';
   el('.lede').textContent =

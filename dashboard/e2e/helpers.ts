@@ -1,6 +1,6 @@
 // What every story's browser test shares: where the exported data and the engine's CSV files
-// are, reading those files, opening a story, moving the clock, counting the colours a globe
-// drew, and reading a number as the page shows it.
+// are, reading those files, opening a story, moving the clock, counting the grey levels a globe
+// drew, checking that nothing has a hue, and reading a number as the page shows it.
 //
 // The engine's CSV files are read from results/dashboard/<mode>/ (the export's mode, from the
 // manifest), or from SATSIM_RESULTS. With SATSIM_SCREENSHOTS=1 the tests also write the
@@ -94,8 +94,11 @@ export async function seek(page: Page, t: number): Promise<void> {
   await expect(page.locator('.clock')).toHaveAttribute('data-t', String(t));
 }
 
-/** How many distinct colours each of the given page areas has, from one screenshot of the
- * window (decoded in the page; software WebGL makes every screenshot slow). */
+/** How many distinct colours (on this black-and-white page, grey levels) each of the given page
+ * areas has, from one screenshot of the window (decoded in the page; software WebGL makes every
+ * screenshot slow). A drawn globe has about 240 to 256 (measured on the small export at
+ * 1440x900); the same area with the globe's canvas hidden has 1 or 2, so the specs' "more than
+ * 50" still proves that something is drawn. */
 export async function colours(page: Page, selectors: readonly string[]): Promise<number[]> {
   const boxes = [];
   for (const s of selectors) boxes.push(await page.locator(s).first().boundingBox());
@@ -119,6 +122,43 @@ export async function colours(page: Page, selectors: readonly string[]): Promise
     },
     { data: png, areas: boxes },
   );
+}
+
+/** The page has no colour with a hue: in a screenshot (of the whole page, or of the window)
+ * every pixel's red, green and blue differ by at most `tolerance` (the page is drawn in black,
+ * white and greys only). */
+export async function expectNoHue(page: Page, tolerance = 3, fullPage = true): Promise<void> {
+  const png = (await page.screenshot({ fullPage })).toString('base64');
+  const found = await page.evaluate(
+    async ({ data, tol }) => {
+      const blob = await (await fetch(`data:image/png;base64,${data}`)).blob();
+      const bitmap = await createImageBitmap(blob);
+      const canvas = new OffscreenCanvas(bitmap.width, bitmap.height);
+      const ctx = canvas.getContext('2d') as OffscreenCanvasRenderingContext2D;
+      ctx.drawImage(bitmap, 0, 0);
+      const pixels = ctx.getImageData(0, 0, bitmap.width, bitmap.height).data;
+      let count = 0;
+      let worst = 0;
+      let at = '';
+      for (let i = 0; i < pixels.length; i += 4) {
+        const r = pixels[i] ?? 0;
+        const g = pixels[i + 1] ?? 0;
+        const b = pixels[i + 2] ?? 0;
+        const hue = Math.max(Math.abs(r - g), Math.abs(g - b), Math.abs(r - b));
+        if (hue > tol) {
+          count++;
+          if (hue > worst) {
+            worst = hue;
+            const p = i / 4;
+            at = `(${p % bitmap.width}, ${Math.floor(p / bitmap.width)}) rgb(${r}, ${g}, ${b})`;
+          }
+        }
+      }
+      return { count, worst, at };
+    },
+    { data: png, tol: tolerance },
+  );
+  expect(found.count, `pixels with a hue; the strongest at ${found.at}`).toBe(0);
 }
 
 /** A number as shown ("100 ms", "8 s", "186,816", "94.4%") in the unit of the engine's value,

@@ -1,12 +1,13 @@
 // Delay over time, one small chart per strategy on a shared delay axis (the strategies'
 // lines lie on top of each other for minutes at a time, so they are drawn side by side rather
-// than overlaid). Each chart shades its drops, ticks its route changes along the bottom, and
+// than overlaid), each in its strategy's line style. Each chart hatches its drops, ticks its route changes along the bottom, and
 // marks the clock's time; a click moves the clock there.
 
 import type uPlot from 'uplot';
 import { AXIS, ResponsivePlot } from '../../charts/plot';
 import { formatMs } from '../../format';
-import { strategyColor, THEME } from '../../theme';
+import { line, strategyStyle, THEME } from '../../theme';
+import { setSwatch } from '../../ui/marks';
 import type { Direction, StrategyRun } from './data';
 import { changeSteps } from './state';
 
@@ -42,11 +43,12 @@ export class DelayCharts {
       const element = document.createElement('figure');
       element.className = 'delay-row';
       element.dataset.strategy = strategy;
-      element.style.setProperty('--swatch', strategyColor(strategy));
       element.innerHTML = `
         <figcaption><span class="delay-name"></span><span class="delay-readout"></span></figcaption>
         <div class="delay-plot"></div>`;
-      (element.querySelector('.delay-name') as HTMLElement).textContent = names[strategy] ?? strategy;
+      const delayName = element.querySelector('.delay-name') as HTMLElement;
+      delayName.textContent = names[strategy] ?? strategy;
+      setSwatch(delayName, line(strategyStyle(strategy)));
       const plotEl = element.querySelector('.delay-plot') as HTMLElement;
       plotEl.setAttribute('role', 'img');
       plotEl.setAttribute('aria-label', `One-way delay over time, ${strategy}`);
@@ -97,14 +99,15 @@ export class DelayCharts {
   }
 
   private options(row: Row, width: number, height: number): uPlot.Options {
-    const color = strategyColor(row.strategy);
+    const style = strategyStyle(row.strategy);
+    const color = style.color;
     return {
       width,
       height,
       legend: { show: false },
       cursor: { y: false, drag: { x: false, y: false }, points: { show: false } },
       scales: { x: { time: false }, y: { range: () => this.yRange } },
-      series: [{}, { stroke: color, width: 1.5, points: { show: false } }],
+      series: [{}, { stroke: color, width: style.width, dash: [...style.dash], points: { show: false } }],
       axes: [
         { ...AXIS, size: 30, values: (_u, ticks) => ticks.map((v) => `${v} s`) },
         { ...AXIS, size: 64, label: 'ms', labelSize: 14, values: (_u, ticks) => ticks.map((v) => formatMs(v)) },
@@ -140,16 +143,31 @@ function sharedRange(direction: Direction, strategies: readonly string[]): [numb
   return [Math.max(0, lo - pad), hi + pad];
 }
 
-/** Each drop as a faint band over the plot's height, behind the line. */
+/** Each drop as a grey hatched band over the plot's height, behind the line. */
 function drawDrops(u: uPlot, run: StrategyRun): void {
   const ctx = u.ctx;
   const { top, height } = u.bbox;
+  const step = 6 * devicePixelRatio;
   ctx.save();
-  ctx.fillStyle = `${THEME.failed}33`;
   for (const d of run.drops) {
     const x0 = u.valToPos(d.start_s, 'x', true);
     const x1 = u.valToPos(d.start_s + d.length_s, 'x', true);
-    ctx.fillRect(x0, top, Math.max(x1 - x0, devicePixelRatio), height);
+    const w = Math.max(x1 - x0, 2 * devicePixelRatio);
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(x0, top, w, height);
+    ctx.clip();
+    ctx.fillStyle = THEME.rule;
+    ctx.fillRect(x0, top, w, height);
+    ctx.strokeStyle = THEME.dim;
+    ctx.lineWidth = devicePixelRatio;
+    ctx.beginPath();
+    for (let x = x0 - height; x < x0 + w; x += step) {
+      ctx.moveTo(x, top + height);
+      ctx.lineTo(x + height, top);
+    }
+    ctx.stroke();
+    ctx.restore();
   }
   ctx.restore();
 }

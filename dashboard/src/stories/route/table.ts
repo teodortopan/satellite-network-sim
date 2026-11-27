@@ -2,7 +2,8 @@
 // story file gives them, rounded only for display.
 
 import { formatCount, formatMs, formatSeconds } from '../../format';
-import { strategyColor } from '../../theme';
+import { line, strategyStyle } from '../../theme';
+import { setSwatch } from '../../ui/marks';
 import type { Direction, RouteSummary } from './data';
 
 const ROWS: { key: keyof RouteSummary; label: string; show: (s: RouteSummary) => string }[] = [
@@ -21,8 +22,9 @@ export function summaryTable(strategies: readonly string[], names: Record<string
     const th = document.createElement('th');
     th.scope = 'col';
     th.dataset.strategy = s;
-    th.style.setProperty('--swatch', strategyColor(s));
     th.textContent = names[s] ?? s;
+    const style = strategyStyle(s);
+    setSwatch(th, line({ ...style, width: style.globeWidth * 0.6 }));
     head.append(th);
   }
   const thead = document.createElement('thead');

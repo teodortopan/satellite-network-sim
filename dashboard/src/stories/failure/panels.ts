@@ -5,7 +5,8 @@ import type uPlot from 'uplot';
 import { AXIS, ResponsivePlot } from '../../charts/plot';
 import type { CommonData } from '../../data/common';
 import { formatCount, formatInstant, formatMs, formatSeconds } from '../../format';
-import { THEME } from '../../theme';
+import { dot, MODE_MARKS, THEME, type DotShape } from '../../theme';
+import { drawShape, setSwatch } from '../../ui/marks';
 import { MODES, type Element, type Fact, type Measure, type Mode, type Scenario } from './data';
 import { MODE_TITLES } from './lane';
 import { factAt, firstDetection } from './state';
@@ -138,18 +139,12 @@ export function measuresPanel(scenario: Scenario): HTMLElement {
   return el;
 }
 
-const MODE_COLORS: Record<Mode, string> = {
-  planner: '#8fb3d9',
-  'local-repair': THEME.delivered,
-  flooding: THEME.news,
-};
-
 interface DotGroup {
   xs: number[];
   ys: number[];
   color: string;
   sizePx: number;
-  ring: boolean;
+  shape: DotShape;
 }
 
 /**
@@ -179,16 +174,17 @@ export class ContextChart {
     const groups: DotGroup[] = MODES.map((mode, row) => {
       const rows = scenario.context.rows.filter((r) => r.reaction === mode && r.lost_s !== null);
       const own = scenario.context.rows.find((r) => r.reaction === mode && r.run === scenario.context.this_run);
+      const mark = MODE_MARKS[mode] ?? { color: THEME.chalk, shape: 'disc' };
       const li = document.createElement('li');
-      li.style.setProperty('--swatch', MODE_COLORS[mode]);
       li.textContent = `${MODE_TITLES[mode]}: this run ${formatSeconds(own?.lost_s ?? null)}`;
+      setSwatch(li, dot(mark));
       legend.append(li);
       return {
         xs: rows.map((r) => r.lost_s as number),
         ys: rows.map((_, i) => 2 - row + spread(i)),
-        color: MODE_COLORS[mode],
+        color: mark.color,
         sizePx: 4,
-        ring: false,
+        shape: mark.shape,
       };
     });
     const mine = scenario.context.rows.filter((r) => r.run === scenario.context.this_run && r.lost_s !== null);
@@ -196,9 +192,13 @@ export class ContextChart {
       xs: mine.map((r) => r.lost_s as number),
       ys: mine.map((r) => 2 - MODES.indexOf(r.reaction)),
       color: THEME.chalk,
-      sizePx: 7,
-      ring: true,
+      sizePx: 9,
+      shape: 'ring',
     });
+    const ringed = document.createElement('li');
+    ringed.textContent = 'This run';
+    setSwatch(ringed, dot({ color: THEME.chalk, shape: 'ring' }));
+    legend.append(ringed);
 
     const data = [null, ...groups.map((g) => [g.xs, g.ys])] as unknown as uPlot.AlignedData;
     this.plot = new ResponsivePlot(plotEl, 220, (width, height) => options(width, height, groups), data);
@@ -215,19 +215,10 @@ function options(width: number, height: number, groups: DotGroup[]): uPlot.Optio
   // Each group's dots, drawn by hand: uPlot's faceted mode leaves point drawing to the caller.
   const drawDots = (u: uPlot, seriesIdx: number): null => {
     const g = groups[seriesIdx - 1] as DotGroup;
-    const ctx = u.ctx;
     const r = g.sizePx * devicePixelRatio;
-    ctx.save();
-    ctx.lineWidth = 2 * devicePixelRatio;
-    ctx.strokeStyle = g.color;
-    ctx.fillStyle = g.color;
     g.xs.forEach((x, i) => {
-      ctx.beginPath();
-      ctx.arc(u.valToPos(x, 'x', true), u.valToPos(g.ys[i] as number, 'y', true), r, 0, 2 * Math.PI);
-      if (g.ring) ctx.stroke();
-      else ctx.fill();
+      drawShape(u.ctx, g.shape, u.valToPos(x, 'x', true), u.valToPos(g.ys[i] as number, 'y', true), r, g.color);
     });
-    ctx.restore();
     return null;
   };
   return {

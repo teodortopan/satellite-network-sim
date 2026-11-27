@@ -1,4 +1,5 @@
-/* The page's look. Colours come from src/theme.ts (applyTheme sets the custom properties).
+/* The page's look: black, white and greys only. The greys come from src/theme.ts (applyTheme
+   sets the custom properties); series are told apart by the swatches TS builds (ui/marks.ts).
    No web fonts: a serif from the visitor's system for reading, its sans for controls. */
 
 :root {
@@ -44,7 +45,7 @@ a {
 }
 
 :focus-visible {
-  outline: 2px solid var(--news);
+  outline: 2px solid var(--chalk);
   outline-offset: 2px;
 }
 
@@ -89,7 +90,7 @@ a {
 
 .story-menu a[aria-current='page'] {
   color: var(--chalk);
-  border-bottom-color: var(--news);
+  border-bottom-color: var(--chalk);
 }
 
 .status {
@@ -142,11 +143,26 @@ a {
   font-weight: 600;
 }
 
-.k-delivered { color: var(--delivered); }
-.k-black-hole { color: var(--black-hole); }
-.k-loop { color: var(--loop); }
-.k-news { color: var(--news); }
-.k-failed { color: var(--failed); }
+.k-mark {
+  color: var(--chalk);
+  white-space: nowrap;
+}
+
+/* The swatch of a series beside its name: a piece of its line or its dot. */
+.swatch {
+  display: inline-block;
+  line-height: 0;
+  vertical-align: middle;
+  margin-right: 7px;
+}
+
+.swatch svg {
+  display: block;
+}
+
+.k-mark .swatch {
+  margin: 0 4px 0 2px;
+}
 
 /* Menus and switches */
 
@@ -247,9 +263,11 @@ a {
   color: var(--dim);
 }
 
-.lane-state[data-state='delivered'] { color: var(--delivered); }
-.lane-state[data-state='black_hole'] { color: var(--black-hole); }
-.lane-state[data-state='loop'] { color: var(--loop); }
+.lane-state[data-state='delivered'],
+.lane-state[data-state='black_hole'],
+.lane-state[data-state='loop'] {
+  color: var(--chalk);
+}
 
 .lane-globe {
   height: clamp(240px, 42vh, 520px);
@@ -299,9 +317,15 @@ a {
   border-color: var(--news);
 }
 
+/* The failure itself: a cross, as failed elements are drawn on the globe. */
 .lane-news li[data-news='failure'].reached::before {
+  width: 9px;
+  height: 9px;
+  top: 0.45em;
+  border: 0;
+  border-radius: 0;
   background: var(--failed);
-  border-color: var(--failed);
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 10'%3E%3Cpath d='M1 1L9 9M9 1L1 9' stroke='black' stroke-width='2.4'/%3E%3C/svg%3E") center / contain no-repeat;
 }
 
 /* The clock, in the page flow right below the globes: never over a globe or its text. */
@@ -558,16 +582,6 @@ a {
   color: var(--dim);
 }
 
-.context-legend li::before {
-  content: '';
-  display: inline-block;
-  width: 9px;
-  height: 9px;
-  margin-right: 8px;
-  border-radius: 50%;
-  background: var(--swatch);
-}
-
 .uplot,
 .uplot * {
   font-family: var(--sans);
@@ -626,24 +640,17 @@ a {
   cursor: pointer;
 }
 
-.toggle::before {
-  content: '';
-  display: inline-block;
-  width: 9px;
-  height: 9px;
-  margin-right: 8px;
-  border-radius: 50%;
-  border: 2px solid var(--swatch, var(--dim));
-  vertical-align: -1px;
+.toggle .swatch {
+  opacity: 0.3;
 }
 
 .toggle[aria-pressed='true'] {
   color: var(--chalk);
-  border-color: color-mix(in srgb, var(--swatch, var(--chalk)) 60%, var(--rule));
+  border-color: var(--dim);
 }
 
-.toggle[aria-pressed='true']::before {
-  background: var(--swatch, var(--chalk));
+.toggle[aria-pressed='true'] .swatch {
+  opacity: 1;
 }
 
 .stage {
@@ -696,8 +703,10 @@ a {
 .readouts li {
   display: grid;
   gap: 2px;
-  padding-left: 14px;
-  border-left: 3px solid var(--swatch);
+}
+
+.readouts .readout-state {
+  padding-left: 37px;
 }
 
 .readouts li[data-on='false'] {
@@ -729,14 +738,11 @@ a {
   color: var(--dim);
 }
 
-.legend-list li::before {
-  content: '';
-  display: inline-block;
-  width: 9px;
-  height: 9px;
-  margin-right: 8px;
-  border-radius: 50%;
-  background: var(--swatch);
+.legend-list .swatch-dot,
+.context-legend .swatch-dot {
+  width: 30px;
+  display: inline-flex;
+  justify-content: center;
 }
 
 .chart-panel {
@@ -762,16 +768,6 @@ a {
   font-size: var(--step--1);
 }
 
-.delay-name::before {
-  content: '';
-  display: inline-block;
-  width: 14px;
-  height: 3px;
-  margin-right: 8px;
-  vertical-align: 3px;
-  background: var(--swatch);
-}
-
 .delay-readout {
   color: var(--dim);
 }
@@ -793,17 +789,6 @@ a {
   width: 0;
   border-left: 1.5px solid var(--chalk);
   pointer-events: none;
-}
-
-.summary-table thead th[data-strategy]::before,
-.panel tbody tr[style] th[scope='row']::before {
-  content: '';
-  display: inline-block;
-  width: 9px;
-  height: 9px;
-  margin-right: 7px;
-  border-radius: 50%;
-  background: var(--swatch);
 }
 
 .table-scroll {

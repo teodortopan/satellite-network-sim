@@ -46,7 +46,7 @@ stops at once with a message if `dist/data/manifest.json` is missing. With
 `SATSIM_SCREENSHOTS=1` it also writes the report's screenshots to `docs/img/phase-5/` (one wide
 shot per story, and the failure story on a phone). There is one spec file per story in `e2e/`;
 what they share (reading the engine's files, opening a story, moving the clock, counting a
-globe's colours, comparing a shown number with the engine's) is in `e2e/helpers.ts`. Chromium
+globe's grey levels, checking that no pixel has a hue, comparing a shown number with the engine's) is in `e2e/helpers.ts`. Chromium
 comes from `PLAYWRIGHT_BROWSERS_PATH` (`/opt/pw-browsers` in the CI image); the version of
 `@playwright/test` is pinned to match it.
 
@@ -69,13 +69,17 @@ listed in `package.json`.
 | `stories/route/` | A route through time (spec 4.6) |
 | `stories/constellation/` | The constellation (spec 4.7) |
 | `stories/resilience/` | The network falling apart (spec 4.8) |
-| `format.ts`, `theme.ts`, `styles.css` | Number formatting, colours, the page's look |
+| `format.ts`, `theme.ts`, `styles.css` | Number formatting, the greys and the style of every series, the page's look |
+| `ui/marks.ts` | The dot shapes and line styles drawn on a chart's canvas and as the swatch beside a name |
 
 Each story folder has `data.ts` (its file, read and checked), `state.ts` (what is shown at a time
 or for a menu choice: lookups only), their unit tests on a hand-made `fixture.ts`, and
-`index.ts` (the view). Each routing strategy, laser pattern and kind of failure has one colour in
-`theme.ts`, used alike on the globe, in the charts and in the tables. The clock bar sits in the
-page flow right below the globes, never over them.
+`index.ts` (the view). The page is black, white and greys only (`e2e/greyscale.spec.ts` checks
+that no pixel has a hue). Each routing strategy, laser pattern, kind of failure, reaction mode
+and shell has one style in `theme.ts` (a grey, a line width and dash pattern, a dot shape), used
+alike on the globe, in the charts and in the swatch beside its name; a dropped route is dotted
+and dimmer, a failed element is a cross, a satellite with the news a ring. The clock bar sits in
+the page flow right below the globes, never over them.
 
 A story implements `Story` in `stories/story.ts` and is added to `STORIES` in
 `stories/index.ts`; only registered stories appear in the menu.

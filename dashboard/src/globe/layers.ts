@@ -24,6 +24,7 @@ import { LineSegmentsGeometry } from 'three/examples/jsm/lines/LineSegmentsGeome
 import { mesh } from 'topojson-client';
 import type { GeometryCollection, Topology } from 'topojson-specification';
 import land110m from 'world-atlas/land-110m.json';
+import { SHAPE_CODE, type DotShape, type LineStyle } from '../theme';
 import { latLonToScene } from './coords';
 
 /** A time that is never reached, for "never marked" (GLSL has no portable infinity). */
@@ -57,49 +58,88 @@ export function earth(palette: Palette): Group {
 const DOT_VERTEX = /* glsl */ `
   attribute vec3 aColor;
   attribute float aSize;
+  attribute float aShape;
   attribute float aMark;
   attribute float aDown;
   uniform float uTime;
   uniform float uScale;
   uniform vec3 uMarkColor;
   uniform float uMarkGrow;
+  uniform float uMarkShape;
   uniform vec3 uDownColor;
+  uniform float uDownGrow;
+  uniform float uDownShape;
   varying vec3 vColor;
+  varying float vShape;
   void main() {
     vec4 mv = modelViewMatrix * vec4(position, 1.0);
     gl_Position = projectionMatrix * mv;
     float size = aSize;
     vColor = aColor;
+    vShape = aShape;
     if (uTime >= aDown) {
       vColor = uDownColor;
-      size *= 1.8;
+      size *= uDownGrow;
+      if (uDownShape >= 0.0) vShape = uDownShape;
     } else if (uTime >= aMark) {
       vColor = uMarkColor;
       size *= uMarkGrow;
+      if (uMarkShape >= 0.0) vShape = uMarkShape;
     }
     gl_PointSize = size * uScale;
   }
 `;
 
+// The shapes of SHAPE_CODE (theme.ts), the same as ui/marks.ts draws them; p runs from -0.5 to
+// 0.5 across the point, y downwards.
 const DOT_FRAGMENT = /* glsl */ `
   varying vec3 vColor;
+  varying float vShape;
+  float segment(vec2 p, vec2 a, vec2 b) {
+    vec2 pa = p - a;
+    vec2 ba = b - a;
+    return length(pa - ba * clamp(dot(pa, ba) / dot(ba, ba), 0.0, 1.0));
+  }
   void main() {
-    vec2 d = gl_PointCoord - 0.5;
-    if (dot(d, d) > 0.25) discard;
+    vec2 p = gl_PointCoord - 0.5;
+    float r = length(p);
+    vec2 q = abs(p);
+    int shape = int(vShape + 0.5);
+    bool inside;
+    if (shape == 1) inside = r > 0.29 && r < 0.5;
+    else if (shape == 2) inside = max(q.x, q.y) < 0.41;
+    else if (shape == 3) inside = max(q.x, q.y) < 0.46 && max(q.x, q.y) > 0.31;
+    else if (shape == 4) inside = min(segment(p, vec2(-0.36), vec2(0.36)), segment(p, vec2(-0.36, 0.36), vec2(0.36, -0.36))) < 0.12;
+    else if (shape == 5) inside = (q.x < 0.14 && q.y < 0.5) || (q.y < 0.14 && q.x < 0.5);
+    else if (shape == 6) inside = q.x + q.y < 0.5;
+    else if (shape == 7) inside = p.y < 0.35 && q.x < (p.y + 0.5) * 0.54;
+    else if (shape == 8) inside = r < 0.17 || (r > 0.33 && r < 0.5);
+    else inside = r < 0.5;
+    if (!inside) discard;
     gl_FragColor = vec4(vColor, 1.0);
+    // Back from three's linear working colours to the page's sRGB, as its own materials do, so
+    // a dot's grey is the grey theme.ts names.
+    #include <colorspace_fragment>
   }
 `;
 
 export interface DotStyle {
   markColor: string;
   markGrow: number;
+  /** The shape from aMark on; absent keeps each dot's own shape. */
+  markShape?: DotShape;
   downColor: string;
+  /** How much a failed dot grows (1.8 when absent). */
+  downGrow?: number;
+  /** The shape from aDown on; absent keeps each dot's own shape. */
+  downShape?: DotShape;
 }
 
 /**
- * Round dots whose colour switches at a time: to the mark colour from aMark on (a satellite
- * that learned the news, a detector), to the down colour from aDown on (a failed element).
- * Times are story seconds; the shader compares them with uTime and computes nothing else.
+ * Dots whose colour, size and shape switch at a time: to the mark style from aMark on (a
+ * satellite that learned the news, a detector), to the down style from aDown on (a failed
+ * element). Times are story seconds; the shader compares them with uTime and computes nothing
+ * else. Each dot has its own shape (aShape, a SHAPE_CODE number) until then.
  */
 export function dotMaterial(style: DotStyle): ShaderMaterial {
   return new ShaderMaterial({
@@ -110,24 +150,34 @@ export function dotMaterial(style: DotStyle): ShaderMaterial {
       uScale: { value: 1 },
       uMarkColor: { value: new Color(style.markColor) },
       uMarkGrow: { value: style.markGrow },
+      uMarkShape: { value: style.markShape === undefined ? -1 : SHAPE_CODE[style.markShape] },
       uDownColor: { value: new Color(style.downColor) },
+      uDownGrow: { value: style.downGrow ?? 1.8 },
+      uDownShape: { value: style.downShape === undefined ? -1 : SHAPE_CODE[style.downShape] },
     },
   });
 }
 
-/** Per-vertex attributes of a dots object; `mark` and `down` default to never. */
+/** One SHAPE_CODE number per dot. */
+export function shapeArray(shapes: readonly DotShape[]): Float32Array {
+  return Float32Array.from(shapes, (s) => SHAPE_CODE[s]);
+}
+
+/** Per-vertex attributes of a dots object; `mark` and `down` default to never, `shapes` to discs. */
 export function dotGeometry(
   position: BufferAttribute,
   colors: Float32Array,
   sizes: Float32Array,
   mark?: Float32Array,
   down?: Float32Array,
+  shapes?: Float32Array,
 ): BufferGeometry {
   const count = position.count;
   const geometry = new BufferGeometry();
   geometry.setAttribute('position', position);
   geometry.setAttribute('aColor', new BufferAttribute(colors, 3));
   geometry.setAttribute('aSize', new BufferAttribute(sizes, 1));
+  geometry.setAttribute('aShape', new BufferAttribute(shapes ?? new Float32Array(count), 1));
   geometry.setAttribute('aMark', new BufferAttribute(mark ?? new Float32Array(count).fill(NEVER), 1));
   geometry.setAttribute('aDown', new BufferAttribute(down ?? new Float32Array(count).fill(NEVER), 1));
   return geometry;
@@ -160,6 +210,11 @@ export function linkSegments(position: BufferAttribute, index: BufferAttribute, 
 }
 
 const PATH_CAPACITY = 128;
+
+/** Earth radii per CSS pixel along a route near the globe's front at the stories' default
+ * zoom (a 32 degree view from about 3.5 radii): turns a dash pattern in pixels into one along
+ * the line. */
+export const RADII_PER_PX = 0.003;
 
 /** A thick polyline whose points are rewritten every frame without new GPU buffers. */
 export class ThickPath {
@@ -196,10 +251,16 @@ export class ThickPath {
     this.buffer.needsUpdate = true;
   }
 
-  /** Dashed (a broken route) or solid; dash and gap lengths in Earth radii. */
-  setDashed(dashed: boolean, dash = 0.014, gap = 0.012): void {
-    this.material.dashSize = dash;
-    this.material.gapSize = gap;
+  /** Draw with this grey and dash pattern (CSS pixels, as in a chart; empty for solid). The
+   * pattern is laid in Earth radii at RADII_PER_PX, so it holds at the default zoom; the line
+   * keeps its width. Call layDashes when the points change. */
+  setStyle(style: Pick<LineStyle, 'color' | 'dash'>): void {
+    this.material.color.set(style.color);
+    const dashed = style.dash.length >= 2;
+    if (dashed) {
+      this.material.dashSize = (style.dash[0] as number) * RADII_PER_PX;
+      this.material.gapSize = (style.dash[1] as number) * RADII_PER_PX;
+    }
     if (this.material.dashed === dashed) return;
     this.material.dashed = dashed;
     this.material.needsUpdate = true;

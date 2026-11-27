@@ -16,11 +16,12 @@ import {
 } from 'three';
 import type { CommonData } from '../../data/common';
 import type { View } from '../../globe/globe-view';
-import { dotGeometry, dotMaterial, dots, NEVER, ThickPath } from '../../globe/layers';
+import { dotGeometry, dotMaterial, dots, NEVER, shapeArray, ThickPath } from '../../globe/layers';
 import { PathPlacer, type PathNode } from '../../globe/paths';
 import type { SatelliteField } from '../../globe/satellite-field';
 import { formatCount, formatInstant, formatMs } from '../../format';
-import { THEME } from '../../theme';
+import { BASELINE_STYLE, LANE_STATE_STYLES, line, MARKS, SHAPE_CODE, THEME, type LineStyle } from '../../theme';
+import { setSwatch } from '../../ui/marks';
 import type { Interval, LaneState, Mode, Scenario } from './data';
 import {
   drawnPath,
@@ -53,12 +54,8 @@ export const STATE_TITLES: Record<LaneState, string> = {
   no_route: 'No route',
 };
 
-const STATE_COLORS: Record<LaneState, string> = {
-  delivered: THEME.delivered,
-  black_hole: THEME.blackHole,
-  loop: THEME.loop,
-  no_route: THEME.dim,
-};
+/** How much a failed satellite's cross grows over a working satellite's dot. */
+const FAILED_GROW = 2.8;
 
 interface RouteLayer {
   space: ThickPath;
@@ -111,13 +108,20 @@ export class Lane {
     this.scene.add(field.segments(THEME.links, 0.1));
     this.scene.add(this.satelliteLayer());
     this.scene.add(this.siteLayer());
-    this.baseline = this.routeLayer(THEME.baseline, 2, 0.35);
-    this.route = this.routeLayer(THEME.delivered, 4.5, 1);
-    this.lostMaterial = dotMaterial({ markColor: THEME.blackHole, markGrow: 1, downColor: THEME.failed });
+    this.baseline = this.routeLayer(BASELINE_STYLE, 0.35);
+    this.route = this.routeLayer(LANE_STATE_STYLES.delivered as LineStyle, 1);
+    this.lostMaterial = dotMaterial({ markColor: MARKS.blackHole.color, markGrow: 1, downColor: MARKS.failed.color });
     this.materials.push(this.lostMaterial);
-    const lostColor = new Color(THEME.blackHole);
+    const lostColor = new Color(MARKS.blackHole.color);
     this.lostPoint = dots(
-      dotGeometry(this.lostPosition, new Float32Array([lostColor.r, lostColor.g, lostColor.b]), new Float32Array([11])),
+      dotGeometry(
+        this.lostPosition,
+        new Float32Array([lostColor.r, lostColor.g, lostColor.b]),
+        new Float32Array([15]),
+        undefined,
+        undefined,
+        shapeArray([MARKS.blackHole.shape]),
+      ),
       this.lostMaterial,
     );
     this.lostPoint.renderOrder = 3;
@@ -168,11 +172,16 @@ export class Lane {
   private showState(iv: Interval): void {
     this.element.dataset.state = iv.state;
     this.element.dataset.intervalStart = String(iv.start_s);
-    this.route.space.material.color.set(STATE_COLORS[iv.state]);
+    const style = LANE_STATE_STYLES[iv.state] ?? null;
+    if (style !== null) {
+      this.route.space.setStyle(style);
+      this.route.space.layDashes();
+    }
     let text = STATE_TITLES[iv.state];
     if (iv.state === 'delivered') text += `, ${formatMs(iv.one_way_ms)} one way`;
     if (iv.state === 'black_hole' && iv.failed_element !== null) text += `: lost at ${this.elementName(iv)}`;
     this.stateText.textContent = text;
+    setSwatch(this.stateText, style === null ? null : line(style));
     this.stateText.dataset.state = iv.state;
   }
 
@@ -193,11 +202,13 @@ export class Lane {
 
   /** Rebuild a route's lines when its interval changes; move its satellite points every frame. */
   private place(layer: RouteLayer, iv: Interval | null): void {
-    if (iv !== layer.shown) {
+    const changed = iv !== layer.shown;
+    if (changed) {
       layer.path = iv === null ? null : drawnPath(iv, this.ends.from, this.ends.to, this.scenario.home_pop);
       layer.ground.set(this.placer.ground(layer.path?.ground ?? []));
     }
     layer.space.set(this.placer.points(layer.path?.space ?? []));
+    if (changed) layer.space.layDashes();
     if (layer === this.route) {
       const lost: PathNode | null = layer.path?.lost ?? null;
       const p = lost === null ? null : this.placer.node(lost);
@@ -209,10 +220,10 @@ export class Lane {
     }
   }
 
-  private routeLayer(color: string, width: number, opacity: number): RouteLayer {
+  private routeLayer(style: LineStyle, opacity: number): RouteLayer {
     const layer: RouteLayer = {
-      space: new ThickPath(color, width, opacity),
-      ground: new ThickPath(color, Math.max(1.5, width * 0.5), opacity * 0.7),
+      space: new ThickPath(style.color, style.width, opacity),
+      ground: new ThickPath(style.color, Math.max(1.5, style.width * 0.5), opacity * 0.7),
       shown: null,
       path: null,
     };
@@ -222,7 +233,8 @@ export class Lane {
     return layer;
   }
 
-  /** Satellites by shell; failed ones turn red at the failure; news marks per mode. */
+  /** Satellites as dots by shell; failed ones turn into crosses at the failure; those with the
+   * news (per mode) into rings. */
   private satelliteLayer(): Points {
     const n = this.field.count;
     const down = new Float32Array(n).fill(NEVER);
@@ -232,9 +244,12 @@ export class Lane {
         ? Float32Array.from(this.scenario.flood.satellite_first_learn_s, (t) => t ?? NEVER)
         : satelliteDetections(this.scenario.facts, n, NEVER);
     const material = dotMaterial({
-      markColor: THEME.news,
-      markGrow: this.mode === 'flooding' ? 1.25 : 2.6,
-      downColor: THEME.failed,
+      markColor: MARKS.news.color,
+      markGrow: this.mode === 'flooding' ? 1.6 : 2.8,
+      markShape: MARKS.news.shape,
+      downColor: MARKS.failed.color,
+      downGrow: FAILED_GROW,
+      downShape: MARKS.failed.shape,
     });
     this.materials.push(material);
     return this.field.points(this.field.shellColors, new Float32Array(n).fill(SAT_SIZE), material, mark, down);
@@ -251,12 +266,15 @@ export class Lane {
     const sizes = new Float32Array(shown.length);
     const mark = new Float32Array(shown.length).fill(NEVER);
     const down = new Float32Array(shown.length).fill(NEVER);
+    const shapes = new Float32Array(shown.length);
     const color = new Color();
     shown.forEach(({ s, i }, k) => {
       (position.array as Float32Array).set(this.placer.site(i), 3 * k);
-      color.set(s.kind === 'city' ? THEME.city : s.kind === 'pop' ? THEME.pop : THEME.gateway);
+      const site = s.kind === 'city' ? MARKS.city : s.kind === 'pop' ? MARKS.pop : MARKS.gateway;
+      color.set(site.color);
       colors.set([color.r, color.g, color.b], 3 * k);
-      sizes[k] = s.kind === 'gateway' ? 3.2 : 7;
+      shapes[k] = SHAPE_CODE[site.shape];
+      sizes[k] = s.kind === 'gateway' ? 4.5 : 9;
       if (this.scenario.failed.gateways.includes(i)) down[k] = this.scenario.failure_s;
       const learnt =
         this.mode === 'flooding'
@@ -264,9 +282,16 @@ export class Lane {
           : this.siteDetection(i);
       if (learnt !== null) mark[k] = learnt;
     });
-    const material = dotMaterial({ markColor: THEME.news, markGrow: 1.6, downColor: THEME.failed });
+    const material = dotMaterial({
+      markColor: MARKS.news.color,
+      markGrow: 1.6,
+      markShape: MARKS.news.shape,
+      downColor: MARKS.failed.color,
+      downGrow: 2.2,
+      downShape: MARKS.failed.shape,
+    });
     this.materials.push(material);
-    const points = dots(dotGeometry(position, colors, sizes, mark, down), material);
+    const points = dots(dotGeometry(position, colors, sizes, mark, down, shapes), material);
     points.renderOrder = 1;
     return points;
   }
