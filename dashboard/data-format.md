@@ -73,7 +73,8 @@ Loaded first; every other file is reached through it.
 | `settings.error_step_s` | integer | The step of that measurement: 1 |
 | `satellites` | integer | Number of satellites, `N` below (8,395) |
 | `positions` | array | One entry per position file, in sample order: `path` (string), `first_sample` (integer, index of its first sample), `samples` (integer). Together they cover samples `0 .. samples - 1` exactly once |
-| `files` | array | Every other file of the export (position files included, the manifest itself not): `path` (string, relative to the manifest), `bytes` (integer), `sha256` (string, lower-case hex) |
+| `files` | array | Every other file of the export (position files and the files under `engine/` included, the manifest itself not): `path` (string, relative to the manifest, `/` between directories), `bytes` (integer), `sha256` (string, lower-case hex) |
+| `engine` | object | The routing program in WebAssembly and its inputs; see [The engine](#the-engine-engine) |
 
 A loader must refuse a file whose size is not `bytes`.
 
@@ -271,3 +272,33 @@ Per step:
 
 These are the planned links that did not fail, not the links that work: a planned link can
 also be out of sight at an instant, and no program writes that. The page labels them so.
+
+## The engine (`engine/`)
+
+The routing program compiled to WebAssembly (`apps/routing_wasm`, built by `scripts/ci.sh`
+into `build/wasm/bin`) and the inputs it reads, so the page can follow the route between any
+two points with the route story's settings. `src/engine/run.ts` runs it and
+`src/engine/from-csv.ts` turns its output into the route story's `directions`;
+`scripts/check-engine.ts` holds both to the route story and to the native program.
+
+| File | What |
+|---|---|
+| `engine/satsim-routing.js`, `engine/satsim-routing.wasm` | The program: an ES module whose default export makes a fresh instance (Emscripten's `MODULARIZE`), for a page, a Web Worker or Node, and its binary; copied from the build |
+| `engine/snapshot/gp.json`, `supgp.json`, `finals2000A.all` | The snapshot's files (`data/starlink/<snapshot>/`), unchanged |
+| `engine/ground/gateways.json`, `assumed_gateways.json`, `pop_codes.json`, `starlink_pops.csv`, `starlink_geofeed.csv` | The ground data's files (`data/ground/<ground>/`), unchanged |
+
+The data check verifies every one byte for byte with its original. The manifest's `engine`:
+
+| Field | Type | Meaning |
+|---|---|---|
+| `program` | object | `js`, `wasm`: the two program files' paths |
+| `snapshot`, `ground` | array of string | The input files' paths, written into the program's in-memory file system as the directories `--snapshot` and `--ground` name |
+| `settings` | object | The route story's: `model` (`best-case`), `pattern` (`three`), `replan_s` (15), `planner` (`start`), `backup` (`on`), `step_s` (1), `plan_time_utc` (the plan time), `roles` (`study`) |
+| `strategies` | array of string | The strategies of a run between two chosen points: `lowest-delay`, `keep-until-broken`, `threshold:2ms` (longest-lived needs the most memory and time) |
+| `window` | object | `start_utc`, `duration_s`: a run must lie inside it; the position window (`settings.window_start_utc`, `settings.window_s`) |
+| `arguments` | array of string | The route story's `routing` arguments, with `{snapshot}`, `{ground}`, `{cities}` (a one-pair cities file), `{start_utc}`, `{duration_s}`, `{strategies}` (comma-separated) and `{drops}` (the drops CSV's path) in place of what a run chooses; `--out -` sends the routes CSV to the program's counted output |
+
+The program reads its arguments from `callMain` and writes `/run/routes.csv` (counting its
+lines into `Module.onRoutesLine`, for progress), `/run/summary.txt` and `/run/messages.txt`;
+the exit status is the routing program's (0, 1 if a check failed, 2 for bad arguments or
+inputs).

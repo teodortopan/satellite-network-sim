@@ -53,6 +53,16 @@ the shells, planes and laser plans of the plan time of Phases 3 and 4 (2026-11-1
                  at that instant, from a one-step run made as run_phase4.baseline_recovery
                  makes it).
                  Small: random satellites at 1%, seed 0.
+  Engine         the routing program in WebAssembly (apps/routing_wasm, built into --engine)
+                 and its inputs, copied unchanged into engine/: the snapshot's gp.json,
+                 supgp.json and finals2000A.all, the ground data's gateways.json,
+                 assumed_gateways.json, pop_codes.json, starlink_pops.csv and
+                 starlink_geofeed.csv. The manifest's `engine` block holds what the page needs
+                 to run it with the route story's settings between two points of its own: the
+                 files, the settings, the on-demand strategies (lowest-delay,
+                 keep-until-broken and threshold:2ms; longest-lived needs the most memory and
+                 time), the window it may run in (the position window) and the route story's
+                 argument list with placeholders for what a run chooses.
 
 Values the export works out itself (each is named in dashboard/data-format.md and recomputed
 by the data check): times from UTC text as seconds from the window or run start; per route
@@ -69,7 +79,8 @@ Exit status 1 if any program exits with an error or its summary reports a failed
 Usage (inside the CI image):
 
     python3 python/export_dashboard.py [--small] [--bin build/validate/bin] \\
-        [--out dashboard/public/data] [--results results/dashboard] [--jobs 4]
+        [--engine build/wasm/bin] [--out dashboard/public/data] [--results results/dashboard] \\
+        [--jobs 4]
 """
 
 from __future__ import annotations
@@ -80,6 +91,7 @@ import csv
 import hashlib
 import json
 import re
+import shutil
 import subprocess
 import sys
 import time
@@ -97,6 +109,7 @@ SNAPSHOT = r4.SNAPSHOT
 GROUND = r4.GROUND
 CITIES = r4.CITIES
 DEFAULT_BIN = REPO / "build/validate/bin"
+DEFAULT_ENGINE = REPO / "build/wasm/bin"
 DEFAULT_OUT = REPO / "dashboard/public/data"
 DEFAULT_RESULTS = REPO / "results/dashboard"
 PHASE4_DATA = REPO / "docs/phase-4-data"
@@ -113,6 +126,32 @@ PATTERNS = ("plus-grid", "three", "six")
 ROUTE_MODEL = "best-case"
 ROUTE_STRATEGIES = ("lowest-delay", "keep-until-broken", "longest-lived", "threshold:2ms")
 ROUTE_SMALL_PAIR = ("New York", "London")
+
+# The routing program in WebAssembly and its inputs, as the routing program reads them.
+ENGINE_DIR = "engine"
+ENGINE_PROGRAM = ("satsim-routing.js", "satsim-routing.wasm")
+ENGINE_SNAPSHOT_FILES = ("gp.json", "supgp.json", "finals2000A.all")
+ENGINE_GROUND_FILES = (
+    "gateways.json",
+    "assumed_gateways.json",
+    "pop_codes.json",
+    "starlink_pops.csv",
+    "starlink_geofeed.csv",
+)
+ENGINE_STRATEGIES = ("lowest-delay", "keep-until-broken", "threshold:2ms")
+# What a run chooses, in the argument list: the route story's own command with these values
+# replaced by placeholders, the routes CSV to standard output (the WebAssembly entry counts
+# its lines) and the drops CSV to a file of the in-memory file system.
+ENGINE_PLACEHOLDERS = {
+    "--snapshot": "{snapshot}",
+    "--ground": "{ground}",
+    "--cities": "{cities}",
+    "--start": "{start_utc}",
+    "--duration-s": "{duration_s}",
+    "--strategies": "{strategies}",
+    "--out": "-",
+    "--drops-out": "{drops}",
+}
 
 FAILURE_PAIR = ("Reykjavik", "Vladivostok")
 FAILURE_INSTANT = 1
@@ -230,9 +269,14 @@ def topology_command(exe: Path, pattern: str, res: Path) -> list[str]:
     ]
 
 
+def route_run() -> r3.Run:
+    """The route story's run: Phase 3's main settings, the best-case model."""
+    return r3.Run("dashboard", "main", ROUTE_MODEL, ROUTE_STRATEGIES, serving="")
+
+
 def routing_command(exe: Path, cities: Path, duration_s: int, res: Path) -> list[str]:
     """Phase 3's main settings (run_phase3.command), the best-case model."""
-    run = r3.Run("dashboard", "main", ROUTE_MODEL, ROUTE_STRATEGIES, serving="")
+    run = route_run()
     command = r3.command(
         run, exe / "routing", duration_s, res / "routing.routes.csv", res / "routing.drops.csv"
     )
@@ -601,6 +645,62 @@ def route_story(res: Path, index: Index, pairs: list[tuple[str, str]], duration_
 
 
 # ---------------------------------------------------------------------------------------
+# The engine in the page.
+# ---------------------------------------------------------------------------------------
+def engine_arguments(res: Path) -> list[str]:
+    """The route story's arguments (without the program) with ENGINE_PLACEHOLDERS."""
+    command = routing_command(Path("routing"), Path("cities.json"), 0, res)[1:]
+    for flag, placeholder in ENGINE_PLACEHOLDERS.items():
+        if flag not in command:
+            raise ExportError(f"the route story's command has no {flag}")
+        command[command.index(flag) + 1] = placeholder
+    return command
+
+
+def copy_engine(engine: Path, out: Path) -> dict:
+    """Copies the program and its inputs into out/engine/; returns the manifest's block."""
+    target = out / ENGINE_DIR
+    groups = {
+        "program": (engine, ENGINE_PROGRAM),
+        "snapshot": (SNAPSHOT, ENGINE_SNAPSHOT_FILES),
+        "ground": (GROUND, ENGINE_GROUND_FILES),
+    }
+    block = {}
+    for group, (source, names) in groups.items():
+        directory = target if group == "program" else target / group
+        directory.mkdir(parents=True, exist_ok=True)
+        for name in names:
+            if not (source / name).is_file():
+                raise ExportError(f"{source / name} not found")
+            shutil.copyfile(source / name, directory / name)
+        prefix = f"{ENGINE_DIR}/" if group == "program" else f"{ENGINE_DIR}/{group}/"
+        block[group] = [prefix + name for name in names]
+    return block
+
+
+def engine_block(files: dict, res: Path, window_s: int) -> dict:
+    run = route_run()
+    return {
+        "program": {"js": files["program"][0], "wasm": files["program"][1]},
+        "snapshot": files["snapshot"],
+        "ground": files["ground"],
+        "settings": {
+            "model": ROUTE_MODEL,
+            "pattern": run.pattern,
+            "replan_s": run.replan_s,
+            "planner": run.planner,
+            "backup": "on",
+            "step_s": r3.STEP_S,
+            "plan_time_utc": PLAN_TIME,
+            "roles": "study",
+        },
+        "strategies": list(ENGINE_STRATEGIES),
+        "window": {"start_utc": WINDOW_START, "duration_s": window_s},
+        "arguments": engine_arguments(res),
+    }
+
+
+# ---------------------------------------------------------------------------------------
 # The failure story.
 # ---------------------------------------------------------------------------------------
 def failure_paths(res: Path, scenario: str) -> dict[str, Path]:
@@ -931,6 +1031,9 @@ def export(args, mode: str) -> dict:
     for program in ("propagate", "constellation", "topology", "routing", "failures"):
         if not (exe / program).is_file():
             raise ExportError(f"{exe / program} not found")
+    for program in ENGINE_PROGRAM:
+        if not (args.engine / program).is_file():
+            raise ExportError(f"{args.engine / program} not found (scripts/ci.sh builds it)")
     inputs = res / "inputs"
     inputs.mkdir(parents=True, exist_ok=True)
     out.mkdir(parents=True, exist_ok=True)
@@ -1124,6 +1227,8 @@ def export(args, mode: str) -> dict:
     print("writing", flush=True)
     for old in [*out.glob("*.json"), *out.glob("positions-*.bin")]:
         old.unlink()
+    shutil.rmtree(out / ENGINE_DIR, ignore_errors=True)
+    engine_files = copy_engine(args.engine, out)
     positions = write_positions(out, positions_array(res / "positions.csv", index, samples))
     write_json(
         out / "satellites.json",
@@ -1195,15 +1300,14 @@ def export(args, mode: str) -> dict:
     )
 
     files = []
-    for path in sorted(out.iterdir()):
-        if path.name == "manifest.json":
+    for path in sorted(p for p in out.rglob("*") if p.is_file()):
+        name = path.relative_to(out).as_posix()
+        if name == "manifest.json":
             continue
         data = path.read_bytes()
         if len(data) >= MAX_FILE_BYTES:
             raise ExportError(f"{path} is {len(data)} bytes, the limit is under {MAX_FILE_BYTES}")
-        files.append(
-            {"path": path.name, "bytes": len(data), "sha256": hashlib.sha256(data).hexdigest()}
-        )
+        files.append({"path": name, "bytes": len(data), "sha256": hashlib.sha256(data).hexdigest()})
     manifest = {
         "format_version": FORMAT_VERSION,
         "snapshot": SNAPSHOT.name,
@@ -1221,6 +1325,7 @@ def export(args, mode: str) -> dict:
         "satellites": len(satellites),
         "positions": positions,
         "files": files,
+        "engine": engine_block(engine_files, res, window_s),
     }
     write_json(out / "manifest.json", manifest, pretty=True)
     return manifest
@@ -1230,6 +1335,9 @@ def main(argv: list[str]) -> int:
     parser = argparse.ArgumentParser(description="Export the dashboard's data.")
     parser.add_argument("--small", action="store_true", help="the seven-minute export")
     parser.add_argument("--bin", type=Path, default=DEFAULT_BIN, help="the built programs")
+    parser.add_argument(
+        "--engine", type=Path, default=DEFAULT_ENGINE, help="the WebAssembly routing program"
+    )
     parser.add_argument("--out", type=Path, default=DEFAULT_OUT, help="exported data")
     parser.add_argument("--results", type=Path, default=DEFAULT_RESULTS, help="engine CSVs")
     parser.add_argument("--jobs", type=int, default=4, help="programs at the same time")

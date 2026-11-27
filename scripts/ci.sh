@@ -83,7 +83,10 @@ step_tidy() {
   local dir=build/tidy
   CC=clang CXX=clang++ cmake --preset tidy -B "$dir"
   local files
-  mapfile -t files < <(our_sources | grep '\.cpp$')
+  # apps/routing_wasm/ is compiled only by Emscripten (its main.cpp includes Emscripten's
+  # headers), so it is not in this native compile_commands.json and is not tidied; clang-format
+  # still checks it, and its build has our warnings as errors.
+  mapfile -t files < <(our_sources | grep '\.cpp$' | grep -v '^apps/routing_wasm/')
   clang-tidy --version
   # Headers are checked through the .cpp files that include them (HeaderFilterRegex).
   # One clang-tidy per file, as many at once as there are cores; xargs exits non-zero if any
@@ -145,6 +148,23 @@ build_export_programs() {
   cmake --build "$dir" --target propagate constellation topology routing failures
 }
 
+# The routing program in WebAssembly (apps/routing_wasm), which the dashboard runs on demand:
+# Emscripten from the image (docker/Dockerfile), Release (-O3, exact IEEE arithmetic, no
+# -ffast-math), our warnings as errors, tests off. Eigen and nlohmann-json come from
+# $SATSIM_WASM_DEPS, a directory without the host's C headers. Writes
+# build/wasm/bin/satsim-routing.js and .wasm.
+build_wasm_engine() {
+  local dir=build/wasm
+  "$SATSIM_EMSCRIPTEN/emcmake" cmake -S . -B "$dir" -G Ninja \
+    -DCMAKE_BUILD_TYPE=Release \
+    -DSATSIM_BUILD_TESTS=OFF \
+    -DSATSIM_WARNINGS_AS_ERRORS=ON \
+    -DCMAKE_FIND_ROOT_PATH_MODE_PACKAGE=BOTH \
+    -DEigen3_DIR="$SATSIM_WASM_DEPS/cmake/Eigen3" \
+    -Dnlohmann_json_DIR="$SATSIM_WASM_DEPS/cmake/nlohmann_json"
+  cmake --build "$dir" --target satsim-routing
+}
+
 # The page's packages, exactly as dashboard/package-lock.json lists them. The browser in the
 # image belongs to one Playwright release, so a different one in the lock file is refused here
 # and not as a missing-browser error in the middle of the test.
@@ -160,16 +180,20 @@ install_dashboard_packages() {
 }
 
 # The dashboard (docs/phase-5-dashboard.md 6): the small export of real engine runs into
-# dashboard/public/data (it replaces whatever export was there), the data check that compares
-# every exported number with the engine's CSV files and measures the interpolation error, then
-# the page's type check, lint, unit tests, build and browser test on that data. Only `npm ci`
-# needs the network.
+# dashboard/public/data (it replaces whatever export was there), with the routing program in
+# WebAssembly and its inputs; the data check that compares every exported number with the
+# engine's CSV files and measures the interpolation error; the engine check, which runs the
+# exported WebAssembly program in Node and holds it to the route story and to the native
+# routing program (dashboard/scripts/check-engine.ts); then the page's type check, lint, unit
+# tests, build and browser test on that data. Only `npm ci` needs the network.
 step_dashboard() {
   local dir=build/validate
   build_export_programs "$dir"
-  python3 python/export_dashboard.py --small --bin "$dir/bin"
-  python3 python/check_dashboard_data.py
+  build_wasm_engine
+  python3 python/export_dashboard.py --small --bin "$dir/bin" --engine build/wasm/bin
+  python3 python/check_dashboard_data.py --engine build/wasm/bin
   install_dashboard_packages
+  node dashboard/scripts/check-engine.ts --routing "$dir/bin/routing"
   cd dashboard
   npm run typecheck
   npm run lint
@@ -183,8 +207,9 @@ step_dashboard() {
 step_dashboard_site() {
   local dir=build/validate
   build_export_programs "$dir"
-  python3 python/export_dashboard.py --bin "$dir/bin"
-  python3 python/check_dashboard_data.py
+  build_wasm_engine
+  python3 python/export_dashboard.py --bin "$dir/bin" --engine build/wasm/bin
+  python3 python/check_dashboard_data.py --engine build/wasm/bin
   install_dashboard_packages
   (cd dashboard && npm run build)
 }

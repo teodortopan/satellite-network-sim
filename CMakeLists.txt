@@ -20,6 +20,14 @@ include(Sanitizers)
 
 include(SatsimTargets)
 
+# The WebAssembly build of the routing program for the dashboard (apps/routing_wasm,
+# scripts/ci.sh build_wasm_engine). The engine throws and catches C++ exceptions, so every
+# target, the vendored code included, is compiled with WebAssembly's own exceptions.
+if(EMSCRIPTEN)
+  add_compile_options(-fwasm-exceptions)
+  add_link_options(-fwasm-exceptions)
+endif()
+
 # Vendored third-party code, built unmodified (see third_party/sgp4/README.md).
 satsim_add_third_party_library(sgp4
   SOURCES third_party/sgp4/SGP4.cpp
@@ -45,6 +53,9 @@ add_subdirectory(apps/inputs)
 add_subdirectory(apps/topology)
 add_subdirectory(apps/routing)
 add_subdirectory(apps/failures)
+if(EMSCRIPTEN)
+  add_subdirectory(apps/routing_wasm)
+endif()
 
 if(SATSIM_BUILD_TESTS)
   enable_testing()
