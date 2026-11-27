@@ -28,7 +28,13 @@ runners, so a mistake in their parsing or conversion cannot hide itself. Compare
     satellite with the failure file, every failed link with the facts CSV, the planned links
     that did not fail with links-three.csv and the facts CSV, every route with the routes CSV,
     every network row with the network CSV;
-  - that every story's time range (its run, or its one step) lies inside the position window.
+  - that every story's time range (its run, or its one step) lies inside the position window;
+  - the engine in the page (engine/): the WebAssembly program byte for byte with the build in
+    --engine (default build/wasm/bin), every input byte for byte with the snapshot's and the
+    ground data's own file, the manifest's `engine` block (its file lists, the settings against
+    the route story's, the on-demand strategies, its window against the position window, and
+    every flag of its argument list against those settings). That the program reproduces the
+    route story is dashboard/scripts/check-engine.ts's job, not this one's.
 
 Whole numbers and names must be equal; decimals must equal the number the program wrote
 (Python's float() of its text, which a JSON number round-trips exactly). Each difference is
@@ -44,7 +50,7 @@ over 1 km; 2 on a usage error.
 Usage (inside the CI image):
 
     python3 python/check_dashboard_data.py [--data dashboard/public/data] \\
-        [--results results/dashboard]
+        [--results results/dashboard] [--engine build/wasm/bin]
 """
 
 from __future__ import annotations
@@ -69,6 +75,16 @@ LIMIT_BYTES = 25 * 1024 * 1024
 LIMIT_ERROR_KM = 1.0
 EARTH_RATE_RAD_S = 7.292115e-5  # Spec 4.3.
 PATTERNS = ("plus-grid", "three", "six")
+ENGINE_PROGRAM = ("satsim-routing.js", "satsim-routing.wasm")
+ENGINE_SNAPSHOT = ("gp.json", "supgp.json", "finals2000A.all")
+ENGINE_GROUND = (
+    "gateways.json",
+    "assumed_gateways.json",
+    "pop_codes.json",
+    "starlink_pops.csv",
+    "starlink_geofeed.csv",
+)
+ENGINE_STRATEGIES = ["lowest-delay", "keep-until-broken", "threshold:2ms"]
 
 
 class Check:
@@ -192,11 +208,99 @@ def check_files(check: Check, data: Path, manifest: dict) -> None:
             entry["sha256"],
             hashlib.sha256(content).hexdigest(),
         )
-    for path in sorted(data.iterdir()):
+    for path in sorted(p for p in data.rglob("*") if p.is_file()):
+        name = path.relative_to(data).as_posix()
         if path.stat().st_size >= LIMIT_BYTES:
-            check.differ(path.name, "-", "size", path.stat().st_size, f"under {LIMIT_BYTES}")
-        if path.name != "manifest.json" and path.name not in listed:
-            check.differ(path.name, "-", "file", "on disk", "not in the manifest")
+            check.differ(name, "-", "size", path.stat().st_size, f"under {LIMIT_BYTES}")
+        if name != "manifest.json" and name not in listed:
+            check.differ(name, "-", "file", "on disk", "not in the manifest")
+
+
+def same_bytes(check: Check, data: Path, exported: str, original: Path) -> None:
+    if not original.is_file():
+        check.differ(exported, "-", "original", "exported", f"{original} missing")
+    elif not (data / exported).is_file():
+        check.differ(exported, "-", "file", "listed", "missing on disk")
+    elif (data / exported).read_bytes() != original.read_bytes():
+        check.differ(exported, "-", "content", "exported", f"differs from {original}")
+
+
+def check_engine(check: Check, data: Path, manifest: dict, story: dict, engine: Path) -> None:
+    """The engine/ files and the manifest's engine block (see the module docstring)."""
+    file = "manifest.json"
+    block = manifest.get("engine")
+    if not isinstance(block, dict):
+        check.differ(file, "engine", "block", block, "an object")
+        return
+    program = {"js": f"engine/{ENGINE_PROGRAM[0]}", "wasm": f"engine/{ENGINE_PROGRAM[1]}"}
+    check.same(file, "engine", "program", block.get("program"), program)
+    snapshot = [f"engine/snapshot/{n}" for n in ENGINE_SNAPSHOT]
+    ground = [f"engine/ground/{n}" for n in ENGINE_GROUND]
+    check.same(file, "engine", "snapshot", block.get("snapshot"), snapshot)
+    check.same(file, "engine", "ground", block.get("ground"), ground)
+    for name in ENGINE_PROGRAM:
+        same_bytes(check, data, f"engine/{name}", engine / name)
+    for name in ENGINE_SNAPSHOT:
+        original = REPO / "data/starlink" / manifest["snapshot"] / name
+        same_bytes(check, data, f"engine/snapshot/{name}", original)
+    for name in ENGINE_GROUND:
+        same_bytes(
+            check, data, f"engine/ground/{name}", REPO / "data/ground" / manifest["ground"] / name
+        )
+    listed = {e["path"] for e in manifest["files"]}
+    for path in [*program.values(), *snapshot, *ground]:
+        if path not in listed:
+            check.differ(file, "engine", "file", path, "not in files")
+
+    s, story_settings = block.get("settings", {}), story["settings"]
+    for key in ("model", "pattern", "replan_s", "planner", "backup", "step_s"):
+        check.same(file, "engine.settings", key, s.get(key), story_settings.get(key))
+    check.same(
+        file,
+        "engine.settings",
+        "plan_time_utc",
+        s.get("plan_time_utc"),
+        manifest["settings"]["plan_time_utc"],
+    )
+    check.same(file, "engine.settings", "roles", s.get("roles"), "study")
+    check.same(file, "engine", "strategies", block.get("strategies"), ENGINE_STRATEGIES)
+    window = {
+        "start_utc": manifest["settings"]["window_start_utc"],
+        "duration_s": manifest["settings"]["window_s"],
+    }
+    check.same(file, "engine", "window", block.get("window"), window)
+
+    arguments = block.get("arguments")
+    if (
+        not isinstance(arguments, list)
+        or len(arguments) % 2
+        or not all(isinstance(a, str) for a in arguments)
+    ):
+        check.differ(file, "engine", "arguments", arguments, "flag and value pairs")
+        return
+    given = dict(zip(arguments[::2], arguments[1::2], strict=True))
+    check.same(file, "engine.arguments", "flags", len(given), len(arguments) // 2)
+    expected = {
+        "--snapshot": "{snapshot}",
+        "--ground": "{ground}",
+        "--cities": "{cities}",
+        "--start": "{start_utc}",
+        "--duration-s": "{duration_s}",
+        "--step-s": str(s.get("step_s")),
+        "--pattern": s.get("pattern"),
+        "--model": s.get("model"),
+        "--roles": "study",
+        "--strategies": "{strategies}",
+        "--replan-s": str(s.get("replan_s")),
+        "--planner": s.get("planner"),
+        "--backup": s.get("backup"),
+        "--out": "-",
+        "--drops-out": "{drops}",
+        "--plan-time": s.get("plan_time_utc"),
+    }
+    check.same(file, "engine.arguments", "flag names", sorted(given), sorted(expected))
+    for flag, value in expected.items():
+        check.same(file, "engine.arguments", flag, given.get(flag), value)
 
 
 def check_satellites(check: Check, satellites: dict, res: Path) -> list[int]:
@@ -978,6 +1082,7 @@ def main(argv: list[str]) -> int:
     parser = argparse.ArgumentParser(description="Check the dashboard's exported data.")
     parser.add_argument("--data", type=Path, default=REPO / "dashboard/public/data")
     parser.add_argument("--results", type=Path, default=REPO / "results/dashboard")
+    parser.add_argument("--engine", type=Path, default=REPO / "build/wasm/bin")
     args = parser.parse_args(argv)
     manifest_path = args.data / "manifest.json"
     if not manifest_path.is_file():
@@ -1019,6 +1124,7 @@ def main(argv: list[str]) -> int:
             f"at most {window_s}",
         )
     check_route(check, load("story-route.json"), res, names, window_start, window_s)
+    check_engine(check, args.data, manifest, load("story-route.json"), args.engine)
     check_failure(check, load("story-failure.json"), res, names, window_start, window_s, len(sites))
     check_resilience(check, load("story-resilience.json"), res, names, window_start, window_s)
 
