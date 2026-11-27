@@ -27,9 +27,11 @@ glossary of every orbital term used here.
   `routing` program against an independent Python model on Hypatia's and the
   Bariloche paper's shells, `python/validate_routing.py`) and `validate-failures`
   (the `failures` program against an independent Python model on Hypatia's shell with
-  a +Grid and a `three` plan, `python/validate_failures.py`) and `dashboard` (the small
-  export of real engine runs, the data check that compares every exported number with the
-  engine's CSV files, then the page's type check, lint, unit tests, build and browser test).
+  a +Grid and a `three` plan, `python/validate_failures.py`) and `dashboard` (the routing
+  program built as WebAssembly, the small export of real engine runs, the data check that
+  compares every exported number with the engine's CSV files, the engine check that holds
+  the WebAssembly program to the native one, then the page's type check, lint, unit tests,
+  build and browser test).
   Exit 0 only if all pass.
   It needs only Docker on the host.
 - `scripts/check.sh <step>` runs one step (`format`, `python-lint`,
@@ -54,14 +56,21 @@ glossary of every orbital term used here.
   picks up where a stopped run left off; failure files from `python/make_failures.py`), its
   two comparisons (`python/compare_failures.py`) and `python/plot_phase4.py` are run by hand
   as well, with commands in `docs/phase-4-results.md`.
-- The dashboard (`dashboard/`, spec `docs/phase-5-dashboard.md`): `python/export_dashboard.py`
+- The dashboard (`dashboard/`, specs `docs/phase-5-dashboard.md` and
+  `docs/phase-6-playground.md`): `python/export_dashboard.py`
   writes its data into `dashboard/public/data/` (not in git; `--small` for tests, about 30
   seconds; the full export about 5 minutes) and `python/check_dashboard_data.py` checks it. In
   `dashboard/`: `npm run dev`, `build`, `typecheck`, `lint`, `test`, `e2e`. The file shapes are
-  in `dashboard/data-format.md`. `scripts/ci.sh dashboard-site` builds the published site;
+  in `dashboard/data-format.md`. The export also copies the routing program in WebAssembly
+  (`apps/routing_wasm`, built by `scripts/ci.sh` into `build/wasm/bin`; `--engine`) and its
+  inputs into `data/engine/`, and the place list into `places.json`;
+  `dashboard/scripts/check-engine.ts` is the engine check. `scripts/ci.sh dashboard-site`
+  builds the published site;
   `.github/workflows/pages.yml` publishes it and starts only by hand. The repository's Pages
   source has to be "GitHub Actions": with "Deploy from a branch" every push to `main`
   replaces the dashboard with the README.
+- `python/fetch_places.py` downloads the places a visitor can search by name (Natural Earth,
+  one request, into `data/ground/places/`); by hand.
 - `python/fetch_ground.py` downloads the ground data and
   `python/make_assumed_gateways.py` derives the assumed gateways; both by hand.
   `python/fetch_lens.py` downloads the LENS ping files (one request each, no
@@ -92,14 +101,15 @@ glossary of every orbital term used here.
 | `apps/topology/` | The `topology` program: delay per city pair, direction and time step, under two endpoint models |
 | `apps/routing/` | The `routing` program: each direction's route over time under several strategies, with the cause of every drop |
 | `apps/failures/` | The `failures` program: what a failure schedule causes over time, the truth and each actor's view, every lane (baseline, reference, planner, local repair, flooding) stepped through it in continuous time, its measures, checks and CSVs |
+| `apps/routing_wasm/` | The `routing` program as a WebAssembly module for the dashboard: a thin entry over the same library, built only with Emscripten |
 | `apps/inputs/` | What `topology` and `routing` share: loading the snapshot and ground data, city pairs, positions and link states per step |
 | `apps/common/` | Helpers every program shares: CSV, statistics, time steps, arguments |
 | `tests/<module>/` | GoogleTest per module, with small fixtures |
 | `tests/failures_app/` | The `failures` program's core on hand-made geometry, re-matching on ideal shells, the real geometry against `StepSource` |
-| `dashboard/` | The web page: loaders that validate every file, the clock, the globe (three.js), charts (uPlot), one module per story under `src/stories/`, unit tests beside the code, browser tests in `e2e/` |
+| `dashboard/` | The web page: loaders that validate every file, the clock, the globe (three.js), charts (uPlot), one module per story under `src/stories/`, the routing program's runner, worker and CSV converter under `src/engine/`, the engine check in `scripts/`, unit tests beside the code, browser tests in `e2e/` |
 | `python/` | The dashboard's export and data check, snapshot and ground-data download, reference generation, validation (four independent models), SpaceX comparison, the Phase 2 runs, the Phase 3 reproductions, the Phase 4 failure files, runs and comparisons, plots |
 | `data/starlink/<date>/` | One dated snapshot: element sets, IERS file, trajectory checksums |
-| `data/ground/` | Cities and pairs; per date: SpaceX's PoP and location files, the community gateway list, assumed gateways; `hypatia/`: Hypatia's 100 cities |
+| `data/ground/` | Cities and pairs; `places/`: the places a dashboard visitor can search; per date: SpaceX's PoP and location files, the community gateway list, assumed gateways; `hypatia/`: Hypatia's 100 cities |
 | `data/lens/<date>/` | Checksums of the LENS dish ping files (the files are not in git) |
 | `docs/` | Per phase: the spec (`phase-N-<name>.md`), the report (`phase-N-results.md`), its data and plots; `ci.md` |
 
@@ -198,7 +208,19 @@ constellation, ground, topology), never the reverse. `failure` may depend on
   at a 30% failed share.
 - Prefer a number in the dashboard's exported files over anything worked out in the page,
   because the data check can only vouch for what is in the files. The page interpolates
-  positions, looks up the state at a time and formats; nothing else.
+  positions, looks up the state at a time and formats; nothing else. The one exception is a
+  route between two places the visitor picks: the routing program itself runs in the
+  browser as WebAssembly, and the engine check vouches for it.
+- Prefer holding the WebAssembly program to the native one on routes, drops and counts
+  exactly and on delays within 1e-9 ms over byte-equal output, because its maths library is
+  not glibc's and delays differ in the last digits (4.3e-14 ms measured). A different route
+  is a real fault: never loosen that part.
+- Prefer giving a WebAssembly build its header-only libraries from a directory of their own
+  (`/opt/wasm-deps` in the image) over Ubuntu's package configurations, because those add
+  `/usr/include` and the host's C headers then break the compile.
+- Prefer grey level, line width, dashes and dot shape with a swatch beside the name over any
+  hue in the dashboard, because the page is black, white and greys only and a browser test
+  fails on a pixel with a hue.
 - Prefer interpolating positions along the arc after turning the later sample back by the
   Earth's rotation over a straight line between Earth-fixed samples, because at a 60 s sample
   step the arc is off by 12 m at most and the straight line by kilometres.
@@ -281,7 +303,10 @@ The rules from the owner's global file that this project relies on.
   and `NODE_EXTRA_CA_CERTS` set to that bundle, and, because the cloud cannot reach
   Playwright's download host, the session's own browsers copied in from `/opt/pw-browsers`
   with `playwright install-deps chromium` in place of `install --with-deps`. If Docker Hub
-  answers 429, start the copy `FROM` an image already built in the session.
+  answers 429, start the copy `FROM` an image already built in the session. For Emscripten,
+  the session of 2026-11-27 downloaded the release named in the Dockerfile on the host
+  (storage.googleapis.com is reachable there), copied it in with `COPY` and dropped the
+  `curl` line, keeping the sha256 check; the download inside `docker build` was not tried.
 - **Not in git, so not in the cloud:** a snapshot's SpaceX trajectory files
   (only `python/compare_spacex.py` needs them, and they cannot be downloaded
   again), the LENS ping files (`python/fetch_lens.py`; only

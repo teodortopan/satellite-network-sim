@@ -4,6 +4,11 @@
 <https://teodortopan.github.io/satellite-network-sim/>. Results:
 [phase-5-results.md](phase-5-results.md). The work plan is in [phase-5-plan.md](phase-5-plan.md).
 
+**Changed by Phase 6** ([phase-6-playground.md](phase-6-playground.md), 2026-11-27): the
+routing program now also runs in the browser, for a route between any two places; the page
+is black, white and greys; its texts are in plain words and it opens on a new story. Where
+this spec says that nothing is simulated in the browser (sections 1, 2 and 7), Phase 6 holds.
+
 Sources opened on 2026-11-22:
 [GitHub Pages limits](https://docs.github.com/en/pages/getting-started-with-github-pages/github-pages-limits),
 [Cloudflare Pages limits](https://developers.cloudflare.com/pages/platform/limits/),
@@ -320,7 +325,8 @@ image gets Node and Chromium for it.
 
 ## 7. Out of scope
 
-- Simulating anything in the browser: no SGP4, no routing, no failures there.
+- Simulating anything in the browser: no SGP4, no routing, no failures there. (Phase 6 lifts
+  this for routing between two places the visitor picks.)
 - A server, accounts, or data that changes after the deploy. The page shows the snapshot of
   Phases 1 to 4.
 - Free choice of failures by the visitor. The scenarios are the exported ones.
