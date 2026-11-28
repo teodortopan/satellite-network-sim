@@ -293,6 +293,38 @@ test('a place at the pole, where satellites are sometimes out of view, says so w
   await expect(headline).toContainText('North Pole → London: no connection at this moment, because');
 });
 
+test('the headline’s exact delay follows the clock even when its rounded text stays the same', async ({ page }) => {
+  // The fault: the headline was redrawn only when its text changed, and the text is rounded,
+  // so its exact value (data-delay-ms) could stay that of an earlier second.
+  await page.goto('./#explore?from=Lagos,6.4433,3.3915&to=Sydney,-33.92,151.1852');
+  await expect(page.locator('body')).toHaveAttribute('data-ready', 'true');
+  await waitForRun(page);
+  const run = await lastRun(page);
+  await pause(page);
+  const rows = parseCsv(run.routesCsv).filter(
+    (r) => r.from === run.names.from && r.to === run.names.to && r.strategy === 'lowest-delay',
+  );
+  // Two seconds in a row on one route whose delays differ but read the same on screen.
+  const shown = (ms: string | undefined): string => Number(ms).toPrecision(3);
+  const k = rows.findIndex((r, i) => {
+    const next = rows[i + 1];
+    return (
+      next !== undefined &&
+      r.status === 'ok' &&
+      next.status === 'ok' &&
+      r.route === next.route &&
+      r.one_way_ms !== next.one_way_ms &&
+      shown(r.one_way_ms) === shown(next.one_way_ms)
+    );
+  });
+  expect(k, 'two seconds with one rounded delay').toBeGreaterThanOrEqual(0);
+  const headline = page.locator('.headline');
+  for (const step of [k, k + 1]) {
+    await seekReadouts(page, step);
+    await expect(headline).toHaveAttribute('data-delay-ms', String(Number(rows[step]?.one_way_ms)), { timeout: 10_000 });
+  }
+});
+
 test('the page keeps animating while the engine works', async ({ page }) => {
   await open(page, 'explore');
   await page.locator('.trip-example').first().click();
