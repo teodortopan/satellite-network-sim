@@ -61,10 +61,19 @@ async function waitForRun(page: Page): Promise<void> {
   await expect(page.locator('.explore')).toHaveAttribute('data-run-state', 'done', { timeout: RUN_TIMEOUT });
 }
 
+/** Stop the clock, on any machine. The Play button is redrawn a frame after the clock starts,
+ * so one look at it can say "paused" while the clock runs (seen at 3 frames a second): click
+ * if it says playing, then require that it says paused and that the time stands still. */
 async function pause(page: Page): Promise<void> {
   const play = page.locator('.clock-play');
-  if ((await play.getAttribute('aria-pressed')) === 'true') await play.click();
-  await expect(play).toHaveAttribute('aria-pressed', 'false');
+  const clock = page.locator('.clock');
+  await expect(async () => {
+    if ((await play.getAttribute('aria-pressed')) === 'true') await play.click();
+    const t = await clock.getAttribute('data-t');
+    await page.waitForTimeout(700);
+    expect(await play.getAttribute('aria-pressed')).toBe('false');
+    expect(await clock.getAttribute('data-t')).toBe(t);
+  }).toPass({ timeout: 30_000 });
 }
 
 /** Each rule's readout at clock time t equals the engine's routes CSV at that second, and the
