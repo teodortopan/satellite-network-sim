@@ -148,7 +148,9 @@ The story ids of Phase 5 (`#failure`, `#route`, `#constellation`, `#resilience`)
 - Every colour on the page has equal red, green and blue. The background is `#000000`.
 - What colour told apart is told apart by grey level, line width, dash pattern and dot
   shape, and a swatch of the same mark stands beside every name.
-- A browser test fails on any pixel with a hue, on every story.
+- A browser test fails on any pixel with a hue, on every story. It runs with the browser's
+  per-stripe (LCD) text smoothing off: that smoothing gives letter edges orange and blue
+  fringes on some machines, which is the browser's doing and not a colour of the page.
 
 ## 6. Out of scope
 

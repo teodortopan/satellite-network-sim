@@ -28,7 +28,11 @@ export default defineConfig({
     viewport: { width: 1440, height: 900 },
     launchOptions: {
       // Headless Chromium has no GPU here; SwiftShader draws WebGL in software.
-      args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'],
+      // --disable-lcd-text: on some machines Chromium smooths letters per red, green and blue
+      // stripe of the screen, which gives letter edges orange and blue fringes. That is the
+      // browser's text smoothing, not a colour of the page, and the no-hue test
+      // (e2e/greyscale.spec.ts) must not count it.
+      args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist', '--disable-lcd-text'],
     },
   },
   webServer: {
