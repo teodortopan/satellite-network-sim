@@ -5,7 +5,7 @@
 import { mkdirSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { expect, test, type Page } from '@playwright/test';
-import { colours, expectClockClear, expectShown, open, readCsv, readData, readResult, SCREENSHOTS, seek, SHOOT, utcPlus, watchErrors } from './helpers';
+import { colours, expectClockClear, expectShown, open, readCsv, readData, readResult, SCREENSHOTS, seek, seekReadouts, SHOOT, utcPlus, watchErrors } from './helpers';
 
 interface StoryFile {
   sources: { routes: string; summary: string };
@@ -49,7 +49,7 @@ function summaryOf(from: string, to: string, strategy: string): { median: string
 }
 
 async function checkStatesAt(page: Page, t: number, rows: Map<string, Record<string, string>>): Promise<string[]> {
-  await seek(page, t);
+  await seekReadouts(page, t);
   const seen: string[] = [];
   const utc = utcPlus(story.settings.start_utc, Math.floor(t));
   for (const s of STRATEGIES) {

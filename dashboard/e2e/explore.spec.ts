@@ -9,7 +9,7 @@
 // (a digest of the routes CSV), which the page keeps for this test (stories/explore/index.ts).
 
 import { expect, test, type Page } from '@playwright/test';
-import { open, parseCsv, readData, seek, utcPlus, watchErrors } from './helpers';
+import { open, parseCsv, readData, seekReadouts, utcPlus, watchErrors } from './helpers';
 
 interface EngineBlock {
   strategies: string[];
@@ -71,7 +71,7 @@ async function pause(page: Page): Promise<void> {
  * headline shows the fastest rule's numbers. */
 async function expectShowsRun(page: Page, run: LastRun, t: number): Promise<string[]> {
   const rows = parseCsv(run.routesCsv);
-  await seek(page, t);
+  await seekReadouts(page, t);
   const utc = utcPlus(run.request.start_utc, Math.floor(t));
   const seen: string[] = [];
   for (const s of engine.strategies) {
@@ -286,7 +286,7 @@ test('a place at the pole, where satellites are sometimes out of view, says so w
   expect(drop, 'the fastest rule has a moment without a connection').toBeDefined();
   await pause(page);
   const t = (Date.parse(`${drop?.utc ?? ''}Z`) - Date.parse(`${run.request.start_utc}Z`)) / 1000;
-  await seek(page, t);
+  await seekReadouts(page, t);
   const headline = page.locator('.headline');
   await expect(headline).toHaveAttribute('data-state', 'drop');
   await expect(headline).toHaveAttribute('data-cause', drop?.drop_cause ?? '');
@@ -318,7 +318,10 @@ test('the page keeps animating while the engine works', async ({ page }) => {
       }),
   );
   expect(await section.getAttribute('data-run-state'), 'the engine was still working').toBe('running');
-  expect(sample.frames, 'frames in one second during the run').toBeGreaterThanOrEqual(10);
+  // Not frozen: with the engine on the page's own thread no frame is drawn until the run ends.
+  // The limit is low because software WebGL on a small machine draws about 3 frames a second
+  // (measured on GitHub's runner; about 30 on a 4-core cloud machine).
+  expect(sample.frames, 'frames in one second during the run').toBeGreaterThanOrEqual(2);
   expect(sample.t1).toBeGreaterThan(sample.t0);
   await waitForRun(page);
   await expect(page.locator('.trip-go')).toHaveText('Show the route');

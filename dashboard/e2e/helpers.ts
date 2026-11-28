@@ -94,6 +94,20 @@ export async function seek(page: Page, t: number): Promise<void> {
   await expect(page.locator('.clock')).toHaveAttribute('data-t', String(t));
 }
 
+/** `seek`, then wait until the route view has redrawn every rule's readout for that time. The
+ * clock takes the time at once, but the readouts change on the next frame, and software WebGL
+ * can draw as few as 3 frames a second: a readout read straight after `seek` can still be the
+ * one of the time before (the same route, the delay of another second). */
+export async function seekReadouts(page: Page, t: number): Promise<void> {
+  await seek(page, t);
+  const readouts = page.locator('.readouts li');
+  const count = await readouts.count();
+  expect(count, 'the route view has readouts').toBeGreaterThan(0);
+  for (let i = 0; i < count; i++) {
+    await expect(readouts.nth(i)).toHaveAttribute('data-step', String(Math.floor(t)));
+  }
+}
+
 /** How many distinct colours (on this black-and-white page, grey levels) each of the given page
  * areas has, from one screenshot of the window (decoded in the page; software WebGL makes every
  * screenshot slow). A drawn globe has about 240 to 256 (measured on the small export at
@@ -130,7 +144,7 @@ export async function colours(page: Page, selectors: readonly string[]): Promise
 export async function expectNoHue(page: Page, tolerance = 3, fullPage = true): Promise<void> {
   const png = (await page.screenshot({ fullPage })).toString('base64');
   const found = await page.evaluate(
-    async ({ data, tol }) => {
+    async ({ data, tol, whole }) => {
       const blob = await (await fetch(`data:image/png;base64,${data}`)).blob();
       const bitmap = await createImageBitmap(blob);
       const canvas = new OffscreenCanvas(bitmap.width, bitmap.height);
@@ -140,6 +154,8 @@ export async function expectNoHue(page: Page, tolerance = 3, fullPage = true): P
       let count = 0;
       let worst = 0;
       let at = '';
+      let x = 0;
+      let y = 0;
       for (let i = 0; i < pixels.length; i += 4) {
         const r = pixels[i] ?? 0;
         const g = pixels[i + 1] ?? 0;
@@ -151,12 +167,21 @@ export async function expectNoHue(page: Page, tolerance = 3, fullPage = true): P
             worst = hue;
             const p = i / 4;
             at = `(${p % bitmap.width}, ${Math.floor(p / bitmap.width)}) rgb(${r}, ${g}, ${b})`;
+            x = p % bitmap.width;
+            y = Math.floor(p / bitmap.width);
           }
         }
       }
+      // What is drawn there, to tell a colour of the page from the browser's text smoothing.
+      const scale = bitmap.width / document.documentElement.clientWidth;
+      const el = document.elementFromPoint(x / scale - (whole ? window.scrollX : 0), y / scale - (whole ? window.scrollY : 0));
+      if (el !== null) {
+        const style = getComputedStyle(el);
+        at += ` in <${el.tagName.toLowerCase()} class="${el.getAttribute('class') ?? ''}"> (color ${style.color}, font ${style.fontFamily})`;
+      }
       return { count, worst, at };
     },
-    { data: png, tol: tolerance },
+    { data: png, tol: tolerance, whole: fullPage },
   );
   expect(found.count, `pixels with a hue; the strongest at ${found.at}`).toBe(0);
 }
