@@ -239,8 +239,11 @@ async function mount({ data, root }: StoryContext): Promise<() => void> {
     const clock = view.clock;
     if (run === null || clock === null) return;
     const h = headlineAt(run.direction, { from: run.from.name, to: run.to.name }, clock.t);
-    if (h.text === lastHeadline) return;
-    lastHeadline = h.text;
+    // Redrawn when anything shown or written changes. The text alone is not enough: it is
+    // rounded, and the exact delay beside it (data-delay-ms) changes every second.
+    const shown = JSON.stringify(h);
+    if (shown === lastHeadline) return;
+    lastHeadline = shown;
     headline.textContent = h.text;
     headline.dataset.state = h.kind;
     headline.dataset.delayMs = h.kind === 'route' ? String(h.delay_ms) : '';
